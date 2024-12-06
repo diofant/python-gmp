@@ -156,18 +156,18 @@ MPZ_from_str(PyObject *s, int base)
     Py_ssize_t len;
     const char *str = PyUnicode_AsUTF8AndSize(s, &len);
 
-    if (str == NULL) {
+    if (!str) {
         return NULL;
     }
 
     unsigned char *buf = PyMem_Malloc(len), *p = buf;
 
-    if (buf == NULL) {
+    if (!buf) {
         return (MPZ_Object*)PyErr_NoMemory();
     }
     memcpy(buf, str, len);
 
-    int negative = (buf[0] == '-');
+    int8_t negative = (buf[0] == '-');
 
     p += negative;
     len -= negative;
