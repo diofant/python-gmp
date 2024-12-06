@@ -1,5 +1,7 @@
 **.pyc
 **.so
+.vscode
+.vs
 .hypothesis/
 venv/
 .venv/

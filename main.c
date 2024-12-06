@@ -389,24 +389,19 @@ MPZ_add(MPZ_Object *u, MPZ_Object *v, int subtract)
 
 
 #define CHECK_OP(u, a)              \
-    MPZ_Object *u;                  \
-    int free_##u = 0;               \
+    static MPZ_Object *u;           \
     if (MPZ_CheckExact(a)) {        \
         u = (MPZ_Object*)a;         \
+        Py_INCREF(u);               \
     }                               \
     else if (PyLong_Check(a)) {     \
         u = from_int(a);            \
         if (!u) {                   \
             goto end;               \
         }                           \
-        free_##u = 1;               \
     }                               \
     else {                          \
         Py_RETURN_NOTIMPLEMENTED;   \
-    }
-#define FREE_OP(u)                  \
-    if (free_##u) {                 \
-        Py_DECREF(u);               \
     }
 
 
@@ -420,8 +415,8 @@ add(PyObject* a, PyObject *b)
 
     res = MPZ_add(u, v, 0);
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return res;
 }
 
@@ -436,8 +431,8 @@ sub(PyObject* a, PyObject *b)
 
     res = MPZ_add(u, v, 1);
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return res;
 }
 
@@ -479,8 +474,8 @@ mul(PyObject* a, PyObject *b)
 
     res = MPZ_mul(u, v);
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return (PyObject*)res;
 }
 
@@ -586,8 +581,8 @@ divmod(PyObject *a, PyObject *b)
     return res;
 end:
     Py_DECREF(res);
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return NULL;
 }
 
@@ -605,8 +600,8 @@ floordiv(PyObject *a, PyObject *b)
     Py_DECREF(r);
     return (PyObject*)q;
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return NULL;
 }
 
@@ -632,8 +627,8 @@ rem(PyObject *a, PyObject *b)
     Py_DECREF(q);
     return (PyObject*)r;
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return NULL;
 }
 
@@ -797,8 +792,8 @@ bitwise_and(PyObject *a, PyObject *b)
 
     res = (PyObject*)MPZ_and(u, v);
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return (PyObject*)res;
 }
 
@@ -927,8 +922,8 @@ bitwise_or(PyObject *a, PyObject *b)
 
     res = (PyObject*)MPZ_or(u, v);
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return (PyObject*)res;
 }
 
@@ -1058,8 +1053,8 @@ bitwise_xor(PyObject *a, PyObject *b)
 
     res = (PyObject*)MPZ_xor(u, v);
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return (PyObject*)res;
 }
 
@@ -1231,8 +1226,8 @@ richcompare(PyObject *a, PyObject *b, int op)
 
     int r = MPZ_Compare(u, v);
 
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     switch(op) {
     case Py_LT:
         return PyBool_FromLong(r == -1);
@@ -1247,10 +1242,10 @@ richcompare(PyObject *a, PyObject *b, int op)
     case Py_NE:
         return PyBool_FromLong(r != 0);
     }
-	Py_RETURN_NOTIMPLEMENTED;
+    Py_RETURN_NOTIMPLEMENTED;
 end:
-    FREE_OP(u);
-    FREE_OP(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     return NULL;
 }
 

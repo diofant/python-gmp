@@ -119,7 +119,6 @@ def test_divmod(x, y):
     assert divmod(mpz(x), mpz(y)) == r
 
 
-@settings(deadline=None)
 @given(integers(min_value=-1000000, max_value=1000000),
        integers(min_value=0, max_value=100000))
 @example(123, 0)
