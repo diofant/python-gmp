@@ -104,6 +104,7 @@ MPZ_to_str(MPZ_Object *self, int base)
     return res;
 }
 
+
 /**
  * Table of digit values for 8-bit string->mpz conversion.
  * Note that when converting a base B string, a char c is a legitimate
@@ -194,6 +195,9 @@ MPZ_from_str(PyObject *s, int base)
             p += 2;
             len -= 2;
         }
+    }
+    if (base == 0) {
+        base = 10;
     }
 
     const unsigned char *digit_value = gmp_digit_value_tab;
