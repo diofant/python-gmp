@@ -147,7 +147,7 @@ const unsigned char gmp_digit_value_tab[] =
 static MPZ_Object *
 MPZ_from_str(PyObject *s, int base)
 {
-    if (base < 2 || base > 62) {
+    if (base != 0 && (base < 2 || base > 62)) {
         PyErr_SetString(PyExc_ValueError,
                         "base must be 0 or in the interval [2, 62]");
         return NULL;
@@ -195,6 +195,9 @@ MPZ_from_str(PyObject *s, int base)
             p += 2;
             len -= 2;
         }
+    }
+    if (base == 0) {
+        base = 10;
     }
 
     const unsigned char *digit_value = gmp_digit_value_tab;
