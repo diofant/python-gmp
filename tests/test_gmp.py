@@ -231,14 +231,16 @@ def test_digits_frombase(x, base):
     if base <= 36:
         assert mpz(smx.upper(), base) == mx
         assert mpz(smx.upper(), base=base) == mx
-    try:
-        nx = '20a'
-        mpz(nx, 10)
-        assert mpz(nx, 16) == 522
-    except ValueError as e:
-        assert str(e) == f'invalid literal for int with base 10: {nx}'
-        return
-    assert False
+        assert int(smx, base) == mx
+        smaller_base = (base + 2)//2 + 1
+        try:
+            i = int(smx, smaller_base)
+        except ValueError:
+            with pytest.raises(ValueError):
+                mpz(smx, smaller_base)
+        else:
+            assert mpz(smx, smaller_base) == i
+
 
 @given(integers())
 def test_frombase_auto(x):

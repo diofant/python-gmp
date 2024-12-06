@@ -105,11 +105,9 @@ MPZ_to_str(MPZ_Object *self, int base)
 }
 
 /**
- * Map the ascii code of a numeric character to the corresponding literal.
- * 
- * example:
- *  p[0] = '1';
- *  p[0] -> 49(ascii code) -> tab[49] -> 1
+ * Table of digit values for 8-bit string->mpz conversion.
+ * Note that when converting a base B string, a char c is a legitimate
+ * base B digit iff gmp_digit_value_tab[c] < B.
  */
 const unsigned char gmp_digit_value_tab[] =
 {
@@ -205,9 +203,10 @@ MPZ_from_str(PyObject *s, int base)
     }
     for (Py_ssize_t i = 0; i < len; i++) {
         p[i] = digit_value[p[i]];
-        if (base == 10 && (p[i] >= 10 && p[i] <= 35)) {
+        if (p[i] >= base) {
             PyErr_Format(PyExc_ValueError,
-                        "invalid literal for int with base 10: '%s'", str);
+                         "invalid literal for mpz() with base %d: %.200R",
+                         base, s);
             return NULL;
         }
     }
