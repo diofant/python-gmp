@@ -253,13 +253,13 @@ def test_frombase_auto(x):
         smx2 = '-0b' + mx.digits(2)[1:]
         smx8 = '-0o' + mx.digits(8)[1:]
         smx16 = '-0x' + mx.digits(16)[1:]
-    assert mpz(smx10, 0) == mx
-    assert mpz(smx2, 0) == mx
-    assert mpz(smx8, 0) == mx
-    assert mpz(smx16, 0) == mx
-    assert mpz(smx2.upper(), 0) == mx
-    assert mpz(smx8.upper(), 0) == mx
-    assert mpz(smx16.upper(), 0) == mx
+    assert mpz(smx10, 10) == mx
+    assert mpz(smx2, 10) == mx
+    assert mpz(smx8, 10) == mx
+    assert mpz(smx16, 10) == mx
+    assert mpz(smx2.upper(), 10) == mx
+    assert mpz(smx8.upper(), 10) == mx
+    assert mpz(smx16.upper(), 10) == mx
 
 
 @pytest.mark.parametrize('protocol',
