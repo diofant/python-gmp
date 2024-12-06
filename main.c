@@ -105,11 +105,9 @@ MPZ_to_str(MPZ_Object *self, int base)
 }
 
 
-/**
- * Table of digit values for 8-bit string->mpz conversion.
- * Note that when converting a base B string, a char c is a legitimate
- * base B digit iff gmp_digit_value_tab[c] < B.
- */
+/* Table of digit values for 8-bit string->mpz conversion.
+   Note that when converting a base B string, a char c is a legitimate
+   base B digit iff gmp_digit_value_tab[c] < B. */
 const unsigned char gmp_digit_value_tab[] =
 {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
