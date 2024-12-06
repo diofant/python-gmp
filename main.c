@@ -147,7 +147,7 @@ const unsigned char gmp_digit_value_tab[] =
 static MPZ_Object *
 MPZ_from_str(PyObject *s, int base)
 {
-    if (base != 0 && (base < 2 || base > 62)) {
+    if (base < 2 || base > 62) {
         PyErr_SetString(PyExc_ValueError,
                         "base must be 0 or in the interval [2, 62]");
         return NULL;
@@ -156,18 +156,18 @@ MPZ_from_str(PyObject *s, int base)
     Py_ssize_t len;
     const char *str = PyUnicode_AsUTF8AndSize(s, &len);
 
-    if (!str) {
+    if (str == NULL) {
         return NULL;
     }
 
-    unsigned char *buf = PyMem_Malloc(len), *p = buf;
+    unsigned char *p = PyMem_Malloc(len);
 
-    if (!buf) {
+    if (p == NULL) {
         return (MPZ_Object*)PyErr_NoMemory();
     }
-    memcpy(buf, str, len);
+    memcpy(p, str, len);
 
-    int8_t negative = (buf[0] == '-');
+    int negative = (str[0] == '-');
 
     p += negative;
     len -= negative;
@@ -195,9 +195,6 @@ MPZ_from_str(PyObject *s, int base)
             p += 2;
             len -= 2;
         }
-    }
-    if (base == 0) {
-        base = 10;
     }
 
     const unsigned char *digit_value = gmp_digit_value_tab;
