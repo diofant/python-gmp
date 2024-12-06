@@ -214,7 +214,7 @@ MPZ_from_str(PyObject *s, int base)
 
     MPZ_Object *res = MPZ_new(1 + len/2, negative);
     res->size = mpn_set_str(res->digits, p, len, base);
-    PyMem_Free(buf);
+    PyMem_Free(p);
 
     mp_limb_t *tmp = res->digits;
 
