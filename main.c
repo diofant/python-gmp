@@ -104,7 +104,13 @@ MPZ_to_str(MPZ_Object *self, int base)
     return res;
 }
 
-
+/**
+ * Map the ascii code of a numeric character to the corresponding literal.
+ * 
+ * example:
+ *  p[0] = '1';
+ *  p[0] -> 49(ascii code) -> tab[49] -> 1
+ */
 const unsigned char gmp_digit_value_tab[] =
 {
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
@@ -191,9 +197,6 @@ MPZ_from_str(PyObject *s, int base)
             len -= 2;
         }
     }
-    if (p[0] != '0' && base == 0) {
-        base = 10;
-    }
 
     const unsigned char *digit_value = gmp_digit_value_tab;
 
@@ -202,6 +205,11 @@ MPZ_from_str(PyObject *s, int base)
     }
     for (Py_ssize_t i = 0; i < len; i++) {
         p[i] = digit_value[p[i]];
+        if (base == 10 && (p[i] >= 10 && p[i] <= 35)) {
+            PyErr_Format(PyExc_ValueError,
+                        "invalid literal for int with base 10: '%s'", str);
+            return NULL;
+        }
     }
 
     MPZ_Object *res = MPZ_new(1 + len/2, negative);
