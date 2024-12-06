@@ -160,14 +160,14 @@ MPZ_from_str(PyObject *s, int base)
         return NULL;
     }
 
-    unsigned char *p = PyMem_Malloc(len);
+    unsigned char *buf = PyMem_Malloc(len), *p = buf;
 
-    if (p == NULL) {
+    if (buf == NULL) {
         return (MPZ_Object*)PyErr_NoMemory();
     }
-    memcpy(p, str, len);
+    memcpy(buf, str, len);
 
-    int negative = (str[0] == '-');
+    int negative = (buf[0] == '-');
 
     p += negative;
     len -= negative;
@@ -214,7 +214,7 @@ MPZ_from_str(PyObject *s, int base)
 
     MPZ_Object *res = MPZ_new(1 + len/2, negative);
     res->size = mpn_set_str(res->digits, p, len, base);
-    PyMem_Free(p);
+    PyMem_Free(buf);
 
     mp_limb_t *tmp = res->digits;
 
