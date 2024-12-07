@@ -17,5 +17,8 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt-get install libgmp-dev
       - run: pip install --upgrade pip
-      - run: pip --verbose install --editable .[tests]
+      - run: pip --verbose install --editable .[tests,sphinx,python-sphinx]
       - run: pytest
+      - run: sphinx-build --color -W --keep-going -b html docs build/sphinx/html
+      - run: sphinx-build --color -W --keep-going -b latex docs build/sphinx/latex
+      - run: make -C build/sphinx/latex all-pdf
