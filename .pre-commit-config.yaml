@@ -11,6 +11,7 @@ repos:
     rev: v1.0.0
     hooks:
       - id: sphinx-lint
+        name: Run sphinx-lint on docs/
         args: [--enable=default-role]
         files: ^docs/
 
@@ -18,5 +19,6 @@ repos:
     rev: v19.1.1
     hooks:
       - id: clang-format
+        name: Run clang-format on *.c|h
         files: \.(c|h)$
         exclude: ^pythoncapi_compat\.h$
