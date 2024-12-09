@@ -1450,12 +1450,166 @@ bit_count(PyObject *a)
 }
 
 
+static void
+revstr(char* s, size_t l, size_t r)
+{
+    while (l < r) {
+        SWAP(char, s[l], s[r]);
+        l++;
+        r--;
+    }
+}
+
+
 static PyObject *
 to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
          PyObject *kwnames)
 {
-    PyErr_SetString(PyExc_NotImplementedError, "to_bytes()");
-    return NULL;
+    if (nargs > 2) {
+        PyErr_SetString(PyExc_TypeError,
+                        "to_bytes() takes at most 2 positional arguments");
+        return NULL;
+    }
+
+    Py_ssize_t length = 1, nkws = 0;
+    int is_little = 0, is_signed = 0, argidx[3] = {-1, -1, -1};
+
+    if (nargs >= 1) {
+        argidx[0] = 0;
+    }
+    if (nargs == 2) {
+        argidx[1] = 1;
+    }
+    if (kwnames) {
+        nkws = PyTuple_GET_SIZE(kwnames);
+    }
+    if (nkws > 3) {
+        PyErr_SetString(PyExc_TypeError,
+                        "to_bytes() takes at most 3 keyword arguments");
+        return NULL;
+    }
+    for (Py_ssize_t i = 0; i < nkws; i++) {
+        const char* kwname = PyUnicode_AsUTF8(PyTuple_GET_ITEM(kwnames, i));
+
+        if (strcmp(kwname, "length") == 0) {
+            if (nargs == 0) {
+                argidx[0] = (int)(nargs + i);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError,
+                                ("argument for to_bytes() given by name "
+                                 "('length') and position (1)"));
+                return NULL;
+            }
+        }
+        else if (strcmp(kwname, "byteorder") == 0) {
+            if (nargs <= 1) {
+                argidx[1] = (int)(nargs + i);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError,
+                                ("argument for to_bytes() given by "
+                                 "name ('byteorder') and position (2)"));
+                return NULL;
+            }
+        }
+        else if (strcmp(kwname, "signed") == 0) {
+            argidx[2] = (int)(nargs + i);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError,
+                            "got an invalid keyword argument for to_bytes()");
+            return NULL;
+        }
+    }
+    if (argidx[0] >= 0) {
+        PyObject *arg = args[argidx[0]];
+
+        if (PyLong_Check(arg)) {
+            length = PyLong_AsSsize_t(arg);
+            if (length < 0) {
+                PyErr_SetString(PyExc_ValueError,
+                                "length argument must be non-negative");
+                return NULL;
+            }
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError,
+                            "to_bytes() takes an integer argument 'length'");
+            return NULL;
+        }
+    }
+    if (argidx[1] >= 0) {
+        PyObject *arg = args[argidx[1]];
+
+        if (PyUnicode_Check(arg)) {
+            const char* byteorder = PyUnicode_AsUTF8(arg);
+
+            if (!byteorder) {
+                return NULL;
+            }
+            else if (strcmp(byteorder, "big") == 0) {
+                is_little = 0;
+            }
+            else if (strcmp(byteorder, "little") == 0) {
+                is_little = 1;
+            }
+            else {
+                PyErr_SetString(PyExc_ValueError,
+                                "byteorder must be either 'little' or 'big'");
+                return NULL;
+            }
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError,
+                            "to_bytes() argument 'byteorder' must be str");
+            return NULL;
+        }
+    }
+    if (argidx[2] >= 0) {
+        is_signed = PyObject_IsTrue(args[argidx[2]]);
+    }
+
+    MPZ_Object *x = (MPZ_Object*)self;
+    int is_negative = x->negative;
+
+    if (is_negative) {
+        if (!is_signed) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "can't convert negative mpz to unsigned");
+            return NULL;
+        }
+        PyErr_SetString(PyExc_NotImplementedError, "XXX");
+        return NULL;
+    }
+
+    Py_ssize_t size = x->size ? mpn_sizeinbase(x->digits, x->size, 256) : 0;
+    Py_ssize_t gap = length - size;
+    PyObject *bytes = PyBytes_FromStringAndSize(NULL, length);
+
+    if (bytes == NULL) {
+        return NULL;
+    }
+
+    char* buffer = PyBytes_AS_STRING(bytes);
+
+    if (gap > 0) {
+        memset(buffer, is_negative ? '\xff' : 0, gap);
+    }
+    if (x->size) {
+        if (CHECK_NO_MEM_LEAK) {
+            mpn_get_str((unsigned char*)(buffer + gap), 256,
+                        x->digits, x->size);
+        }
+        else {
+            Py_DECREF(bytes);
+            return PyErr_NoMemory();
+        }
+    }
+    if (is_little && length) {
+        revstr(buffer, 0, length - 1);
+    }
+    return bytes;
 }
 
 
@@ -1463,8 +1617,172 @@ static PyObject *
 from_bytes(PyTypeObject *type, PyObject *const *args,
            Py_ssize_t nargs, PyObject *kwnames)
 {
-    PyErr_SetString(PyExc_NotImplementedError, "from_bytes()");
-    return NULL;
+    if (nargs > 2) {
+        PyErr_SetString(PyExc_TypeError,
+                        ("from_bytes() takes at most 2"
+                         " positional arguments"));
+        return NULL;
+    }
+
+    Py_ssize_t nkws = 0;
+    int is_little = 0, is_signed = 0, argidx[3] = {-1, -1, -1};
+
+    if (nargs >= 1) {
+        argidx[0] = 0;
+    }
+    if (nargs == 2) {
+        argidx[1] = 1;
+    }
+    if (kwnames) {
+        nkws = PyTuple_GET_SIZE(kwnames);
+    }
+    if (nkws > 3) {
+        PyErr_SetString(PyExc_TypeError,
+                        "from_bytes() takes at most 3 keyword arguments");
+        return NULL;
+    }
+    if (nkws + nargs < 1) {
+        PyErr_SetString(PyExc_TypeError,
+                        ("from_bytes() missing required argument"
+                         " 'bytes' (pos 1)"));
+        return NULL;
+    }
+    for (Py_ssize_t i = 0; i < nkws; i++) {
+        const char *kwname = PyUnicode_AsUTF8(PyTuple_GET_ITEM(kwnames, i));
+
+        if (strcmp(kwname, "bytes") == 0) {
+            if (nargs == 0) {
+                argidx[0] = (int)(nargs + i);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError,
+                                ("argument for from_bytes() given by"
+                                 " name ('bytes') and position (1)"));
+                return NULL;
+            }
+        }
+        else if (strcmp(kwname, "byteorder") == 0) {
+            if (nargs <= 1) {
+                argidx[1] = (int)(nargs + i);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError,
+                                ("argument for from_bytes() given by"
+                                 " name ('byteorder') and position (2)"));
+                return NULL;
+            }
+        }
+        else if (strcmp(kwname, "signed") == 0) {
+            argidx[2] = (int)(nargs + i);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError, ("got an invalid keyword "
+                                              "argument for from_bytes()"));
+            return NULL;
+        }
+    }
+    if (argidx[1] >= 0) {
+        PyObject *arg = args[argidx[1]];
+
+        if (PyUnicode_Check(arg)) {
+            const char* byteorder = PyUnicode_AsUTF8(arg);
+
+            if (!byteorder) {
+                return NULL;
+            }
+            else if (strcmp(byteorder, "big") == 0) {
+                is_little = 0;
+            }
+            else if (strcmp(byteorder, "little") == 0) {
+                is_little = 1;
+            }
+            else {
+                PyErr_SetString(PyExc_ValueError,
+                                ("byteorder must be either 'little'"
+                                 " or 'big'"));
+                return NULL;
+            }
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError,
+                            ("from_bytes() argument 'byteorder'"
+                             " must be str"));
+            return NULL;
+        }
+    }
+    else if (argidx[2] >= 0) {
+        is_signed = PyObject_IsTrue(args[argidx[2]]);
+    }
+
+    PyObject *bytes = PyObject_Bytes(args[argidx[0]]);
+    char *buffer;
+    Py_ssize_t length;
+
+    if (bytes == NULL) {
+        return NULL;
+    }
+    if (PyBytes_AsStringAndSize(bytes, &buffer, &length) == -1) {
+        return NULL;
+    }
+    if (!length) {
+        Py_DECREF(bytes);
+        return (PyObject*)MPZ_FromDigitSign(0, 0);
+    }
+
+    MPZ_Object *res = MPZ_new(1 + length/2, 0);
+
+    if (!res) {
+        Py_DECREF(bytes);
+        return NULL;
+    }
+    if (is_little) {
+        char *tmp = PyMem_Malloc(length);
+
+        if (!tmp) {
+            Py_DECREF(bytes);
+            return PyErr_NoMemory();
+        }
+        memcpy(tmp, buffer, length);
+        buffer = tmp;
+        revstr(buffer, 0, length - 1);
+    }
+    if (CHECK_NO_MEM_LEAK) {
+        res->size = mpn_set_str(res->digits, (unsigned char*)buffer,
+                                length, 256);
+    }
+    else {
+        Py_DECREF(res);
+        PyMem_Free(bytes);
+        if (is_little) {
+            PyMem_Free(buffer);
+        }
+        return PyErr_NoMemory();
+    }
+    Py_DECREF(bytes);
+    if (is_little) {
+        PyMem_Free(buffer);
+    }
+
+    mp_limb_t *tmp = res->digits;
+
+    res->digits = PyMem_Resize(tmp, mp_limb_t, res->size);
+    if (!res->digits) {
+        res->digits = tmp;
+        Py_DECREF(res);
+        return PyErr_NoMemory();
+    }
+    MPZ_normalize(res);
+
+    __mpz_struct tmp2;
+
+    tmp2._mp_d = res->digits;
+    tmp2._mp_size = res->size;
+    if (is_signed && mpz_tstbit(&tmp2, 8*length - 1)) {
+        PyErr_SetString(PyExc_NotImplementedError, "XXX");
+        Py_DECREF(res);
+        return NULL;
+    }
+    return (PyObject*)res;
 }
 
 
