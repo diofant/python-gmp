@@ -1,0 +1,16 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.1
+    hooks:
+      - id: ruff
+        name: Run ruff on tests/
+        args: [--exit-non-zero-on-fix]
+        files: ^tests/
+
+  - repo: https://github.com/sphinx-contrib/sphinx-lint
+    rev: v1.0.0
+    hooks:
+      - id: sphinx-lint
+        name: Run sphinx-lint on docs/
+        args: [--enable=default-role]
+        files: ^docs/
