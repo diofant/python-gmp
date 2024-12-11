@@ -7,11 +7,12 @@
 #include <gmp.h>
 
 
-static const char python_gmp_version[] = "0.1.0";
+static const char python_gmp_version[] = "0.1.2";
 
 
 static jmp_buf gmp_env;
 #define GMP_TRACKER_SIZE_INCR 16
+#define CHECK_NO_MEM_LEAK (setjmp(gmp_env) != 1)
 static struct {
     size_t size;
     size_t alloc;
@@ -157,7 +158,7 @@ MPZ_to_str(MPZ_Object *self, int base, int repr)
                                 "abcdefghijklmnopqrstuvwxyz") :
                                "0123456789abcdefghijklmnopqrstuvwxyz");
 
-    if (setjmp(gmp_env) != 1) {
+    if (CHECK_NO_MEM_LEAK) {
         len -= (mpn_get_str(buf + prefix, base,
                             self->digits, self->size) != (size_t)len);
     }
@@ -321,7 +322,7 @@ MPZ_from_str(PyObject *s, int base)
 
     MPZ_Object *res = MPZ_new(1 + len/2, negative);
 
-    if (setjmp(gmp_env) != 1) {
+    if (CHECK_NO_MEM_LEAK) {
         res->size = mpn_set_str(res->digits, p, len, base);
     }
     else {
@@ -565,7 +566,7 @@ MPZ_mul(MPZ_Object *v, MPZ_Object *u)
         SWAP(MPZ_Object*, u, v);
     }
     if (u == v) {
-        if (setjmp(gmp_env) != 1) {
+        if (CHECK_NO_MEM_LEAK) {
             mpn_sqr(res->digits, u->digits, u->size);
         }
         else {
@@ -574,7 +575,7 @@ MPZ_mul(MPZ_Object *v, MPZ_Object *u)
         }
     }
     else {
-        if (setjmp(gmp_env) != 1) {
+        if (CHECK_NO_MEM_LEAK) {
             mpn_mul(res->digits, u->digits, u->size,
                     v->digits, v->size);
         }
@@ -635,7 +636,7 @@ MPZ_DivMod(MPZ_Object *a, MPZ_Object *b, MPZ_Object **q, MPZ_Object **r)
             Py_DECREF(*q);
             return -1;
         }
-        if (setjmp(gmp_env) != 1) {
+        if (CHECK_NO_MEM_LEAK) {
             mpn_tdiv_qr((*q)->digits, (*r)->digits, 0,
                         a->digits, a->size,
                         b->digits, b->size);
@@ -795,19 +796,148 @@ invert(MPZ_Object *self)
 }
 
 
+static MPZ_Object *
+MPZ_lshift(MPZ_Object *u, MPZ_Object *v)
+{
+    if (v->negative) {
+        PyErr_SetString(PyExc_ValueError, "negative shift count");
+        return NULL;
+    }
+    if (!u->size) {
+        return MPZ_FromDigitSign(0, 0);
+    }
+    if (!v->size) {
+        return (MPZ_Object*)plus(u);
+    }
+    if (v->size > 1) {
+        PyErr_SetString(PyExc_OverflowError,
+                        "too many digits in integer");
+        return NULL;
+    }
+
+    mp_limb_t lshift = v->digits[0];
+    mp_size_t whole = lshift/GMP_NUMB_BITS;
+    mp_size_t size = u->size + whole;
+
+    lshift %= GMP_NUMB_BITS;
+    if (lshift) {
+        size++;
+    }
+    if (u->size == 1 && !whole) {
+        mp_limb_t t = u->digits[0] << lshift;
+
+        if (t >> lshift == u->digits[0]) {
+            return MPZ_FromDigitSign(t, u->negative);
+        }
+    }
+
+    MPZ_Object *res = MPZ_new(size, u->negative);
+
+    if (!res) {
+        return NULL;
+    }
+    if (whole) {
+        mpn_zero(res->digits, whole);
+    }
+
+    mp_limb_t carry = mpn_lshift(res->digits + whole, u->digits,
+                                 u->size, lshift);
+
+    if (lshift) {
+        res->digits[size - 1] = carry;
+    }
+    MPZ_normalize(res);
+    return res;
+}
+
+
 static PyObject *
 lshift(PyObject *a, PyObject *b)
 {
-    PyErr_SetString(PyExc_NotImplementedError, "mpz.__lshift__");
-    return NULL;
+    PyObject *res = NULL;
+
+    CHECK_OP(u, a);
+    CHECK_OP(v, b);
+
+    res = (PyObject*)MPZ_lshift(u, v);
+end:
+    Py_XDECREF(u);
+    Py_XDECREF(v);
+    return (PyObject*)res;
+}
+
+
+static MPZ_Object *
+MPZ_rshift(MPZ_Object *u, MPZ_Object *v)
+{
+    if (v->negative) {
+        PyErr_SetString(PyExc_ValueError, "negative shift count");
+        return NULL;
+    }
+    if (!u->size) {
+        return MPZ_FromDigitSign(0, 0);
+    }
+    if (!v->size) {
+        return (MPZ_Object*)plus(u);
+    }
+    if (v->size > 1) {
+        if (u->negative) {
+            return MPZ_FromDigitSign(1, 1);
+        }
+        else {
+            return MPZ_FromDigitSign(0, 0);
+        }
+    }
+
+    mp_size_t whole = v->digits[0] / GMP_NUMB_BITS;
+    mp_size_t rshift = v->digits[0] % GMP_NUMB_BITS;
+    mp_size_t size = u->size;
+
+    if (whole >= size) {
+        return MPZ_FromDigitSign(u->negative, u->negative);
+    }
+    size -= whole;
+
+    MPZ_Object *res = MPZ_new(size + 1, u->negative);
+
+    if (!res) {
+        return NULL;
+    }
+    res->digits[size] = 0;
+
+    int carry = 0;
+
+    if (rshift) {
+        if (mpn_rshift(res->digits, u->digits + whole, size, rshift)) {
+            carry = u->negative;
+        }
+    }
+    else {
+        mpn_copyi(res->digits, u->digits + whole, size);
+    }
+    if (carry) {
+        if (mpn_add_1(res->digits, res->digits, size, 1)) {
+            res->digits[size] = 1;
+        }
+    }
+    MPZ_normalize(res);
+    return res;
 }
 
 
 static PyObject *
 rshift(PyObject *a, PyObject *b)
 {
-    PyErr_SetString(PyExc_NotImplementedError, "mpz.__rshift__");
-    return NULL;
+    PyObject *res = NULL;
+
+    CHECK_OP(u, a);
+    CHECK_OP(v, b);
+
+    res = (PyObject*)MPZ_rshift(u, v);
+end:
+    Py_XDECREF(u);
+    Py_XDECREF(v);
+    return (PyObject*)res;
 }
 
 
@@ -1236,7 +1366,7 @@ power(PyObject *a, PyObject *b, PyObject *m)
                 Py_DECREF(v);
                 return PyErr_NoMemory();
             }
-            if (setjmp(gmp_env) != 1) {
+            if (CHECK_NO_MEM_LEAK) {
                 res->size = mpn_pow_1(res->digits, u->digits, u->size,
                                       v->digits[0], tmp);
             }
@@ -1693,6 +1823,21 @@ static PyMethodDef methods[] = {
 };
 
 
+PyDoc_STRVAR(mpz_doc,
+"mpz(x, /)\n\
+mpz(x, /, base=10)\n\
+\n\
+Convert a number or string to an integer, or return 0 if no arguments\n\
+are given.  If x is a number, return x.__int__().  For floating-point\n\
+numbers, this truncates towards zero.\n\
+\n\
+If x is not a number or if base is given, then x must be a string,\n\
+bytes, or bytearray instance representing an integer literal in the\n\
+given base.  The literal can be preceded by '+' or '-' and be surrounded\n\
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\n\
+Base 0 means to interpret the base from the string as an integer literal.");
+
+
 PyTypeObject MPZ_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "gmp.mpz",
@@ -1706,6 +1851,7 @@ PyTypeObject MPZ_Type = {
     .tp_hash = (hashfunc) hash,
     .tp_getset = getsetters,
     .tp_methods = methods,
+    .tp_doc = mpz_doc,
 };
 
 
@@ -1793,7 +1939,7 @@ gmp_gcd(PyObject *self, PyObject * const *args, Py_ssize_t nargs)
             mp_size_t newsize;
 
             if (tmp->size >= arg->size) {
-                if (setjmp(gmp_env) != 1) {
+                if (CHECK_NO_MEM_LEAK) {
                     newsize = mpn_gcd(res->digits, tmp->digits, tmp->size,
                                       arg->digits, arg->size);
                 }
@@ -1805,7 +1951,7 @@ gmp_gcd(PyObject *self, PyObject * const *args, Py_ssize_t nargs)
                 }
             }
             else {
-                if (setjmp(gmp_env) != 1) {
+                if (CHECK_NO_MEM_LEAK) {
                     newsize = mpn_gcd(res->digits, arg->digits, arg->size,
                                       tmp->digits, tmp->size);
                 }
@@ -1870,7 +2016,7 @@ gmp_isqrt(PyObject *self, PyObject *other)
     if (!res) {
         return NULL;
     }
-    if (setjmp(gmp_env) != 1) {
+    if (CHECK_NO_MEM_LEAK) {
         mpn_sqrtrem(res->digits, NULL, x->digits, x->size);
     }
     else {
@@ -1884,11 +2030,25 @@ end:
 }
 
 
+static PyObject *
+gmp_factorial(PyObject *self, PyObject *other)
+{
+    PyErr_SetString(PyExc_NotImplementedError, "factorial");
+    return NULL;
+}
+
+
 static PyMethodDef functions [] =
 {
-    {"gcd", (PyCFunction)gmp_gcd, METH_FASTCALL, "Greatest Common Divisor."},
+    {"gcd", (PyCFunction)gmp_gcd, METH_FASTCALL,
+     ("gcd($module, /, *integers)\n--\n\n"
+      "Greatest Common Divisor.")},
     {"isqrt", gmp_isqrt, METH_O,
-     "Return the integer part of the square root of the input."},
+     ("isqrt($module, n, /)\n--\n\n"
+      "Return the integer part of the square root of the input.")},
+    {"factorial", gmp_factorial, METH_O,
+     ("factorial($module, n, /)\n--\n\n"
+      "Find n!.\n\nRaise a ValueError if x is negative or non-integral.")},
     {NULL}  /* sentinel */
 };
 
@@ -1922,5 +2082,37 @@ PyInit_gmp(void)
     }
     mp_set_memory_functions(gmp_allocate_function, NULL,
                             gmp_free_function);
+
+    PyObject *numbers = PyImport_ImportModule("numbers");
+
+    if (!numbers) {
+        return NULL;
+    }
+
+    char* register_str = "numbers.Integral.register(gmp.mpz)\n";
+    PyObject *ns = PyDict_New();
+
+    if (!ns) {
+        Py_DECREF(numbers);
+        return NULL;
+    }
+    if ((PyDict_SetItemString(ns, "numbers", numbers) < 0)
+        || (PyDict_SetItemString(ns, "gmp", m) < 0))
+    {
+        Py_DECREF(numbers);
+        Py_DECREF(ns);
+        return NULL;
+    }
+
+    PyObject *res = PyRun_String(register_str, Py_file_input, ns, ns);
+
+    if (!res) {
+        Py_DECREF(numbers);
+        Py_DECREF(ns);
+        return NULL;
+    }
+    Py_DECREF(ns);
+    Py_XDECREF(res);
+    Py_DECREF(numbers);
     return m;
 }

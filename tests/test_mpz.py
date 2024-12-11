@@ -35,14 +35,13 @@ def test_mpz_from_to_str(x):
 def test_mpz_from_to_int(x):
     sx = str(x)
     mx = mpz(x)
-    assert mpz(mx) == mx == x
+    assert mpz(sx) == mpz(mx) == mx == x
     assert int(mx) == x
 
 
 @given(integers())
 def test_repr(x):
     mx = mpz(x)
-    sx = str(x)
     assert repr(mx) == f"mpz({x!s})"
 
 
@@ -199,6 +198,58 @@ def test_xor(x, y):
     assert x ^ my == r
 
 
+@given(integers(), integers(max_value=12345))
+def test_lshift(x, y):
+    mx = mpz(x)
+    my = mpz(y)
+    try:
+        r = x << y
+    except OverflowError:
+        with pytest.raises(OverflowError):
+            mx << my
+        with pytest.raises(OverflowError):
+            x << my
+        with pytest.raises(OverflowError):
+            mx << y
+    except ValueError:
+        with pytest.raises(ValueError):
+            mx << my
+        with pytest.raises(ValueError):
+            x << my
+        with pytest.raises(ValueError):
+            mx << y
+    else:
+        assert mx << my == r
+        assert mx << y == r
+        assert x << my == r
+
+
+@given(integers(), integers())
+def test_rshift(x, y):
+    mx = mpz(x)
+    my = mpz(y)
+    try:
+        r = x >> y
+    except OverflowError:
+        with pytest.raises(OverflowError):
+            mx >> my
+        with pytest.raises(OverflowError):
+            x >> my
+        with pytest.raises(OverflowError):
+            mx >> y
+    except ValueError:
+        with pytest.raises(ValueError):
+            mx >> my
+        with pytest.raises(ValueError):
+            x >> my
+        with pytest.raises(ValueError):
+            mx >> y
+    else:
+        assert mx >> my == r
+        assert mx >> y == r
+        assert x >> my == r
+
+
 @given(integers())
 def test_getseters(x):
     mx = mpz(x)
@@ -249,7 +300,7 @@ def test_to_bytes(x, length, byteorder, signed):
     try:
         rx = x.to_bytes(length, byteorder, signed=signed)
     except OverflowError:
-        with raises(OverflowError):
+        with pytest.raises(OverflowError):
             mpz(x).to_bytes(length, byteorder, signed=signed)
     else:
         assert rx == mpz(x).to_bytes(length, byteorder, signed=signed)
@@ -388,10 +439,9 @@ def test_pickle(protocol, x):
     assert mx == pickle.loads(pickle.dumps(mx, protocol))
 
 
-@pytest.mark.skipif(platform.python_implementation() == 'PyPy',
-                    reason="FIXME: https://github.com/pypy/pypy/issues/5147")
 def test_outofmemory():
-    resource.setrlimit(resource.RLIMIT_AS, (1024*32*1024, -1))
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    resource.setrlimit(resource.RLIMIT_AS, (1024*32*1024, hard))
     total = 20
     for n in range(total):
         a = random.randint(49846727467293, 249846727467293)
@@ -405,4 +455,4 @@ def test_outofmemory():
                 break
             i += 1
     assert n + 1 == total
-    resource.setrlimit(resource.RLIMIT_AS, (-1, -1))
+    resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
