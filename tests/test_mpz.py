@@ -79,6 +79,31 @@ def test_mpz_plus_minus_abs(x):
 
 
 @given(integers(), integers())
+@example(123_1, 123_1)
+@example(123_456, 123_456)
+@example(123_456_789, 123_456_789)
+def test_underscore_literal(x, y):
+    if not y:
+        return
+    mx = mpz(str(x))
+    my = mpz(str(y))
+    assert mx == x
+    assert my == y
+    r = x + y
+    assert mx + my == r
+    r = x - y
+    assert mx - my == r
+    r = x * y
+    assert mx * my == r
+    r = x // y
+    assert mx // my == r
+    r = x % y
+    assert mx % my == r
+    r = divmod(x, y)
+    assert divmod(mx, my) == r
+
+
+@given(integers(), integers())
 def test_add_sub(x, y):
     mx = mpz(x)
     my = mpz(y)
