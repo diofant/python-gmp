@@ -8,7 +8,8 @@ import sys
 
 import pytest
 from hypothesis import assume, example, given
-from hypothesis.strategies import booleans, integers, sampled_from
+from hypothesis.strategies import (booleans, characters, integers,
+                                   sampled_from, text)
 
 from gmp import mpz
 from gmp import _limb_size as limb_size
@@ -24,6 +25,19 @@ def test_mpz_from_to_str(x):
     sx = str(x)
     mx = mpz(sx)
     assert str(mx) == sx
+
+
+@pytest.mark.xfail(reason="https://github.com/diofant/python-gmp/issues/46")
+@given(text(alphabet=characters(min_codepoint=48, max_codepoint=57,
+                                include_characters=['_'])))
+def test_mpz_underscores(s):
+    try:
+        i = int(s)
+    except ValueError:
+        with pytest.raises(ValueError):
+            mpz(s)
+    else:
+        assert mpz(s) == i
 
 
 @given(integers())
@@ -281,7 +295,6 @@ def test_to_bytes(x, length, byteorder, signed):
         assert rx == mpz(x).to_bytes(length, byteorder, signed=signed)
 
 
-@pytest.mark.xfail(reason="https://github.com/diofant/python-gmp/issues/3")
 @given(integers(), integers(min_value=0, max_value=10000),
        sampled_from(['big', 'little']), booleans())
 @example(0, 0, 'big', False)
@@ -308,7 +321,37 @@ def test_from_bytes(x, length, byteorder, signed):
         rx = int.from_bytes(bytes, byteorder, signed=signed)
         assert rx == mpz.from_bytes(bytes, byteorder, signed=signed)
         assert rx == mpz.from_bytes(bytearray(bytes), byteorder, signed=signed)
+        if platform.python_implementation() == 'PyPy':  # FIXME
+            return
         assert rx == mpz.from_bytes(list(bytes), byteorder, signed=signed)
+
+
+def test_mpz_from_bytes_interface():
+    with pytest.raises(TypeError):
+        mpz.from_bytes()
+    with pytest.raises(TypeError):
+        mpz.from_bytes(1, 2, 3)
+    with pytest.raises(TypeError):
+        mpz.from_bytes(b'', 2)
+    with pytest.raises(TypeError):
+        mpz.from_bytes(1)
+    with pytest.raises(TypeError):
+        mpz.from_bytes(b'', bytes=b'')
+    with pytest.raises(TypeError):
+        mpz.from_bytes(b'', 'big', byteorder='big')
+    with pytest.raises(TypeError):
+        mpz.from_bytes(b'', spam=1)
+    with pytest.raises(TypeError):
+        mpz.from_bytes(a=1, b=2, c=3, d=4)
+
+    with pytest.raises(ValueError):
+        mpz.from_bytes(b'', 'spam')
+
+    assert mpz.from_bytes(b'\x01', byteorder='little') == mpz.from_bytes(b'\x01', 'little')
+
+    assert mpz.from_bytes(b'\x01') == mpz.from_bytes(bytes=b'\x01')
+    assert mpz.from_bytes(b'\x01') == mpz.from_bytes(b'\x01', 'big')
+    assert mpz.from_bytes(b'\x01') == mpz.from_bytes(b'\x01', signed=False)
 
 
 @pytest.mark.xfail(reason="https://github.com/diofant/python-gmp/issues/2")
