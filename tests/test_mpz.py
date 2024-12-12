@@ -8,7 +8,8 @@ import sys
 
 import pytest
 from hypothesis import assume, example, given
-from hypothesis.strategies import booleans, integers, sampled_from
+from hypothesis.strategies import (booleans, characters, composite, integers,
+                                   sampled_from, text)
 
 from gmp import mpz
 from gmp import _limb_size as limb_size
@@ -20,10 +21,77 @@ from gmp import _limb_size as limb_size
 @example(75424656551107706)
 @example(1284673497348563845623546741523784516734143215346712)
 @example(65869376547959985897597359)
-def test_mpz_from_to_str(x):
+def test_from_to_str(x):
     sx = str(x)
     mx = mpz(sx)
     assert str(mx) == sx
+
+
+@pytest.mark.xfail(reason="diofant/python-gmp#46")
+@given(text(alphabet=characters(min_codepoint=48, max_codepoint=57,
+                                include_characters=['_'])))
+def test_underscores(s):
+    try:
+        i = int(s)
+    except ValueError:
+        with pytest.raises(ValueError):
+            mpz(s)
+    else:
+        assert mpz(s) == i
+
+
+@composite
+def fmt_str(draw, types='bdoxX'):
+    res = ''
+    type = draw(sampled_from(types))
+
+    # fill_char and align
+    fill_char = draw(sampled_from(['']*3 + list('z;clxvjqwer')))
+    if fill_char:
+        skip_0_padding = True
+        align = draw(sampled_from(list('<^>=')))
+        res += fill_char + align
+    else:
+        align = draw(sampled_from([''] + list('<^>=')))
+        if align:
+            skip_0_padding = True
+            res += align
+        else:
+            skip_0_padding = False
+
+    # sign character
+    res += draw(sampled_from([''] + list('-+ ')))
+
+    # alternate mode
+    res += draw(sampled_from(['', '#']))
+
+    # pad with 0s
+    pad0 = draw(sampled_from(['', '0']))
+    skip_thousand_separators = False
+    if pad0 and not skip_0_padding:
+        res += pad0
+        skip_thousand_separators = True
+
+    # Width
+    res += draw(sampled_from(['']*7 + list(map(str, range(1, 40)))))
+
+    # grouping character (thousand_separators)
+    gchar = draw(sampled_from([''] + list(',_')))
+    if (gchar and not skip_thousand_separators
+            and not (gchar == ',' and type in ['b', 'o', 'x', 'X'])):
+        res += gchar
+
+    # Type
+    res += type
+
+    return res
+
+
+@given(integers(), fmt_str())
+def test___format__(x, fmt):
+    mx = mpz(x)
+    r = format(x, fmt)
+    assert format(mx, fmt) == r
 
 
 @given(integers())
@@ -32,7 +100,7 @@ def test_mpz_from_to_str(x):
 @example(75424656551107706)
 @example(1284673497348563845623546741523784516734143215346712)
 @example(65869376547959985897597359)
-def test_mpz_from_to_int(x):
+def test_from_to_int(x):
     sx = str(x)
     mx = mpz(x)
     assert mpz(sx) == mpz(mx) == mx == x
@@ -59,7 +127,7 @@ def test_richcompare(x, y):
 @example(0)
 @example(-1)
 @example(-2)
-def test_mpz_hash(x):
+def test_hash(x):
     mx = mpz(x)
     assert hash(mx) == hash(x)
 
@@ -70,7 +138,7 @@ def test_mpz_hash(x):
 @example(75424656551107706)
 @example(1284673497348563845623546741523784516734143215346712)
 @example(65869376547959985897597359)
-def test_mpz_plus_minus_abs(x):
+def test_plus_minus_abs(x):
     mx = mpz(x)
     assert +mx == x
     assert -mx == -x
@@ -145,8 +213,20 @@ def test_divmod(x, y):
     assert divmod(mx, my) == r
 
 
-@given(integers(min_value=-1000000, max_value=1000000),
-       integers(min_value=0, max_value=100000))
+@pytest.mark.xfail(reason="diofant/python-gmp#6")
+@given(integers(), integers())
+def test_truediv(x, y):
+    if not y:
+        return
+    mx = mpz(x)
+    my = mpz(y)
+    r = x / y
+    assert mx / my == r
+    assert mx / y == r
+    assert x / my == r
+
+
+@given(integers(), integers(max_value=100000))
 @example(123, 0)
 @example(-321, 0)
 @example(1, 123)
@@ -154,12 +234,40 @@ def test_divmod(x, y):
 @example(123, 321)
 @example(-56, 321)
 def test_power(x, y):
+    if y > 0 and abs(x) > 1000000:
+        return
     mx = mpz(x)
     my = mpz(y)
-    r = x**y
-    assert mx**my == r
-    assert mx**y == r
-    assert x**my == r
+    try:
+        r = x**y
+    except OverflowError:
+        with pytest.raises(OverflowError):
+            mx**my
+    except ZeroDivisionError:
+        with pytest.raises(ZeroDivisionError):
+            mx**my
+    else:
+        assert mx**my == r
+        assert mx**y == r
+        assert x**my == r
+
+
+@pytest.mark.xfail(reason="diofant/python-gmp#8")
+@given(integers(), integers(max_value=1000000), integers())
+def test_power_mod(x, y, z):
+    mx = mpz(x)
+    my = mpz(y)
+    mz = mpz(z)
+    try:
+        r = pow(x, y, z)
+    except ValueError:
+        with pytest.raises(ValueError):
+            pow(mx, my, mz)
+    else:
+        assert pow(mx, my, mz) == r
+        assert pow(mx, my, z) == r
+        assert pow(mx, y, mz) == r
+        assert pow(x, my, mz) == r
 
 
 @given(integers())
@@ -274,7 +382,7 @@ def test_methods(x):
     assert math.ceil(mx) == math.ceil(x)
 
 
-@pytest.mark.xfail(reason="https://github.com/diofant/python-gmp/issues/3")
+@pytest.mark.xfail(reason="diofant/python-gmp#3")
 @given(integers(), integers(min_value=0, max_value=10000),
        sampled_from(['big', 'little']), booleans())
 @example(0, 0, 'big', False)
@@ -306,7 +414,6 @@ def test_to_bytes(x, length, byteorder, signed):
         assert rx == mpz(x).to_bytes(length, byteorder, signed=signed)
 
 
-@pytest.mark.xfail(reason="https://github.com/diofant/python-gmp/issues/3")
 @given(integers(), integers(min_value=0, max_value=10000),
        sampled_from(['big', 'little']), booleans())
 @example(0, 0, 'big', False)
@@ -333,10 +440,39 @@ def test_from_bytes(x, length, byteorder, signed):
         rx = int.from_bytes(bytes, byteorder, signed=signed)
         assert rx == mpz.from_bytes(bytes, byteorder, signed=signed)
         assert rx == mpz.from_bytes(bytearray(bytes), byteorder, signed=signed)
+        if platform.python_implementation() == 'PyPy':  # FIXME
+            return
         assert rx == mpz.from_bytes(list(bytes), byteorder, signed=signed)
 
 
-@pytest.mark.xfail(reason="https://github.com/diofant/python-gmp/issues/2")
+def test_from_bytes_interface():
+    with pytest.raises(TypeError):
+        mpz.from_bytes()
+    with pytest.raises(TypeError):
+        mpz.from_bytes(1, 2, 3)
+    with pytest.raises(TypeError):
+        mpz.from_bytes(b'', 2)
+    with pytest.raises(TypeError):
+        mpz.from_bytes(1)
+    with pytest.raises(TypeError):
+        mpz.from_bytes(b'', bytes=b'')
+    with pytest.raises(TypeError):
+        mpz.from_bytes(b'', 'big', byteorder='big')
+    with pytest.raises(TypeError):
+        mpz.from_bytes(b'', spam=1)
+    with pytest.raises(TypeError):
+        mpz.from_bytes(a=1, b=2, c=3, d=4)
+
+    with pytest.raises(ValueError):
+        mpz.from_bytes(b'', 'spam')
+
+    assert mpz.from_bytes(b'\x01', byteorder='little') == mpz.from_bytes(b'\x01', 'little')
+
+    assert mpz.from_bytes(b'\x01') == mpz.from_bytes(bytes=b'\x01')
+    assert mpz.from_bytes(b'\x01') == mpz.from_bytes(b'\x01', 'big')
+    assert mpz.from_bytes(b'\x01') == mpz.from_bytes(b'\x01', signed=False)
+
+
 @given(integers())
 @example(117529601297931785)
 def test___float__(x):
@@ -349,7 +485,7 @@ def test___float__(x):
         assert float(mx) == fx
 
 
-@pytest.mark.xfail(reason="https://github.com/diofant/python-gmp/issues/4")
+@pytest.mark.xfail(reason="diofant/python-gmp#4")
 @given(integers(), integers(min_value=-20, max_value=30))
 def test___round__(x, n):
     mx = mpz(x)
@@ -414,14 +550,9 @@ def test_digits_frombase_high(x, base):
 def test_frombase_auto(x):
     mx = mpz(x)
     smx10 = mx.digits(10)
-    if mx >= 0:
-        smx2 = '0b' + mx.digits(2)
-        smx8 = '0o' + mx.digits(8)
-        smx16 = '0x' + mx.digits(16)
-    else:
-        smx2 = '-0b' + mx.digits(2)[1:]
-        smx8 = '-0o' + mx.digits(8)[1:]
-        smx16 = '-0x' + mx.digits(16)[1:]
+    smx2 = mx.digits(2, prefix=True)
+    smx8 = mx.digits(8, prefix=True)
+    smx16 = mx.digits(16, prefix=True)
     assert mpz(smx10, 0) == mx
     assert mpz(smx2, 0) == mx
     assert mpz(smx8, 0) == mx
@@ -432,7 +563,7 @@ def test_frombase_auto(x):
 
 
 @pytest.mark.parametrize('protocol',
-                         range(2, pickle.HIGHEST_PROTOCOL + 1))
+                         range(pickle.HIGHEST_PROTOCOL + 1))
 @given(integers())
 def test_pickle(protocol, x):
     mx = mpz(x)

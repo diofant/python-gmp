@@ -1,11 +1,10 @@
 [build-system]
-requires = ["setuptools>=74.1"]
+requires = ["setuptools>=74.1", 'setuptools_scm[toml]>=6.0']
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "python-gmp"
-#dynamic = ["version"]
-version = "0.1.2"
+dynamic = ["version"]
 description = "Safe bindings to the GNU GMP library"
 keywords = ['gmp', 'multiple-precision', 'arbitrary-precision', 'bignum']
 license = {text = "MIT"}
@@ -44,8 +43,8 @@ Documentation = 'https://python-gmp.readthedocs.io/'
 [tool.setuptools]
 ext-modules = [{name = "gmp", sources = ["main.c"], libraries = ["gmp"]}]
 
-#[tool.setuptools.dynamic]
-#version = {attr = "gmp.__version__"}
+[tool.setuptools.dynamic]
+version = {attr = 'setuptools_scm.get_version'}
 
 [tool.setuptools.package-data]
 "*" = ["*.h"]

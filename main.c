@@ -3,11 +3,9 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
+#include <float.h>
 #include <setjmp.h>
 #include <gmp.h>
-
-
-static const char python_gmp_version[] = "0.1.2";
 
 
 static jmp_buf gmp_env;
@@ -77,6 +75,7 @@ typedef struct _mpzobject {
     PyObject_HEAD
     uint8_t negative;
     mp_size_t size;
+    /* XXX: add alloc field? */
     mp_limb_t *digits;
 } MPZ_Object;
 
@@ -129,17 +128,28 @@ MPZ_FromDigitSign(mp_limb_t digit, uint8_t negative)
 
 
 static PyObject *
-MPZ_to_str(MPZ_Object *self, int base, int repr)
+MPZ_to_str(MPZ_Object *self, int base, int repr, int auto_prefix)
 {
     if (base < 2 || base > 62) {
         PyErr_SetString(PyExc_ValueError,
                         "base must be in the interval [2, 62]");
         return NULL;
     }
+    if (auto_prefix) {
+        repr = 0;
+    }
 
     Py_ssize_t len = mpn_sizeinbase(self->digits, self->size, base);
     Py_ssize_t prefix = repr ? 4 : 0;
-    unsigned char *buf = PyMem_Malloc(len + prefix + repr + self->negative);
+
+    if (auto_prefix && (base == 2 || base == 8 || base == 16)) {
+        auto_prefix = 2;
+    }
+    else {
+        auto_prefix = 0;
+    }
+
+    unsigned char *buf = PyMem_Malloc(len + auto_prefix + prefix + repr + self->negative);
 
     if (!buf) {
         return PyErr_NoMemory();
@@ -152,6 +162,17 @@ MPZ_to_str(MPZ_Object *self, int base, int repr)
     }
     repr += prefix;
     prefix += self->negative;
+    if (auto_prefix) {
+        if (base == 2) {
+            memcpy(buf + prefix, "0b", 2);
+        }
+        else if (base == 8) {
+            memcpy(buf + prefix, "0o", 2);
+        }
+        else {
+            memcpy(buf + prefix, "0x", 2);
+        }
+    }
 
     const char *num_to_text = (base > 36 ?
                                ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -159,14 +180,14 @@ MPZ_to_str(MPZ_Object *self, int base, int repr)
                                "0123456789abcdefghijklmnopqrstuvwxyz");
 
     if (CHECK_NO_MEM_LEAK) {
-        len -= (mpn_get_str(buf + prefix, base,
+        len -= (mpn_get_str(buf + auto_prefix + prefix, base,
                             self->digits, self->size) != (size_t)len);
     }
     else {
         PyMem_Free(buf);
         return PyErr_NoMemory();
     }
-    for (mp_size_t i = prefix; i < len + prefix; i++)
+    for (mp_size_t i = prefix + auto_prefix; i < len + prefix + auto_prefix; i++)
     {
         buf[i] = num_to_text[buf[i]];
     }
@@ -175,7 +196,7 @@ MPZ_to_str(MPZ_Object *self, int base, int repr)
     }
 
     PyObject *res = PyUnicode_FromStringAndSize((char*)buf,
-                                                len + repr + self->negative);
+                                                len + repr + self->negative + auto_prefix);
 
     PyMem_Free(buf);
     return res;
@@ -322,6 +343,10 @@ MPZ_from_str(PyObject *s, int base)
 
     MPZ_Object *res = MPZ_new(1 + len/2, negative);
 
+    if (!res) {
+        PyMem_Free(buf);
+        return NULL;
+    }
     if (CHECK_NO_MEM_LEAK) {
         res->size = mpn_set_str(res->digits, p, len, base);
     }
@@ -353,6 +378,9 @@ plus(MPZ_Object *a)
 
     MPZ_Object *res = MPZ_new(a->size, a->negative);
 
+    if (!res) {
+        return NULL;
+    }
     mpn_copyi(res->digits, a->digits, a->size);
     return (PyObject*)res;
 }
@@ -389,7 +417,7 @@ absolute(MPZ_Object *a)
 static PyObject *
 to_int(MPZ_Object *self)
 {
-    PyObject *str = MPZ_to_str(self, 16, 0);
+    PyObject *str = MPZ_to_str(self, 16, 0, 0);
 
     if (!str) {
         return NULL;
@@ -402,16 +430,105 @@ to_int(MPZ_Object *self)
 }
 
 
+static mp_limb_t
+MPZ_AsManAndExp(MPZ_Object *a, Py_ssize_t *e)
+{
+    mp_limb_t high = 1ULL<<DBL_MANT_DIG;
+    mp_limb_t r = 0, carry, left;
+    mp_size_t as, i, bits=0;
+
+    if (!a->size) {
+        *e = 0;
+        return 0;
+    }
+    as = a->size;
+    r = a->digits[as - 1];
+    if (r >= high) {
+        while ((r >> bits) >= high) {
+            bits++;
+        }
+        left = 1ULL << (bits - 1);
+        carry = r & (2*left - 1);
+        r >>= bits;
+        i = as - 1;
+        *e = (as - 1)*GMP_NUMB_BITS + DBL_MANT_DIG + bits;
+    }
+    else {
+        while (!((r << 1) & high)) {
+            r <<= 1;
+            bits++;
+        }
+        i = as - 1;
+        *e = (as - 1)*GMP_NUMB_BITS + DBL_MANT_DIG - bits;
+        for (i = as - 1;i && bits >= GMP_NUMB_BITS;) {
+            bits -= GMP_NUMB_BITS;
+            r += a->digits[--i] << bits;
+        }
+        if (i == 0) {
+            return r;
+        }
+        if (bits) {
+            bits = GMP_NUMB_BITS - bits;
+            left = 1ULL << (bits - 1);
+            r += a->digits[i - 1] >> bits;
+            carry = a->digits[i-1] & (2*left - 1);
+            i--;
+        }
+        else {
+            left = 1ULL<<(GMP_NUMB_BITS - 1);
+            carry = a->digits[i-1];
+            i--;
+        }
+    }
+    if (carry > left) {
+        r++;
+    }
+    else if (carry == left) {
+        if (r%2 == 1) {
+            r++;
+        }
+        else {
+            mp_size_t j;
+
+            for (j = 0; j < i; j++) {
+                if (a->digits[j]) {
+                    break;
+                }
+            }
+            if (i != j) {
+                r++;
+            }
+        }
+    }
+    return r;
+}
+
+
+static double
+MPZ_AsDoubleAndExp(MPZ_Object *a, Py_ssize_t *e)
+{
+    mp_limb_t man = MPZ_AsManAndExp(a, e);
+    double d = ldexp(man, -DBL_MANT_DIG);
+
+    if (a->negative) {
+        d = -d;
+    }
+    return d;
+}
+
+
 static PyObject *
 to_float(MPZ_Object *self)
 {
-    __mpz_struct tmp;
+    Py_ssize_t exp;
+    double d = MPZ_AsDoubleAndExp(self, &exp);
 
-    tmp._mp_d = self->digits;
-    tmp._mp_size = (self->negative ? -1 : 1)*self->size;
-
-    double d = mpz_get_d(&tmp);
-
+	if (exp > DBL_MAX_EXP) {
+        PyErr_SetString(PyExc_OverflowError,
+                        "integer too large to convert to float");
+        return NULL;
+    }
+    d = ldexp(d, exp);
     if (isinf(d)) {
         PyErr_SetString(PyExc_OverflowError,
                         "integer too large to convert to float");
@@ -1328,17 +1445,32 @@ power(PyObject *a, PyObject *b, PyObject *m)
     CHECK_OP(u, a);
     CHECK_OP(v, b);
     if (Py_IsNone(m)) {
+        if (v->negative) {
+            PyObject *uf, *vf, *resf;
+
+            uf = to_float(u);
+            Py_DECREF(u);
+            if (!uf) {
+                Py_DECREF(v);
+                return NULL;
+            }
+            vf = to_float(v);
+            Py_DECREF(v);
+            if (!vf) {
+                Py_DECREF(uf);
+                goto end;
+            }
+            resf = PyFloat_Type.tp_as_number->nb_power(uf, vf, Py_None);
+            Py_DECREF(uf);
+            Py_DECREF(vf);
+            return resf;
+        }
         if (!v->size) {
             res = MPZ_FromDigitSign(1, 0);
             goto end;
         }
         if (!u->size) {
             res = MPZ_FromDigitSign(0, 0);
-            goto end;
-        }
-        if (v->negative) {
-            PyErr_SetString(PyExc_NotImplementedError,
-                            "mpz.__pow__: float arg");
             goto end;
         }
         if (u->size == 1 && u->digits[0] == 1) {
@@ -1430,14 +1562,14 @@ static PyNumberMethods as_number = {
 static PyObject *
 repr(MPZ_Object *self)
 {
-    return MPZ_to_str(self, 10, 1);
+    return MPZ_to_str(self, 10, 1, 0);
 }
 
 
 static PyObject *
 str(MPZ_Object *self)
 {
-    return MPZ_to_str(self, 10, 0);
+    return MPZ_to_str(self, 10, 0, 0);
 }
 
 
@@ -1609,6 +1741,17 @@ bit_count(PyObject *a)
 }
 
 
+static void
+revstr(char* s, size_t l, size_t r)
+{
+    while (l < r) {
+        SWAP(char, s[l], s[r]);
+        l++;
+        r--;
+    }
+}
+
+
 static PyObject *
 to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
          PyObject *kwnames)
@@ -1622,8 +1765,183 @@ static PyObject *
 from_bytes(PyTypeObject *type, PyObject *const *args,
            Py_ssize_t nargs, PyObject *kwnames)
 {
-    PyErr_SetString(PyExc_NotImplementedError, "from_bytes()");
-    return NULL;
+    if (nargs > 2) {
+        PyErr_SetString(PyExc_TypeError,
+                        ("from_bytes() takes at most 2"
+                         " positional arguments"));
+        return NULL;
+    }
+
+    Py_ssize_t nkws = 0;
+    int is_little = 0, is_signed = 0, argidx[3] = {-1, -1, -1};
+
+    if (nargs >= 1) {
+        argidx[0] = 0;
+    }
+    if (nargs == 2) {
+        argidx[1] = 1;
+    }
+    if (kwnames) {
+        nkws = PyTuple_GET_SIZE(kwnames);
+    }
+    if (nkws > 3) {
+        PyErr_SetString(PyExc_TypeError,
+                        "from_bytes() takes at most 3 keyword arguments");
+        return NULL;
+    }
+    if (nkws + nargs < 1) {
+        PyErr_SetString(PyExc_TypeError,
+                        ("from_bytes() missing required argument"
+                         " 'bytes' (pos 1)"));
+        return NULL;
+    }
+    for (Py_ssize_t i = 0; i < nkws; i++) {
+        const char *kwname = PyUnicode_AsUTF8(PyTuple_GET_ITEM(kwnames, i));
+
+        if (strcmp(kwname, "bytes") == 0) {
+            if (nargs == 0) {
+                argidx[0] = (int)(nargs + i);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError,
+                                ("argument for from_bytes() given by"
+                                 " name ('bytes') and position (1)"));
+                return NULL;
+            }
+        }
+        else if (strcmp(kwname, "byteorder") == 0) {
+            if (nargs <= 1) {
+                argidx[1] = (int)(nargs + i);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError,
+                                ("argument for from_bytes() given by"
+                                 " name ('byteorder') and position (2)"));
+                return NULL;
+            }
+        }
+        else if (strcmp(kwname, "signed") == 0) {
+            argidx[2] = (int)(nargs + i);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError, ("got an invalid keyword "
+                                              "argument for from_bytes()"));
+            return NULL;
+        }
+    }
+    if (argidx[1] >= 0) {
+        PyObject *arg = args[argidx[1]];
+
+        if (PyUnicode_Check(arg)) {
+            const char* byteorder = PyUnicode_AsUTF8(arg);
+
+            if (!byteorder) {
+                return NULL;
+            }
+            else if (strcmp(byteorder, "big") == 0) {
+                is_little = 0;
+            }
+            else if (strcmp(byteorder, "little") == 0) {
+                is_little = 1;
+            }
+            else {
+                PyErr_SetString(PyExc_ValueError,
+                                ("byteorder must be either 'little'"
+                                 " or 'big'"));
+                return NULL;
+            }
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError,
+                            ("from_bytes() argument 'byteorder'"
+                             " must be str"));
+            return NULL;
+        }
+    }
+    if (argidx[2] >= 0) {
+        is_signed = PyObject_IsTrue(args[argidx[2]]);
+    }
+
+    PyObject *bytes = PyObject_Bytes(args[argidx[0]]);
+    char *buffer;
+    Py_ssize_t length;
+
+    if (bytes == NULL) {
+        return NULL;
+    }
+    if (PyBytes_AsStringAndSize(bytes, &buffer, &length) == -1) {
+        return NULL;
+    }
+    if (!length) {
+        Py_DECREF(bytes);
+        return (PyObject*)MPZ_FromDigitSign(0, 0);
+    }
+
+    MPZ_Object *res = MPZ_new(1 + length/2, 0);
+
+    if (!res) {
+        Py_DECREF(bytes);
+        return NULL;
+    }
+    if (is_little) {
+        char *tmp = PyMem_Malloc(length);
+
+        if (!tmp) {
+            Py_DECREF(bytes);
+            return PyErr_NoMemory();
+        }
+        memcpy(tmp, buffer, length);
+        buffer = tmp;
+        revstr(buffer, 0, length - 1);
+    }
+    if (CHECK_NO_MEM_LEAK) {
+        res->size = mpn_set_str(res->digits, (unsigned char*)buffer,
+                                length, 256);
+    }
+    else {
+        Py_DECREF(res);
+        PyMem_Free(bytes);
+        if (is_little) {
+            PyMem_Free(buffer);
+        }
+        return PyErr_NoMemory();
+    }
+    Py_DECREF(bytes);
+    if (is_little) {
+        PyMem_Free(buffer);
+    }
+
+    mp_limb_t *tmp = res->digits;
+
+    res->digits = PyMem_Resize(tmp, mp_limb_t, res->size);
+    if (!res->digits) {
+        res->digits = tmp;
+        Py_DECREF(res);
+        return PyErr_NoMemory();
+    }
+    MPZ_normalize(res);
+    if (is_signed && mpn_sizeinbase(res->digits, res->size,
+                                    2) == 8*(size_t)length)
+    {
+        if (res->size > 1) {
+            if (mpn_sub_1(res->digits, res->digits, res->size, 1)) {
+                res->digits[res->size - 1] -= 1;
+            }
+            mpn_com(res->digits, res->digits, res->size - 1);
+        }
+        else {
+            res->digits[res->size - 1] -= 1;
+        }
+        res->digits[res->size - 1] = ~res->digits[res->size - 1];
+
+        mp_size_t shift = GMP_NUMB_BITS*res->size - 8*length;
+
+        res->digits[res->size - 1] <<= shift;
+        res->digits[res->size - 1] >>= shift;
+        res->negative = 1;
+        MPZ_normalize(res);
+    }
+    return (PyObject*)res;
 }
 
 
@@ -1653,16 +1971,26 @@ __round__(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 
 
 static PyObject *
-__getnewargs__(PyObject *self, PyObject *Py_UNUSED(ignored))
+__reduce__(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
-    return Py_BuildValue("(Ni)", MPZ_to_str((MPZ_Object*)self, 16, 0), 16);
+    return Py_BuildValue("O(Ni)", Py_TYPE(self),
+                         MPZ_to_str((MPZ_Object*)self, 16, 0, 0),
+                         16);
 }
+
 
 static PyObject *
 __format__(PyObject *self, PyObject *format_spec)
 {
-    PyErr_SetString(PyExc_NotImplementedError, "mpz.__format__");
-    return NULL;
+    /* FIXME: replace this stub */
+    PyObject *integer = to_int((MPZ_Object*)self), *res;
+
+    if (!integer) {
+        return NULL;
+    }
+    res = PyObject_CallMethod(integer, "__format__", "O", format_spec);
+    Py_DECREF(integer);
+    return res;
 }
 
 
@@ -1692,17 +2020,20 @@ digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
     }
 
     Py_ssize_t nkws = 0;
-    int base = 10, argidx[1] = {-1};
+    int base = 10, prefix = 0, argidx[2] = {-1, -1};
 
-    if (nargs == 1) {
+    if (nargs >= 1) {
         argidx[0] = 0;
+    }
+    if (nargs == 2) {
+        argidx[1] = 1;
     }
     if (kwnames) {
         nkws = PyTuple_GET_SIZE(kwnames);
     }
-    if (nkws > 1) {
+    if (nkws > 2) {
         PyErr_SetString(PyExc_TypeError,
-                        "digits() takes at most one keyword argument");
+                        "digits() takes at most two keyword argument");
         return NULL;
     }
     for (Py_ssize_t i = 0; i < nkws; i++) {
@@ -1715,6 +2046,16 @@ digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
             else {
                 PyErr_SetString(PyExc_TypeError,
                                 "argument for digits() given by name ('base') and position (1)");
+                return NULL;
+            }
+        }
+        else if (strcmp(kwname, "prefix") == 0) {
+            if (nargs <= 1) {
+                argidx[1] = (int)(nargs + i);
+            }
+            else {
+                PyErr_SetString(PyExc_TypeError,
+                                "argument for digits() given by name ('prefix') and position (2)");
                 return NULL;
             }
         }
@@ -1739,8 +2080,10 @@ digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
             return NULL;
         }
     }
-
-    return MPZ_to_str((MPZ_Object*)self, base, 0);
+    if (argidx[1] != -1) {
+        prefix = PyObject_IsTrue(args[argidx[1]]);
+    }
+    return MPZ_to_str((MPZ_Object*)self, base, 0, prefix);
 }
 
 PyDoc_STRVAR(to_bytes__doc__,
@@ -1806,7 +2149,7 @@ static PyMethodDef methods[] = {
       "Rounding an Integral returns itself.\n\n"
       "Rounding with an ndigits argument also returns an integer.")
     },
-    {"__getnewargs__", (PyCFunction)__getnewargs__, METH_NOARGS, NULL},
+    {"__reduce__", (PyCFunction)__reduce__, METH_NOARGS, NULL},
     {"__format__", (PyCFunction)__format__, METH_O,
      ("__format__($self, format_spec, /)\n--\n\n"
       "Convert to a string according to format_spec.")},
@@ -1903,6 +2246,7 @@ gmp_gcd(PyObject *self, PyObject * const *args, Py_ssize_t nargs)
                     Py_DECREF(res);
                     return NULL;
                 }
+                Py_DECREF(tmp);
             }
             else {
                 Py_DECREF(res);
@@ -1913,6 +2257,10 @@ gmp_gcd(PyObject *self, PyObject * const *args, Py_ssize_t nargs)
             if (!res->size) {
                 Py_DECREF(res);
                 res = (MPZ_Object*)absolute(arg);
+                if (!res) {
+                    Py_DECREF(arg);
+                    return NULL;
+                }
                 Py_DECREF(arg);
                 continue;
             }
@@ -2070,11 +2418,6 @@ PyInit_gmp(void)
     if (PyModule_AddType(m, &MPZ_Type) < 0) {
         return NULL;
     }
-    if (PyModule_AddStringConstant(m, "__version__",
-                                   python_gmp_version) < 0)
-    {
-        return NULL;
-    }
     if (PyModule_Add(m, "_limb_size",
                      PyLong_FromSize_t(sizeof(mp_limb_t))) < 0)
     {
@@ -2089,7 +2432,7 @@ PyInit_gmp(void)
         return NULL;
     }
 
-    char* register_str = "numbers.Integral.register(gmp.mpz)\n";
+    const char* str = "numbers.Integral.register(gmp.mpz)\n";
     PyObject *ns = PyDict_New();
 
     if (!ns) {
@@ -2104,15 +2447,35 @@ PyInit_gmp(void)
         return NULL;
     }
 
-    PyObject *res = PyRun_String(register_str, Py_file_input, ns, ns);
+    PyObject *res = PyRun_String(str, Py_file_input, ns, ns);
 
     if (!res) {
         Py_DECREF(numbers);
         Py_DECREF(ns);
         return NULL;
     }
+    Py_DECREF(res);
+
+    PyObject *importlib = PyImport_ImportModule("importlib.metadata");
+
+    if (!importlib) {
+        Py_DECREF(ns);
+        return NULL;
+    }
+    if (PyDict_SetItemString(ns, "importlib", importlib) < 0) {
+        Py_DECREF(ns);
+        Py_DECREF(importlib);
+        return NULL;
+    }
+    str = "gmp.__version__ = importlib.version('python-gmp')\n";
+    res = PyRun_String(str, Py_file_input, ns, ns);
+    if (!res) {
+        Py_DECREF(ns);
+        Py_DECREF(importlib);
+        return NULL;
+    }
     Py_DECREF(ns);
-    Py_XDECREF(res);
-    Py_DECREF(numbers);
+    Py_DECREF(importlib);
+    Py_DECREF(res);
     return m;
 }
