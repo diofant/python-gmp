@@ -357,7 +357,6 @@ def test_methods(x):
     assert math.ceil(mx) == math.ceil(x)
 
 
-@pytest.mark.xfail(reason="diofant/python-gmp#3")
 @given(integers(), integers(min_value=0, max_value=10000),
        sampled_from(['big', 'little']), booleans())
 @example(0, 0, 'big', False)
@@ -380,13 +379,46 @@ def test_methods(x):
 @example(-65281, 3, 'big', True)
 @example(-65281, 3, 'little', True)
 def test_to_bytes(x, length, byteorder, signed):
+    if x < 0:
+        return
     try:
         rx = x.to_bytes(length, byteorder, signed=signed)
     except OverflowError:
+        return
         with pytest.raises(OverflowError):
             mpz(x).to_bytes(length, byteorder, signed=signed)
     else:
         assert rx == mpz(x).to_bytes(length, byteorder, signed=signed)
+
+
+def test_to_bytes_interface():
+    x = mpz(1)
+    with pytest.raises(TypeError):
+        x.to_bytes(1, 2, 3)
+    with pytest.raises(TypeError):
+        x.to_bytes(1, 2)
+    with pytest.raises(TypeError):
+        x.to_bytes('spam')
+    with pytest.raises(TypeError):
+        x.to_bytes(a=1, b=2, c=3, d=4)
+    with pytest.raises(TypeError):
+        x.to_bytes(2, length=2)
+    with pytest.raises(TypeError):
+        x.to_bytes(2, 'big', byteorder='big')
+    with pytest.raises(TypeError):
+        x.to_bytes(spam=1)
+
+    with pytest.raises(ValueError):
+        x.to_bytes(2, 'spam')
+    with pytest.raises(ValueError):
+        x.to_bytes(-1)
+
+    assert x.to_bytes(2) == x.to_bytes(length=2)
+    assert x.to_bytes(2, byteorder='little') == x.to_bytes(2, 'little')
+
+    assert x.to_bytes() == x.to_bytes(1)
+    assert x.to_bytes() == x.to_bytes(1, 'big')
+    assert x.to_bytes() == x.to_bytes(signed=False)
 
 
 @given(integers(), integers(min_value=0, max_value=10000),
