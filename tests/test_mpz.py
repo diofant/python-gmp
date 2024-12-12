@@ -27,7 +27,6 @@ def test_from_to_str(x):
     assert str(mx) == sx
 
 
-@pytest.mark.xfail(reason="diofant/python-gmp#46")
 @given(text(alphabet=characters(min_codepoint=48, max_codepoint=57,
                                 include_characters=['_'])))
 def test_underscores(s):
