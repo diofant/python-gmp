@@ -10,3 +10,5 @@ then
 else
   auditwheel repair -w ${DEST_DIR} ${WHEEL}
 fi
+
+unzip -l ${WHEEL}
