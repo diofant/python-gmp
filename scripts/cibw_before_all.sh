@@ -24,9 +24,6 @@ make -j6
 make install
 cd ../
 
-# -- copy headers --
-cp $PREFIX/include/gmp.h python-gmp/
-
 # -- generate *.lib files from *.dll on M$ Windows --
 if [ "$OSTYPE" = "msys" ]
 then
