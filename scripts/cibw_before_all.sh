@@ -19,6 +19,7 @@ rm config.guess && mv configfsf.guess config.guess && chmod +x config.guess
             --enable-shared \
             --disable-static \
             --with-pic \
+            --disable-alloca \
             --prefix=$PREFIX -q
 make -j6 -s
 make -s install

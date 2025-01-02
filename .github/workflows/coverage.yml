@@ -17,16 +17,20 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: |
           sudo apt-get update
-          sudo apt-get install libgmp-dev
           sudo apt-get install lcov
       - run: pip install --upgrade pip 'setuptools<=79.0.1' setuptools_scm
+      - run: bash scripts/cibw_before_all.sh
       - run: pip --verbose install --editable .[tests]
-      - run: |
+      - name: Build and run coverage tests
+        run: |
           python setup.py clean
-          CFLAGS="-coverage" python setup.py develop
+          python setup.py develop
           pytest --hypothesis-profile=default
           lcov --capture --directory . --no-external \
               --output-file build/coverage-${{ matrix.python-version }}.info
+        env:
+          CFLAGS: -coverage
+          LD_LIBRARY_PATH: .local/lib/
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python-version }}
