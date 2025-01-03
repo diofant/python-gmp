@@ -67,9 +67,9 @@ def benchmark_gmpy2_mpz():
 
 # 1. Run benchmark
 #  >> python3 scripts/benchmark.py -o <benchmark_result>
-# 2. Display benchmark Table
+# 2. Show benchmark table
 #  >> python3 -m pyperf compare_to <benchmark_file> <benchmark_result> --table
-# or Display benchmark hist graph
+# or Show benchmark hist graph
 #  >> python3 -m pyperf hist <benchmark_result>
 if __name__ == "__main__":
     runner = pyperf.Runner(loops=1)
