@@ -606,8 +606,8 @@ def test_from_bytes(x, length, byteorder, signed):
         rx = int.from_bytes(bytes, byteorder, signed=signed)
         assert rx == mpz.from_bytes(bytes, byteorder, signed=signed)
         assert rx == mpz.from_bytes(bytearray(bytes), byteorder, signed=signed)
-        if platform.python_implementation() == "PyPy":  # FIXME
-            return
+        if platform.python_implementation() == "PyPy":
+            return  # XXX: pypy/pypy#5165
         assert rx == mpz.from_bytes(list(bytes), byteorder, signed=signed)
 
 
