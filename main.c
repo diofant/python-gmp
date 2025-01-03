@@ -460,11 +460,6 @@ MPZ_from_int(PyObject *obj)
 
     MPZ_Object *res = MPZ_from_str(str, 16);
 
-    if (!res) {
-        /* LCOV_EXCL_START */
-        return NULL;
-        /* LCOV_EXCL_STOP */
-    }
     Py_DECREF(str);
     return res;
 #endif
