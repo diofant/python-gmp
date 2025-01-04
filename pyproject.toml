@@ -46,6 +46,7 @@ Homepage = "https://github.com/diofant/python-gmp"
 Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 
 [tool.setuptools]
+ext-modules = [{name = "gmp", sources = ["main.c"], libraries = ["gmp"], include-dirs = [".local/include"], library-dirs = [".local/lib"]}]
 py-modules = ["_gmp_fractions", "_gmp_utils"]
 
 [tool.setuptools.dynamic]
