@@ -1591,17 +1591,20 @@ static MPZ_Object *
 MPZ_powm(MPZ_Object *u, MPZ_Object *v, MPZ_Object *w)
 {
     if (mpn_scan1(w->digits, 0)) {
-        __mpz_struct tmp, b, e, m;
+        mpz_t tmp, b, e, m;
 
-        b._mp_d = u->digits;
-        b._mp_size = u->size;
-        e._mp_d = v->digits;
-        e._mp_size = v->size;
-        m._mp_d = w->digits;
-        m._mp_size = w->size;
+        b->_mp_d = u->digits;
+        b->_mp_size = u->size;
+        b->_mp_alloc = u->size;
+        e->_mp_d = v->digits;
+        e->_mp_size = v->size;
+        e->_mp_alloc = v->size;
+        m->_mp_d = w->digits;
+        m->_mp_size = w->size;
+        m->_mp_alloc = w->size;
         if (CHECK_NO_MEM_LEAK) {
-            mpz_init(&tmp);
-            mpz_powm(&tmp, &b, &e, &m);
+            mpz_init(tmp);
+            mpz_powm(tmp, b, e, m);
         }
         else {
             /* LCOV_EXCL_START */
@@ -1609,16 +1612,16 @@ MPZ_powm(MPZ_Object *u, MPZ_Object *v, MPZ_Object *w)
             /* LCOV_EXCL_STOP */
         }
 
-        MPZ_Object *res = MPZ_new(tmp._mp_size, 0);
+        MPZ_Object *res = MPZ_new(tmp->_mp_size, 0);
 
         if (!res) {
             /* LCOV_EXCL_START */
-            mpz_clear(&tmp);
+            mpz_clear(tmp);
             return NULL;
             /* LCOV_EXCL_STOP */
         }
-        mpn_copyi(res->digits, tmp._mp_d, res->size);
-        mpz_clear(&tmp);
+        mpn_copyi(res->digits, tmp->_mp_d, res->size);
+        mpz_clear(tmp);
         return res;
     }
 
