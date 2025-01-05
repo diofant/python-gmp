@@ -31,7 +31,7 @@ def test_factorial_outofmemory():
 
     for _ in range(100):
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-        resource.setrlimit(resource.RLIMIT_AS, (1024*64*1024, hard))
+        resource.setrlimit(resource.RLIMIT_AS, (1024*32*1024, hard))
         a = random.randint(12811, 24984)
         a = mpz(a)
         while True:
