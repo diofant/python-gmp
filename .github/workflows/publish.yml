@@ -3,7 +3,7 @@ on: push
 jobs:
   build:
     name: Build distribution
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
       with:
@@ -25,7 +25,7 @@ jobs:
     needs:
       - build
       - wheels
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     environment:
       name: pypi
       url: https://pypi.org/p/python-gmp
@@ -44,7 +44,7 @@ jobs:
       and upload them to GitHub Release
     needs:
       - publish-to-pypi
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       id-token: write
