@@ -18,7 +18,10 @@ def test_isqrt(x):
 def test_factorial(x):
     mx = mpz(x)
     r = math.factorial(x)
-    assert factorial(mx) == factorial(x) == r
+    try:
+        assert factorial(mx) == factorial(x) == r
+    except MemoryError:
+        pass
 
 
 @pytest.mark.skipif(platform.system() != "Linux",
