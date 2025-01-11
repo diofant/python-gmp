@@ -106,7 +106,7 @@ typedef struct _mpzobject {
 PyTypeObject MPZ_Type;
 
 #if !defined(PYPY_VERSION)
-#  define CACHE_SIZE (99)
+#  define CACHE_SIZE (0)
 #else
 #  define CACHE_SIZE (0)
 #endif
