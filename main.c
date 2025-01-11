@@ -2591,7 +2591,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
         else {
             res = MPZ_powm(u, v, w);
         }
-        if (negativeOutput && res->size) {
+        if (negativeOutput && res && res->size) {
             MPZ_Object *tmp = res;
 
             res = MPZ_sub(res, w);
