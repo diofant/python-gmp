@@ -55,7 +55,6 @@ jobs:
           export LDFLAGS="-L$(brew --prefix gmp)/lib"
           pip --verbose install --editable .[tests]
       - run: pytest
-      - run: python scripts/fac.py
   windows:
     needs:
       - linux
@@ -84,4 +83,3 @@ jobs:
           pip install --upgrade pip
           pip --verbose install -e .[tests]
           pytest
-          python scripts/fac.py
