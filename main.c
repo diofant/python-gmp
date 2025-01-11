@@ -2516,7 +2516,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
         }
         else if (PyLong_Check(module)) {
             w = MPZ_from_int(module);
-            if (!u) {
+            if (!w) {
                 goto end;
             }
         }
