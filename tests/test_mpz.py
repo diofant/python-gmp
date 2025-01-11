@@ -361,31 +361,33 @@ def test_power(x, y):
         assert x**my == r
 
 
-#@given(integers(), integers(max_value=1000000), integers())
-#@example(123, 111, 1)
-#@example(123, 1, 12)
-#@example(1, 123, 12)
-#def test_power_mod(x, y, z):
-#    mx = mpz(x)
-#    my = mpz(y)
-#    mz = mpz(z)
-#    try:
-#        r = pow(x, y, z)
-#    except ValueError:
-#        with pytest.raises(ValueError):
-#            pow(mx, my, mz)
-#    except ZeroDivisionError:
-#        with pytest.raises(ZeroDivisionError):
-#            pow(mx, my, mz)
-#    else:
-#        assert pow(mx, my, mz) == r
-#        assert pow(mx, my, z) == r
-#        assert pow(mx, y, mz) == r
-#        if platform.python_implementation() == "PyPy":  # FIXME
-#            return
-#        assert pow(x, my, mz) == r
-#
-#
+@given(integers(), integers(max_value=1000000), integers())
+@example(123, 111, 1)
+@example(123, 1, 12)
+@example(1, 123, 12)
+def test_power_mod(x, y, z):
+    mx = mpz(x)
+    my = mpz(y)
+    mz = mpz(z)
+    try:
+        r = pow(x, y, z)
+    except ValueError:
+        with pytest.raises(ValueError):
+            pow(mx, my, mz)
+    except ZeroDivisionError:
+        with pytest.raises(ZeroDivisionError):
+            pow(mx, my, mz)
+    else:
+        if not (z & 1):
+            return
+        assert pow(mx, my, mz) == r
+        assert pow(mx, my, z) == r
+        assert pow(mx, y, mz) == r
+        if platform.python_implementation() == "PyPy":  # FIXME
+            return
+        assert pow(x, my, mz) == r
+
+
 @given(integers())
 def test_invert(x):
     mx = mpz(x)
