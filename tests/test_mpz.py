@@ -171,21 +171,21 @@ def test_mpz_interface():
         mpz(with_int(1j))
 
 
-#def test_mpz_subclasses():
-#    class mpz2(mpz):
-#        pass
-#
-#    assert issubclass(mpz2, mpz)
-#    x = mpz2(123)
-#    assert type(x) is mpz2
-#    assert type(x) is not mpz
-#    assert isinstance(x, mpz2)
-#    assert isinstance(x, mpz)
-#    assert x == mpz(123)
-#    assert mpz2() == 0
-#    assert mpz2("123", 16) == int("123", 16)
-#
-#
+def test_mpz_subclasses():
+    class mpz2(mpz):
+        pass
+
+    assert issubclass(mpz2, mpz)
+    x = mpz2(123)
+    assert type(x) is mpz2
+    assert type(x) is not mpz
+    assert isinstance(x, mpz2)
+    assert isinstance(x, mpz)
+    assert x == mpz(123)
+    assert mpz2() == 0
+    assert mpz2("123", 16) == int("123", 16)
+
+
 @given(integers())
 def test_repr(x):
     mx = mpz(x)

@@ -156,11 +156,14 @@ MPZ_new(mp_size_t size, uint8_t negative)
     return res;
 }
 
+#define MPZ_CheckExact(u) Py_IS_TYPE((u), &MPZ_Type)
+
 static void
 MPZ_dealloc(MPZ_Object *u)
 {
     if (global.gmp_cache_size < CACHE_SIZE
-        && u->size <= MAX_CACHE_MPZ_LIMBS)
+        && u->size <= MAX_CACHE_MPZ_LIMBS
+        && MPZ_CheckExact((PyObject *)u))
     {
         global.gmp_cache[(global.gmp_cache_size)++] = u;
     }
@@ -1984,7 +1987,6 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
 }
 
 #define MPZ_Check(u) PyObject_TypeCheck((u), &MPZ_Type)
-#define MPZ_CheckExact(u) Py_IS_TYPE((u), &MPZ_Type)
 
 #if PY_VERSION_HEX >= 0x030D0000 || defined(PYPY_VERSION)
 /* copied from CPython internals */
