@@ -33,6 +33,7 @@ gmp_reallocate_function(void *ptr, size_t old_size, size_t new_size)
         }
         gmp_tracker.ptrs[gmp_tracker.size] = ret;
         gmp_tracker.size++;
+        assert(gmp_tracker.size<=TRACKER_MAX_SIZE);
         return ret;
     }
     size_t i = gmp_tracker.size - 1;
@@ -42,6 +43,8 @@ gmp_reallocate_function(void *ptr, size_t old_size, size_t new_size)
             break;
         }
     }
+    assert(i<gmp_tracker.size);
+    assert(gmp_tracker.ptrs[i] == ptr);
 
     void *ret = realloc(ptr, new_size);
 
@@ -75,6 +78,7 @@ gmp_free_function(void *ptr, size_t size)
     for (size_t i = gmp_tracker.size - 1; i >= 0; i--) {
         if (gmp_tracker.ptrs[i] == ptr) {
             gmp_tracker.ptrs[i] = NULL;
+            assert(i<gmp_tracker.size);
             break;
         }
     }
