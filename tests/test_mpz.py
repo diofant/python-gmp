@@ -378,8 +378,6 @@ def test_power_mod(x, y, z):
         with pytest.raises(ZeroDivisionError):
             pow(mx, my, mz)
     else:
-        if not (z & 1):
-            return
         assert pow(mx, my, mz) == r
         assert pow(mx, my, z) == r
         assert pow(mx, y, mz) == r
