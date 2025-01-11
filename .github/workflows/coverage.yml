@@ -32,34 +32,34 @@ jobs:
 #         name: coverage-${{ matrix.python-version }}
 #         path: |
 #           build/coverage-${{ matrix.python-version }}.info
-  merge-coverage:
-    runs-on: ubuntu-24.04
-    needs:
-      - coverage
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - run: |
-          sudo apt-get update
-          sudo apt-get install lcov
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: coverage-*
-          path: build/
-          merge-multiple: true
-      - run: |
-          genhtml build/coverage*.info --output-directory build/coverage
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: |
-            build/coverage/
-            build/coverage*.info
-      - uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          gcov_ignore: pythoncapi_compat.h
-          gcov_include: src/main.c
-          gcov_args: --no-external
-          fail_ci_if_error: true
+# merge-coverage:
+#   runs-on: ubuntu-24.04
+#   needs:
+#     - coverage
+#   steps:
+#     - uses: actions/checkout@v4
+#       with:
+#         fetch-depth: 0
+#     - run: |
+#         sudo apt-get update
+#         sudo apt-get install lcov
+#     - uses: actions/download-artifact@v4
+#       with:
+#         pattern: coverage-*
+#         path: build/
+#         merge-multiple: true
+#     - run: |
+#         genhtml build/coverage*.info --output-directory build/coverage
+#     - uses: actions/upload-artifact@v4
+#       with:
+#         name: coverage
+#         path: |
+#           build/coverage/
+#           build/coverage*.info
+#     - uses: codecov/codecov-action@v5
+#       with:
+#         token: ${{ secrets.CODECOV_TOKEN }}
+#         gcov_ignore: pythoncapi_compat.h
+#         gcov_include: src/main.c
+#         gcov_args: --no-external
+#         fail_ci_if_error: true
