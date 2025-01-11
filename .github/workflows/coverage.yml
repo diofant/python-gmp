@@ -23,7 +23,7 @@ jobs:
       - run: pip --verbose install --editable .[tests]
       - run: |
           python setup.py clean
-          CFLAGS="-coverage" python setup.py develop
+          CFLAGS="-coverage -g" python setup.py develop
           pytest --hypothesis-profile=default
           lcov --capture --directory . --no-external \
               --output-file build/coverage-${{ matrix.python-version }}.info
