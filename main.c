@@ -55,10 +55,8 @@ gmp_reallocate_function(void *ptr, size_t old_size, size_t new_size)
 err:
     /* LCOV_EXCL_START */
     for (size_t i = 0; i < gmp_tracker.size; i++) {
-        if (gmp_tracker.ptrs[i]) {
-            free(gmp_tracker.ptrs[i]);
-            gmp_tracker.ptrs[i] = NULL;
-        }
+        free(gmp_tracker.ptrs[i]);
+        gmp_tracker.ptrs[i] = NULL;
     }
     gmp_tracker.size = 0;
     longjmp(gmp_env, 1);
@@ -75,15 +73,22 @@ static void
 gmp_free_function(void *ptr, size_t size)
 {
     for (size_t i = gmp_tracker.size - 1; i >= 0; i--) {
-        if (gmp_tracker.ptrs[i] && gmp_tracker.ptrs[i] == ptr) {
+        if (gmp_tracker.ptrs[i] == ptr) {
             gmp_tracker.ptrs[i] = NULL;
-            if (i == gmp_tracker.size - 1) {
-                gmp_tracker.size--;
-            }
             break;
         }
     }
     free(ptr);
+
+    size_t i = gmp_tracker.size - 1;
+
+    while (gmp_tracker.size > 0) {
+        if (gmp_tracker.ptrs[i]) {
+            break;
+        }
+        gmp_tracker.size--;
+        i--;
+    }
 }
 
 typedef struct _mpzobject {
@@ -2650,7 +2655,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
         }
         else if (PyLong_Check(module)) {
             w = MPZ_from_int(module);
-            if (!u) {
+            if (!w) {
                 goto end;
             }
         }
@@ -2725,7 +2730,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
         else {
             res = MPZ_powm(u, v, w);
         }
-        if (negativeOutput && res->size) {
+        if (negativeOutput && res && res->size) {
             MPZ_Object *tmp = res;
 
             res = MPZ_sub(res, w);
