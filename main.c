@@ -1880,16 +1880,7 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
     }
     memset(buffer, is_negative ? 0xFF : 0, gap);
     if (u->size) {
-        if (CHECK_NO_MEM_LEAK) {
-            mpn_get_str((unsigned char *)(buffer + gap), 256, u->digits,
-                        u->size);
-        }
-        else {
-            /* LCOV_EXCL_START */
-            Py_XDECREF(tmp);
-            return PyErr_NoMemory();
-            /* LCOV_EXCL_STOP */
-        }
+        mpn_get_str((unsigned char *)(buffer + gap), 256, u->digits, u->size);
     }
     Py_XDECREF(tmp);
     if (is_little && length) {
@@ -1943,20 +1934,7 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
         buffer = tmp;
         revstr(buffer, 0, length - 1);
     }
-    if (CHECK_NO_MEM_LEAK) {
-        res->size = mpn_set_str(res->digits, (unsigned char *)buffer,
-                                length, 256);
-    }
-    else {
-        /* LCOV_EXCL_START */
-        Py_DECREF(res);
-        PyMem_Free(bytes);
-        if (is_little) {
-            PyMem_Free(buffer);
-        }
-        return (MPZ_Object *)PyErr_NoMemory();
-        /* LCOV_EXCL_STOP */
-    }
+    res->size = mpn_set_str(res->digits, (unsigned char *)buffer, length, 256);
     Py_DECREF(bytes);
     if (is_little) {
         PyMem_Free(buffer);
