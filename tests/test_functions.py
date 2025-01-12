@@ -1,5 +1,7 @@
 import math
 import platform
+import random
+import resource
 
 import pytest
 from gmp import factorial, gcd, isqrt, mpz
@@ -29,15 +31,11 @@ def test_factorial(x):
 @pytest.mark.skipif(platform.python_implementation() == "PyPy",
                     reason="XXX: bug in PyNumber_ToBase()?")
 def test_factorial_outofmemory():
-    import random
-    import resource
-
     soft, hard = resource.getrlimit(resource.RLIMIT_AS)
     resource.setrlimit(resource.RLIMIT_AS, (1024*32*1024, hard))
 
     for _ in range(100):
         a = random.randint(12811, 24984)
-        print(a)
         while True:
             try:
                 factorial(a)
