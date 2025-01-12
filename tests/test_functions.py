@@ -37,7 +37,6 @@ def test_factorial_outofmemory():
 
     for _ in range(100):
         a = random.randint(12811, 24984)
-        a = mpz(a)
         while True:
             try:
                 factorial(a)
