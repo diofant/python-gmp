@@ -1,1 +1,1 @@
-sphinx @ git+https://github.com/picnixz/sphinx.git@fix/13188-classmethod-c
+sphinx @ git+https://github.com/sphinx-doc/sphinx.git
