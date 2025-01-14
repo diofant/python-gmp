@@ -32,7 +32,7 @@ jobs:
           sudo apt-get install libgmp-dev
       - run: pip install --upgrade pip
       - run: pip --verbose install --editable .[tests]
-      - run: pytest
+      - run: pytest --assert=plain
   macos:
     needs:
       - linux
@@ -52,7 +52,7 @@ jobs:
           export CFLAGS="$CFLAGS -I$(brew --prefix gmp)/include"
           export LDFLAGS="-L$(brew --prefix gmp)/lib"
           pip --verbose install --editable .[tests]
-      - run: pytest
+      - run: pytest --assert=plain
   windows:
     needs:
       - linux
@@ -80,4 +80,4 @@ jobs:
           source .test-venv/bin/activate
           pip install --upgrade pip
           pip --verbose install -e .[tests]
-          pytest
+          pytest --assert=plain

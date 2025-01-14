@@ -46,7 +46,7 @@ Homepage = "https://github.com/diofant/python-gmp"
 Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 
 [tool.setuptools]
-py-modules = ["_gmp_fractions", "_gmp_utils"]
+py-modules = ["_gmp_fractions"]
 
 [tool.setuptools.dynamic]
 version = {attr = "setuptools_scm.get_version"}
