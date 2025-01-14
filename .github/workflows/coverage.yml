@@ -24,7 +24,7 @@ jobs:
       - run: |
           python setup.py clean
           CFLAGS="-coverage -g" python setup.py develop
-          pytest --hypothesis-profile=default -vs
+          pytest --hypothesis-profile=default --assert=plain -vs
           lcov --capture --directory . --no-external \
               --output-file build/coverage-${{ matrix.python-version }}.info
       - uses: actions/upload-artifact@v4
