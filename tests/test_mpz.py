@@ -2,6 +2,7 @@ import math
 import operator
 import pickle
 import platform
+import resource
 import string
 import sys
 import warnings
@@ -776,8 +777,6 @@ def test_pickle(protocol, x):
 @example(249846727467293)
 @example(1292734994793)
 def test_outofmemory(x):
-    import resource
-
     soft, hard = resource.getrlimit(resource.RLIMIT_AS)
     resource.setrlimit(resource.RLIMIT_AS, (1024*32*1024, hard))
     mx = mpz(x)
