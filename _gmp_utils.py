@@ -51,7 +51,15 @@ def powproduct(ns):
             if exp % 2:
                 units *= base
             multi.append((base, exp//2))
-    return units * powproduct(multi)**2
+    p = powproduct(multi)
+    p2 = p**2
+    del p
+    #pp = int(units) * int(p2)
+    #print(units.bit_length(), p2.bit_length(), flush=True)
+    pp2 = units * p2
+    del units
+    del p2
+    return pp2
 
 
 def factorial(n, /):
