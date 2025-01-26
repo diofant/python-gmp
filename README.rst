@@ -10,6 +10,15 @@ also few functions (factorial, gcd and isqrt), compatible with the stdlib's
 module math.
 
 
+Warning on alloca
+-----------------
+
+Most GMP packages enable using alloca() for temporary workspace allocation.
+This module can't prevent a crash in case of a stack overflow.  To avoid this,
+you should compile the GMP library with '--disable-alloca' configure option to
+use rather the heap for all temporary allocations.
+
+
 Motivation
 ----------
 
