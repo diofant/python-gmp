@@ -19,6 +19,13 @@ you should compile the GMP library with '--disable-alloca' configure option to
 use rather the heap for all temporary allocations.
 
 
+Warning on using mp_set_memory_functions()
+------------------------------------------
+
+This extension customize memory allocation routines, used by the GMP.  Don't
+use together with other GMP bindings, like the gmpy2!
+
+
 Motivation
 ----------
 
