@@ -11,11 +11,10 @@ build:
         python: "3"
 python:
     install:
-        - requirements: docs/requirements.txt
         - method: pip
           path: .
-#         extra_requirements:
-#             - docs
+          extra_requirements:
+              - docs
 sphinx:
     fail_on_warning: true
     configuration: docs/conf.py
