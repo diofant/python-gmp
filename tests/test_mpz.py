@@ -733,8 +733,6 @@ def test_from_bytes(x, length, byteorder, signed):
         if platform.python_implementation() != "GraalVM":
             assert rx == mpz.from_bytes(bytearray(bytes), byteorder,
                                         signed=signed)
-        if platform.python_implementation() == "PyPy":
-            return  # XXX: pypy/pypy#5165
         assert rx == mpz.from_bytes(list(bytes), byteorder, signed=signed)
 
 
