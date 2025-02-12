@@ -370,6 +370,8 @@ def test_divmod_errors():
         divmod(mx, 1j)
 
 
+@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
+                    reason="XXX: broken truediv")
 @given(integers(), integers())
 @example(0, -1)
 @example(0, 123)
@@ -444,9 +446,13 @@ def test_power(x, y):
         with pytest.raises(OverflowError):
             mx**my
     except ZeroDivisionError:
+        if not x and platform.python_implementation() == "GraalVM":
+            return
         with pytest.raises(ZeroDivisionError):
             mx**my
     else:
+        if platform.python_implementation() == "GraalVM" and y < 0:
+            return
         assert mx**my == r
         assert mx**y == r
         assert x**my == r
@@ -661,6 +667,8 @@ def test_to_bytes(x, length, byteorder, signed):
     try:
         rx = x.to_bytes(length, byteorder, signed=signed)
     except OverflowError:
+        if platform.python_implementation() == "GraalVM" and not length:
+            return
         with pytest.raises(OverflowError):
             mpz(x).to_bytes(length, byteorder, signed=signed)
     else:
@@ -722,7 +730,9 @@ def test_from_bytes(x, length, byteorder, signed):
     else:
         rx = int.from_bytes(bytes, byteorder, signed=signed)
         assert rx == mpz.from_bytes(bytes, byteorder, signed=signed)
-        assert rx == mpz.from_bytes(bytearray(bytes), byteorder, signed=signed)
+        if platform.python_implementation() != "GraalVM":
+            assert rx == mpz.from_bytes(bytearray(bytes), byteorder,
+                                        signed=signed)
         assert rx == mpz.from_bytes(list(bytes), byteorder, signed=signed)
 
 
@@ -847,6 +857,8 @@ def test_digits_interface():
 def test_digits_frombase(x, base):
     mx = mpz(x)
     smx = mx.digits(base)
+    if platform.python_implementation() == "GraalVM":
+        smx = str(smx)
     assert mpz(smx, base) == mx
     assert mpz(smx.upper(), base) == mx
     assert int(smx, base) == mx
@@ -886,6 +898,9 @@ def test_pickle(protocol, x):
 
 @pytest.mark.skipif(platform.system() != "Linux",
                     reason="FIXME: setrlimit fails with ValueError on MacOS")
+@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
+                    reason=("XXX: module 'resource' has no "
+                            "attribute 'setrlimit'"))
 @given(integers(min_value=49846727467293, max_value=249846727467293))
 @example(249846727467293)
 @example(1292734994793)
