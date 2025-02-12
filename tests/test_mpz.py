@@ -388,6 +388,9 @@ def test_truediv(x, y):
         with pytest.raises(OverflowError):
             mx / my
     else:
+        if platform.python_implementation() == "GraalVM":
+            mpmath = pytest.importorskip("mpmath")
+            r = float(mpmath.mpf(x)/mpmath.mpf(y))
         assert mx / my == r
         assert mx / y == r
         assert x / my == r
@@ -663,6 +666,8 @@ def test_to_bytes(x, length, byteorder, signed):
     try:
         rx = x.to_bytes(length, byteorder, signed=signed)
     except OverflowError:
+        if platform.python_implementation() == "GraalVM" and not length:
+            return
         with pytest.raises(OverflowError):
             mpz(x).to_bytes(length, byteorder, signed=signed)
     else:
@@ -724,7 +729,9 @@ def test_from_bytes(x, length, byteorder, signed):
     else:
         rx = int.from_bytes(bytes, byteorder, signed=signed)
         assert rx == mpz.from_bytes(bytes, byteorder, signed=signed)
-        assert rx == mpz.from_bytes(bytearray(bytes), byteorder, signed=signed)
+        if platform.python_implementation() != "GraalVM":
+            assert rx == mpz.from_bytes(bytearray(bytes), byteorder,
+                                        signed=signed)
         if platform.python_implementation() == "PyPy":
             return  # XXX: pypy/pypy#5165
         assert rx == mpz.from_bytes(list(bytes), byteorder, signed=signed)
@@ -892,6 +899,9 @@ def test_pickle(protocol, x):
 
 @pytest.mark.skipif(platform.system() != "Linux",
                     reason="FIXME: setrlimit fails with ValueError on MacOS")
+@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
+                    reason=("XXX: module 'resource' has no "
+                            "attribute 'setrlimit'"))
 @given(integers(min_value=49846727467293, max_value=249846727467293))
 @example(249846727467293)
 @example(1292734994793)
