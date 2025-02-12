@@ -31,7 +31,7 @@ jobs:
       - run: pip --verbose install --editable .[tests]
         env:
           CFLAGS: -Wpedantic -Werror -std=c17
-      - run: pytest
+      - run: pytest -v
         env:
           LD_LIBRARY_PATH: .local/lib/
   macos:
