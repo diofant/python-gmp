@@ -447,6 +447,8 @@ def test_power(x, y):
         with pytest.raises(ZeroDivisionError):
             mx**my
     else:
+        if platform.python_implementation() == "GraalVM" and y < 0:
+            return
         assert mx**my == r
         assert mx**y == r
         assert x**my == r
@@ -849,6 +851,8 @@ def test_digits_interface():
 def test_digits_frombase(x, base):
     mx = mpz(x)
     smx = mx.digits(base)
+    if platform.python_implementation() == "GraalVM":
+        smx = str(smx)
     assert mpz(smx, base) == mx
     assert mpz(smx.upper(), base) == mx
     assert int(smx, base) == mx

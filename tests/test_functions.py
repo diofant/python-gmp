@@ -66,6 +66,9 @@ def test_factorial(x):
                     reason="FIXME: setrlimit fails with ValueError on MacOS")
 @pytest.mark.skipif(platform.python_implementation() == "PyPy",
                     reason="XXX: bug in PyNumber_ToBase()?")
+@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
+                    reason=("XXX: module 'resource' has no "
+                            "attribute 'setrlimit'"))
 @given(integers(min_value=12811, max_value=24984))
 def test_factorial_outofmemory(x):
     soft, hard = resource.getrlimit(resource.RLIMIT_AS)
