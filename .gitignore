@@ -8,3 +8,4 @@ venv/
 *.egg-info/
 *.swp
 build/
+.local/

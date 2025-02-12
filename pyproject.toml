@@ -46,7 +46,7 @@ Homepage = "https://github.com/diofant/python-gmp"
 Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 
 [tool.setuptools]
-py-modules = ["_gmp_fractions", "_gmp_utils"]
+py-modules = ["_gmp_fractions"]
 
 [tool.setuptools.dynamic]
 version = {attr = "setuptools_scm.get_version"}
@@ -55,7 +55,7 @@ version = {attr = "setuptools_scm.get_version"}
 "*" = ["*.h"]
 
 [project.optional-dependencies]
-tests = ["pytest", "hypothesis<=6.123.4"]
+tests = ["pytest", "hypothesis<=6.123.4", "mpmath>=1.4.0a4"]
 docs = ["sphinx"]
 develop = ["python-gmp[tests,docs]", "pre-commit", "pyperf",
            "gmpy2>=2.2; platform_python_implementation!='PyPy'",
