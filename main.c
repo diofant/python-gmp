@@ -481,7 +481,7 @@ err:
     z->_mp_size = (u->negative ? -1 : 1) * u->size; \
     z->_mp_alloc = u->size;
 
-#if !defined(PYPY_VERSION)
+#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
 #  define BITS_TO_LIMBS(n) (((n) + (GMP_NUMB_BITS - 1))/GMP_NUMB_BITS)
 
 static size_t int_digit_size, int_nails, int_bits_per_digit;
@@ -491,7 +491,7 @@ static int int_digits_order, int_endianness;
 static MPZ_Object *
 MPZ_from_int(PyObject *obj)
 {
-#if !defined(PYPY_VERSION)
+#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
     static PyLongExport long_export;
     MPZ_Object *res = NULL;
 
@@ -553,7 +553,7 @@ MPZ_from_int(PyObject *obj)
 static PyObject *
 MPZ_to_int(MPZ_Object *u)
 {
-#if !defined(PYPY_VERSION)
+#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
     TMP_MPZ(z, u)
     if (mpz_fits_slong_p(z)) {
         return PyLong_FromLong(mpz_get_si(z));
@@ -2167,10 +2167,11 @@ MK_MPZ_func_ul(fib, fib_ui)
 
 #define MPZ_Check(u) PyObject_TypeCheck((u), &MPZ_Type)
 
-#if PY_VERSION_HEX >= 0x030D0000 || defined(PYPY_VERSION)
+#if (PY_VERSION_HEX >= 0x030D0000 || defined(PYPY_VERSION) \
+     || defined(GRAALVM_PYTHON))
 /* copied from CPython internals */
 static PyObject *
-_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
+PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
 {
     if (!PyUnicode_Check(unicode)) {
         PyErr_BadInternalCall();
@@ -2214,6 +2215,9 @@ _PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
     }
     return result;
 }
+#else
+#  define PyUnicode_TransformDecimalAndSpaceToASCII \
+          _PyUnicode_TransformDecimalAndSpaceToASCII
 #endif
 
 static PyObject *
@@ -2269,7 +2273,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
     }
 str:
     if (PyUnicode_Check(arg)) {
-        PyObject *asciistr = _PyUnicode_TransformDecimalAndSpaceToASCII(arg);
+        PyObject *asciistr = PyUnicode_TransformDecimalAndSpaceToASCII(arg);
 
         if (!asciistr) {
             /* LCOV_EXCL_START */
@@ -3986,7 +3990,7 @@ PyInit_gmp(void)
 {
     mp_set_memory_functions(gmp_allocate_function, gmp_reallocate_function,
                             gmp_free_function);
-#if !defined(PYPY_VERSION)
+#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
     /* Query parameters of Python’s internal representation of integers. */
     const PyLongLayout *layout = PyLong_GetNativeLayout();
 
