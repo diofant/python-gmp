@@ -447,7 +447,7 @@ def test_power(x, y):
             mx**my
     except ZeroDivisionError:
         if not x and platform.python_implementation() == "GraalVM":
-            pass
+            return
         with pytest.raises(ZeroDivisionError):
             mx**my
     else:
