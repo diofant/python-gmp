@@ -16,7 +16,6 @@ jobs:
           sudo apt-get install libgmp-dev
           sudo apt-get install texlive texlive-latex-extra latexmk
       - run: pip install --upgrade pip
-      - run: pip install -U git+https://github.com/sphinx-doc/sphinx.git
       - run: pip --verbose install --editable .[docs]
       - run: |
           alias sphinx-build='sphinx-build --color -W --keep-going'

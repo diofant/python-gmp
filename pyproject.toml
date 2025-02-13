@@ -56,7 +56,7 @@ version = {attr = "setuptools_scm.get_version"}
 
 [project.optional-dependencies]
 tests = ["pytest", "hypothesis<=6.123.4", "mpmath>=1.4.0a4"]
-docs = ["sphinx"]
+docs = ["sphinx>=8.2"]
 develop = ["python-gmp[tests,docs]", "pre-commit", "pyperf",
            "gmpy2>=2.2; platform_python_implementation!='PyPy'",
            "python-flint>=0.7.0a5"]
