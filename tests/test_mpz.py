@@ -532,7 +532,7 @@ def test_power_mod(x, y, z):
         assert pow(mx, my, mz) == r
         assert pow(mx, my, z) == r
         assert pow(mx, y, mz) == r
-        if platform.python_implementation() == "PyPy":  # FIXME
+        if platform.python_implementation() == "PyPy":
             return  # XXX: pypy/pypy#5207
         assert pow(x, my, mz) == r
         assert pow(mx, y, z) == r
@@ -781,9 +781,6 @@ def test_from_bytes(x, length, byteorder, signed):
             # XXX: oracle/graalpython#476
             assert rx == mpz.from_bytes(bytearray(bytes), byteorder,
                                         signed=signed)
-        if (platform.python_implementation() == "PyPy"
-                and sys.pypy_version_info < (7, 3, 18)):
-            return  # XXX: pypy/pypy#5165
         assert rx == mpz.from_bytes(list(bytes), byteorder, signed=signed)
 
 

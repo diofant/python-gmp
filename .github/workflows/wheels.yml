@@ -23,7 +23,7 @@ jobs:
           path-type: inherit
         if: ${{ matrix.os == 'windows-2022' }}
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.22.0
+        uses: pypa/cibuildwheel@v2.23.0
         env:
           CIBW_ENABLE: pypy cpython-prerelease cpython-freethreading
           CIBW_SKIP: pp38* pp39* *-win32 *-manylinux_i686 *-musllinux_* pp310-win* cp313t-win*
