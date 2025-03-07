@@ -2023,6 +2023,7 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
         || (is_signed && nbits
             && (nbits == 8 * length ? !is_negative : is_negative)))
     {
+        Py_XDECREF(tmp);
         PyErr_SetString(PyExc_OverflowError, "int too big to convert");
         return NULL;
     }
