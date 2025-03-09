@@ -686,9 +686,6 @@ def test_methods(x):
     assert math.ceil(mx) == math.ceil(x)
 
 
-@pytest.mark.skipif((hasattr(sys, "_is_gil_enabled")
-                     and not sys._is_gil_enabled()),
-                    reason="XXX: HypothesisWorks/hypothesis#4236")
 @given(integers(), integers(min_value=0, max_value=10000),
        sampled_from(["big", "little"]), booleans())
 @example(0, 0, "big", False)
