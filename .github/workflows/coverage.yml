@@ -19,7 +19,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install libgmp-dev
           sudo apt-get install lcov
-      - run: pip install --upgrade pip setuptools setuptools_scm
+      - run: pip install --upgrade pip 'setuptools<=79.0.1' setuptools_scm
       - run: pip --verbose install --editable .[tests]
       - run: |
           python setup.py clean
