@@ -200,6 +200,97 @@ zz_from_i64(zz_t *u, int64_t v)
     return MP_OK;
 }
 
+#define SWAP(T, a, b) \
+    do {              \
+        T _tmp = a;   \
+        a = b;        \
+        b = _tmp;     \
+    } while (0);
+
+static mp_err
+_zz_addsub(const zz_t *u, const zz_t *v, bool subtract, zz_t *w)
+{
+    bool negu = u->negative, negv = subtract ? !v->negative : v->negative;
+    bool same_sign = negu == negv;
+
+    if (u->size < v->size) {
+        SWAP(const zz_t *, u, v);
+        SWAP(bool, negu, negv);
+    }
+
+    if (zz_resize(w, u->size + same_sign) || TMP_OVERFLOW) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+    w->negative = negu;
+    if (same_sign) {
+        w->digits[w->size - 1] = mpn_add(w->digits,
+                                         u->digits, u->size,
+                                         v->digits, v->size);
+    }
+    else if (u->size != v->size) {
+        mpn_sub(w->digits, u->digits, u->size, v->digits, v->size);
+    }
+    else {
+        int cmp = mpn_cmp(u->digits, v->digits, u->size);
+
+        if (cmp < 0) {
+            mpn_sub_n(w->digits, v->digits, u->digits, u->size);
+            w->negative = negv;
+        }
+        else if (cmp > 0) {
+            mpn_sub_n(w->digits, u->digits, v->digits, u->size);
+        }
+        else {
+            w->size = 0;
+        }
+    }
+    zz_normalize(w);
+    return MP_OK;
+}
+
+static mp_err
+zz_add(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    return _zz_addsub(u, v, false, w);
+}
+
+static mp_err
+zz_sub(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    return _zz_addsub(u, v, true, w);
+}
+
+static mp_err
+zz_mul(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    if (u->size < v->size) {
+        SWAP(const zz_t *, u, v);
+    }
+    if (!v->size) {
+        return zz_from_i64(w, 0);
+    }
+    if (zz_resize(w, u->size + v->size) || TMP_OVERFLOW) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+    w->negative = u->negative != v->negative;
+    if (v->size == 1) {
+        w->digits[w->size - 1] = mpn_mul_1(w->digits, u->digits, u->size,
+                                           v->digits[0]);
+    }
+    else if (u->size == v->size) {
+        if (u != v) {
+            mpn_mul_n(w->digits, u->digits, v->digits, u->size);
+        }
+        else {
+            mpn_sqr(w->digits, u->digits, u->size);
+        }
+    }
+    else {
+        mpn_mul(w->digits, u->digits, u->size, v->digits, v->size);
+    }
+    w->size -= w->digits[w->size - 1] == 0;
+    return MP_OK;
+}
 
 typedef struct {
     PyObject_HEAD
@@ -772,101 +863,45 @@ MPZ_AsDoubleAndExp(MPZ_Object *u, Py_ssize_t *e)
     return d;
 }
 
-#define SWAP(T, a, b) \
-    do {              \
-        T _tmp = a;   \
-        a = b;        \
-        b = _tmp;     \
-    } while (0);
-
 static MPZ_Object *
-_MPZ_addsub(const MPZ_Object *u, const MPZ_Object *v, int subtract)
+MPZ_add(const MPZ_Object *u, const MPZ_Object *v)
 {
-    bool negu = ISNEG(u), negv = subtract ? !ISNEG(v) : ISNEG(v);
-    bool same_sign = negu == negv;
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    if (SZ(u) < SZ(v)) {
-        SWAP(const MPZ_Object *, u, v);
-        SWAP(bool, negu, negv);
-    }
-
-    MPZ_Object *res = MPZ_new(SZ(u) + same_sign, negu);
-
-    if (!res || TMP_OVERFLOW) {
+    if (!res || zz_add(&u->z, &v->z, &res->z)) {
         /* LCOV_EXCL_START */
         Py_XDECREF(res);
         return (MPZ_Object *)PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
-    if (same_sign) {
-        LS(res)[SZ(res) - 1] = mpn_add(LS(res), LS(u), SZ(u), LS(v), SZ(v));
-    }
-    else if (SZ(u) != SZ(v)) {
-        mpn_sub(LS(res), LS(u), SZ(u), LS(v), SZ(v));
-    }
-    else {
-        int cmp = mpn_cmp(LS(u), LS(v), SZ(u));
-
-        if (cmp < 0) {
-            mpn_sub_n(LS(res), LS(v), LS(u), SZ(u));
-            ISNEG(res) = negv;
-        }
-        else if (cmp > 0) {
-            mpn_sub_n(LS(res), LS(u), LS(v), SZ(u));
-        }
-        else {
-            SZ(res) = 0;
-        }
-    }
-    zz_normalize(&res->z);
     return res;
 }
 
 static MPZ_Object *
-MPZ_add(const MPZ_Object *u, const MPZ_Object *v)
+MPZ_sub(const MPZ_Object *u, const MPZ_Object *v)
 {
-    return _MPZ_addsub(u, v, 0);
-}
+    MPZ_Object *res = MPZ_new(0, 0);
 
-static MPZ_Object *
-MPZ_sub(MPZ_Object *u, MPZ_Object *v)
-{
-    return _MPZ_addsub(u, v, 1);
+    if (!res || zz_sub(&u->z, &v->z, &res->z)) {
+        /* LCOV_EXCL_START */
+        Py_XDECREF(res);
+        return (MPZ_Object *)PyErr_NoMemory();
+        /* LCOV_EXCL_STOP */
+    }
+    return res;
 }
 
 static MPZ_Object *
 MPZ_mul(const MPZ_Object *u, const MPZ_Object *v)
 {
-    if (SZ(u) < SZ(v)) {
-        SWAP(const MPZ_Object *, u, v);
-    }
-    if (!SZ(v)) {
-        return MPZ_from_i64(0);
-    }
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    MPZ_Object *res = MPZ_new(SZ(u) + SZ(v), ISNEG(u) != ISNEG(v));
-
-    if (!res || TMP_OVERFLOW) {
+    if (!res || zz_mul(&u->z, &v->z, &res->z)) {
         /* LCOV_EXCL_START */
         Py_XDECREF(res);
         return (MPZ_Object *)PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
-    if (SZ(v) == 1) {
-        LS(res)[SZ(res) - 1] = mpn_mul_1(LS(res), LS(u), SZ(u), LS(v)[0]);
-    }
-    else if (SZ(u) == SZ(v)) {
-        if (u != v) {
-            mpn_mul_n(LS(res), LS(u), LS(v), SZ(u));
-        }
-        else {
-            mpn_sqr(LS(res), LS(u), SZ(u));
-        }
-    }
-    else {
-        mpn_mul(LS(res), LS(u), SZ(u), LS(v), SZ(v));
-    }
-    SZ(res) -= LS(res)[SZ(res) - 1] == 0;
     return res;
 }
 
