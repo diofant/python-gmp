@@ -357,21 +357,6 @@ MPZ_new(mp_size_t size, bool negative)
 
 #define MPZ_CheckExact(u) Py_IS_TYPE((u), &MPZ_Type)
 
-static void
-MPZ_dealloc(MPZ_Object *u)
-{
-    if (global.gmp_cache_size < CACHE_SIZE
-        && SZ(u) <= MAX_CACHE_MPZ_LIMBS
-        && MPZ_CheckExact((PyObject *)u))
-    {
-        global.gmp_cache[(global.gmp_cache_size)++] = u;
-    }
-    else {
-        zz_clear(&u->z);
-        Py_TYPE((PyObject *)u)->tp_free((PyObject *)u);
-    }
-}
-
 static MPZ_Object *
 MPZ_from_i64(int64_t v)
 {
@@ -2389,7 +2374,18 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
 static void
 dealloc(PyObject *self)
 {
-    MPZ_dealloc((MPZ_Object *)self);
+    MPZ_Object *u = (MPZ_Object *)self;
+
+    if (global.gmp_cache_size < CACHE_SIZE
+        && SZ(u) <= MAX_CACHE_MPZ_LIMBS
+        && MPZ_CheckExact((PyObject *)u))
+    {
+        global.gmp_cache[(global.gmp_cache_size)++] = u;
+    }
+    else {
+        zz_clear(&u->z);
+        Py_TYPE((PyObject *)u)->tp_free((PyObject *)u);
+    }
 }
 
 typedef struct gmp_pyargs {
