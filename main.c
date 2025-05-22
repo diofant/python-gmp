@@ -236,6 +236,78 @@ zz_neg(const zz_t *u, zz_t *v)
     return ret;
 }
 
+/* Maps 1-byte integer to digit character for bases up to 36. */
+static const char *NUM_TO_TEXT = "0123456789abcdefghijklmnopqrstuvwxyz";
+static const char *MPZ_TAG = "mpz(";
+static int OPT_TAG = 0x1;
+static int OPT_PREFIX = 0x2;
+
+static mp_err
+zz_to_str(const zz_t *u, int base, int options, char **buf)
+{
+    if (base < 2 || base > 36) {
+        return MP_VAL;
+    }
+
+    size_t len = mpn_sizeinbase(u->digits, u->size, base);
+
+    /*            tag sign prefix        )   \0 */
+    *buf = malloc(4 + 1   + 2    + len + 1 + 1);
+
+    unsigned char *p = (unsigned char *)(*buf);
+
+    if (!p) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+    if (options & OPT_TAG) {
+        strcpy((char *)p, MPZ_TAG);
+        p += strlen(MPZ_TAG);
+    }
+    if (u->negative) {
+        *(p++) = '-';
+    }
+    if (options & OPT_PREFIX) {
+        if (base == 2) {
+            *(p++) = '0';
+            *(p++) = 'b';
+        }
+        else if (base == 8) {
+            *(p++) = '0';
+            *(p++) = 'o';
+        }
+        else if (base == 16) {
+            *(p++) = '0';
+            *(p++) = 'x';
+        }
+    }
+    if ((base & (base - 1)) == 0) {
+        len -= (mpn_get_str(p, base, u->digits, u->size) != len);
+    }
+    else { /* generic base, not power of 2, input might be clobbered */
+        mp_limb_t *tmp = malloc(sizeof(mp_limb_t) * (u->size ? u->size : 1));
+
+        if (!tmp || TMP_OVERFLOW) {
+            /* LCOV_EXCL_START */
+            free(tmp);
+            free(*buf);
+            return MP_MEM;
+            /* LCOV_EXCL_STOP */
+        }
+        mpn_copyi(tmp, u->digits, u->size);
+        len -= (mpn_get_str(p, base, tmp, u->size) != len);
+        free(tmp);
+    }
+    for (size_t i = 0; i < len; i++) {
+        *p = NUM_TO_TEXT[*p];
+        p++;
+    }
+    if (options & OPT_TAG) {
+        *(p++) = ')';
+    }
+    *(p++) = '\0';
+    return MP_OK;
+}
+
 #define SWAP(T, a, b) \
     do {              \
         T _tmp = a;   \
@@ -426,78 +498,23 @@ MPZ_abs(const MPZ_Object *u)
     return res;
 }
 
-/* Maps 1-byte integer to digit character for bases up to 36. */
-static const char *num_to_text = "0123456789abcdefghijklmnopqrstuvwxyz";
-
-static const char *mpz_tag = "mpz(";
-static int OPT_TAG = 0x1;
-static int OPT_PREFIX = 0x2;
-
 static PyObject *
 MPZ_to_str(MPZ_Object *u, int base, int options)
 {
-    if (base < 2 || base > 36) {
+    char *buf;
+    mp_err ret = zz_to_str(&u->z, base, options, &buf);
+
+    if (ret == MP_VAL) {
         PyErr_SetString(PyExc_ValueError, "mpz base must be >= 2 and <= 36");
         return NULL;
     }
-
-    size_t len = mpn_sizeinbase(LS(u), SZ(u), base);
-    /*                                tag sign prefix        )   \0 */
-    unsigned char *buf = PyMem_Malloc(4 + 1   + 2    + len + 1 + 1), *p = buf;
-
-    if (!buf) {
+    else if (ret == MP_MEM) {
         return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-    if (options & OPT_TAG) {
-        strcpy((char *)buf, mpz_tag);
-        p += strlen(mpz_tag);
-    }
-    if (ISNEG(u)) {
-        *(p++) = '-';
-    }
-    if (options & OPT_PREFIX) {
-        if (base == 2) {
-            *(p++) = '0';
-            *(p++) = 'b';
-        }
-        else if (base == 8) {
-            *(p++) = '0';
-            *(p++) = 'o';
-        }
-        else if (base == 16) {
-            *(p++) = '0';
-            *(p++) = 'x';
-        }
-    }
-    if ((base & (base - 1)) == 0) {
-        len -= (mpn_get_str(p, base, LS(u), SZ(u)) != len);
-    }
-    else { /* generic base, not power of 2, input might be clobbered */
-        mp_limb_t *tmp = PyMem_New(mp_limb_t, SZ(u));
 
-        if (!tmp || TMP_OVERFLOW) {
-            /* LCOV_EXCL_START */
-            PyMem_Free(tmp);
-            PyMem_Free(buf);
-            return PyErr_NoMemory();
-            /* LCOV_EXCL_STOP */
-        }
-        mpn_copyi(tmp, LS(u), SZ(u));
-        len -= (mpn_get_str(p, base, tmp, SZ(u)) != len);
-        PyMem_Free(tmp);
-    }
-    for (size_t i = 0; i < len; i++) {
-        *p = num_to_text[*p];
-        p++;
-    }
-    if (options & OPT_TAG) {
-        *(p++) = ')';
-    }
-    *(p++) = '\0';
+    PyObject *res = PyUnicode_FromString(buf);
 
-    PyObject *res = PyUnicode_FromString((char *)buf);
-
-    PyMem_Free(buf);
+    free(buf);
     return res;
 }
 
