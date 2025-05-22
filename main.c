@@ -308,6 +308,140 @@ zz_to_str(const zz_t *u, int base, int options, char **buf)
     return MP_OK;
 }
 
+/* Table of digit values for 8-bit string->mpz conversion.
+   Note that when converting a base B string, a char c is a legitimate
+   base B digit iff DIGIT_VALUE_TAB[c] < B. */
+const unsigned char DIGIT_VALUE_TAB[] =
+{
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1,-1,-1,-1,-1,-1,
+  -1,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
+  25,26,27,28,29,30,31,32,33,34,35,-1,-1,-1,-1,-1,
+  -1,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
+  25,26,27,28,29,30,31,32,33,34,35,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1,-1,-1,-1,-1,-1,
+  -1,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
+  25,26,27,28,29,30,31,32,33,34,35,-1,-1,-1,-1,-1,
+  -1,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,
+  51,52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+};
+
+static mp_err
+zz_from_str(const char *str, size_t len, int base, zz_t *u)
+{
+    if (base != 0 && (base < 2 || base > 36)) {
+        return MP_VAL;
+    }
+    if (!len) {
+        return MP_VAL;
+    }
+
+    unsigned char *buf = malloc(len), *p = buf;
+
+    if (!buf) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+    memcpy(buf, str, len);
+
+    bool negative = (p[0] == '-');
+
+    p += negative;
+    len -= negative;
+    if (len && p[0] == '+') {
+        p++;
+        len--;
+    }
+    if (p[0] == '0' && len >= 2) {
+        if (base == 0) {
+            if (tolower(p[1]) == 'b') {
+                base = 2;
+            }
+            else if (tolower(p[1]) == 'o') {
+                base = 8;
+            }
+            else if (tolower(p[1]) == 'x') {
+                base = 16;
+            }
+            else {
+                goto err;
+            }
+        }
+        if ((tolower(p[1]) == 'b' && base == 2)
+            || (tolower(p[1]) == 'o' && base == 8)
+            || (tolower(p[1]) == 'x' && base == 16))
+        {
+            p += 2;
+            len -= 2;
+            if (len && p[0] == '_') {
+                p++;
+                len--;
+            }
+        }
+    }
+    if (base == 0) {
+        base = 10;
+    }
+    if (!len) {
+        goto err;
+    }
+    if (p[0] == '_') {
+        goto err;
+    }
+
+    const unsigned char *digit_value = DIGIT_VALUE_TAB;
+    size_t new_len = len;
+
+    for (size_t i = 0; i < len; i++) {
+        if (p[i] == '_') {
+            if (i == len - 1 || p[i + 1] == '_') {
+                goto err;
+            }
+            new_len--;
+            memmove(p + i, p + i + 1, len - i - 1);
+        }
+        p[i] = digit_value[p[i]];
+        if (p[i] >= base) {
+            goto err;
+        }
+    }
+    len = new_len;
+    if (zz_resize(u, 1 + len/2) || TMP_OVERFLOW) {
+        /* LCOV_EXCL_START */
+        free(buf);
+        return MP_MEM;
+        /* LCOV_EXCL_STOP */
+    }
+    u->negative = negative;
+    u->size = mpn_set_str(u->digits, p, len, base);
+    free(buf);
+    if (zz_resize(u, u->size) == MP_MEM) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+    zz_normalize(u);
+    return MP_OK;
+err:
+    free(buf);
+    return MP_VAL;
+}
+
 #define SWAP(T, a, b) \
     do {              \
         T _tmp = a;   \
@@ -518,51 +652,9 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
     return res;
 }
 
-/* Table of digit values for 8-bit string->mpz conversion.
-   Note that when converting a base B string, a char c is a legitimate
-   base B digit iff gmp_digit_value_tab[c] < B. */
-const unsigned char gmp_digit_value_tab[] =
-{
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1,-1,-1,-1,-1,-1,
-  -1,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
-  25,26,27,28,29,30,31,32,33,34,35,-1,-1,-1,-1,-1,
-  -1,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
-  25,26,27,28,29,30,31,32,33,34,35,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, -1,-1,-1,-1,-1,-1,
-  -1,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
-  25,26,27,28,29,30,31,32,33,34,35,-1,-1,-1,-1,-1,
-  -1,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,
-  51,52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-};
-
 static MPZ_Object *
 MPZ_from_str(PyObject *obj, int base)
 {
-    if (base != 0 && (base < 2 || base > 36)) {
-        PyErr_SetString(PyExc_ValueError,
-                        "mpz base must be >= 2 and <= 36, or 0");
-        return NULL;
-    }
-
     Py_ssize_t len;
     const char *str = PyUnicode_AsUTF8AndSize(obj, &len);
 
@@ -570,103 +662,34 @@ MPZ_from_str(PyObject *obj, int base)
         return NULL; /* LCOV_EXCL_LINE */
     }
 
-    unsigned char *buf = PyMem_Malloc(len), *p = buf;
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    if (!buf) {
+    if (!res) {
         return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-    memcpy(buf, str, len);
-    if (!len) {
-        goto err;
-    }
 
-    bool negative = (p[0] == '-');
+    mp_err ret = zz_from_str(str, len, base, &res->z);
 
-    p += negative;
-    len -= negative;
-    if (len && p[0] == '+') {
-        p++;
-        len--;
-    }
-    if (p[0] == '0' && len >= 2) {
-        if (base == 0) {
-            if (tolower(p[1]) == 'b') {
-                base = 2;
-            }
-            else if (tolower(p[1]) == 'o') {
-                base = 8;
-            }
-            else if (tolower(p[1]) == 'x') {
-                base = 16;
-            }
-            else {
-                goto err;
-            }
-        }
-        if ((tolower(p[1]) == 'b' && base == 2)
-            || (tolower(p[1]) == 'o' && base == 8)
-            || (tolower(p[1]) == 'x' && base == 16))
-        {
-            p += 2;
-            len -= 2;
-            if (len && p[0] == '_') {
-                p++;
-                len--;
-            }
-        }
-    }
-    if (base == 0) {
-        base = 10;
-    }
-    if (!len) {
-        goto err;
-    }
-    if (p[0] == '_') {
-        goto err;
-    }
-
-    const unsigned char *digit_value = gmp_digit_value_tab;
-    Py_ssize_t new_len = len;
-
-    for (Py_ssize_t i = 0; i < len; i++) {
-        if (p[i] == '_') {
-            if (i == len - 1 || p[i + 1] == '_') {
-                goto err;
-            }
-            new_len--;
-            memmove(p + i, p + i + 1, len - i - 1);
-        }
-        p[i] = digit_value[p[i]];
-        if (p[i] >= base) {
-            goto err;
-        }
-    }
-    len = new_len;
-
-    MPZ_Object *res = MPZ_new(1 + len/2, negative);
-
-    if (!res || TMP_OVERFLOW) {
-        /* LCOV_EXCL_START */
-        Py_XDECREF(res);
-        PyMem_Free(buf);
-        return NULL;
-        /* LCOV_EXCL_STOP */
-    }
-    SZ(res) = mpn_set_str(LS(res), p, len, base);
-    PyMem_Free(buf);
-    if (zz_resize(&res->z, SZ(res)) == MPZ_MEM) {
+    if (ret == MP_MEM) {
         /* LCOV_EXCL_START */
         Py_DECREF(res);
         return (MPZ_Object *)PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
-    zz_normalize(&res->z);
+    else if (ret == MP_VAL) {
+        Py_DECREF(res);
+        if (2 <= base && base <= 36) {
+            PyErr_Format(PyExc_ValueError,
+                         "invalid literal for mpz() with base %d: %.200R",
+                         base, obj);
+        }
+        else {
+            PyErr_SetString(PyExc_ValueError,
+                            "mpz base must be >= 2 and <= 36, or 0");
+        }
+        return NULL;
+    }
     return res;
-err:
-    PyMem_Free(buf);
-    PyErr_Format(PyExc_ValueError,
-                 "invalid literal for mpz() with base %d: %.200R", base, obj);
-    return NULL;
 }
 
 #define TMP_MPZ(z, u)                               \
