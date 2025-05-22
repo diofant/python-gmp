@@ -105,7 +105,7 @@ typedef int8_t mp_err;
 static mp_err
 zz_init(zz_t *u)
 {
-    u->negative = 0;
+    u->negative = false;
     u->size = 0;
     u->digits = NULL;
     return MP_OK;
@@ -128,9 +128,9 @@ zz_resize(zz_t *u, mp_size_t size)
 static void
 zz_clear(zz_t *u)
 {
-    u->negative = 0;
-    u->size = 0;
     free(u->digits);
+    u->negative = false;
+    u->size = 0;
     u->digits = NULL;
 }
 
@@ -198,6 +198,42 @@ zz_from_i64(zz_t *u, int64_t v)
     }
 #endif
     return MP_OK;
+}
+
+static mp_err
+zz_copy(const zz_t *u, zz_t *v)
+{
+    if (!u->size) {
+        return zz_from_i64(v, 0);
+    }
+    if (zz_resize(v, u->size)) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+    v->negative = u->negative;
+    mpn_copyi(v->digits, u->digits, u->size);
+    return MP_OK;
+}
+
+static mp_err
+zz_abs(const zz_t *u, zz_t *v)
+{
+    mp_err ret = zz_copy(u, v);
+
+    if (!ret) {
+        v->negative = false;
+    }
+    return ret;
+}
+
+static mp_err
+zz_neg(const zz_t *u, zz_t *v)
+{
+    mp_err ret = zz_copy(u, v);
+
+    if (!ret && u->size) {
+        v->negative = !u->negative;
+    }
+    return ret;
 }
 
 #define SWAP(T, a, b) \
@@ -371,28 +407,22 @@ MPZ_from_i64(int64_t v)
 static MPZ_Object *
 MPZ_copy(const MPZ_Object *u)
 {
-    if (!SZ(u)) {
-        return MPZ_from_i64(0);
-    }
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    MPZ_Object *res = MPZ_new(SZ(u), ISNEG(u));
-
-    if (!res) {
-        return NULL; /* LCOV_EXCL_LINE */
+    if (res && zz_copy(&u->z, &res->z)) {
+        PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-    mpn_copyi(LS(res), LS(u), SZ(u));
     return res;
 }
 
 static MPZ_Object *
 MPZ_abs(const MPZ_Object *u)
 {
-    MPZ_Object *res = MPZ_copy(u);
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    if (!res) {
-        return NULL; /* LCOV_EXCL_LINE */
+    if (res && zz_abs(&u->z, &res->z)) {
+        PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-    ISNEG(res) = 0;
     return res;
 }
 
@@ -2618,13 +2648,11 @@ plus(PyObject *self)
 static PyObject *
 minus(PyObject *self)
 {
-    MPZ_Object *u = (MPZ_Object *)self, *res = MPZ_copy(u);
+    MPZ_Object *u = (MPZ_Object *)self;;
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    if (!res) {
-        return NULL; /* LCOV_EXCL_LINE */
-    }
-    if (SZ(u)) {
-        ISNEG(res) = !ISNEG(u);
+    if (res && zz_neg(&u->z, &res->z)) {
+        PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
     return (PyObject *)res;
 }
