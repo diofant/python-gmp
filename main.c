@@ -534,6 +534,101 @@ zz_mul(const zz_t *u, const zz_t *v, zz_t *w)
     return MP_OK;
 }
 
+static mp_err
+zz_divmod(zz_t *q, zz_t *r, const zz_t *u, const zz_t *v)
+{
+    if (!v->size) {
+        return MP_VAL;
+    }
+    if (!u->size) {
+        if (zz_from_i64(q, 0) || zz_from_i64(r, 0)) {
+            goto err; /* LCOV_EXCL_LINE */
+        }
+    }
+    else if (u->size < v->size) {
+        if (u->negative != v->negative) {
+            if (zz_from_i64(q, -1) || zz_add(u, v, r)) {
+                goto err; /* LCOV_EXCL_LINE */
+            }
+        }
+        else {
+            if (zz_from_i64(q, 0) || zz_copy(u, r)) {
+                goto err; /* LCOV_EXCL_LINE */
+            }
+        }
+    }
+    else {
+        bool q_negative = (u->negative != v->negative);
+
+        if (zz_resize(q, u->size - v->size + 1 + q_negative)) {
+            return MP_MEM; /* LCOV_EXCL_LINE */
+        }
+        q->negative = q_negative;
+        if (q_negative) {
+            q->digits[q->size - 1] = 0;
+        }
+        if (zz_resize(r, v->size)) {
+            /* LCOV_EXCL_START */
+            zz_clear(q);
+            return MP_MEM;
+            /* LCOV_EXCL_STOP */
+        }
+        r->negative = v->negative;
+        if (ENOUGH_MEMORY) {
+            mpn_tdiv_qr(q->digits, r->digits, 0, u->digits, u->size,
+                        v->digits, v->size);
+        }
+        else {
+            goto err; /* LCOV_EXCL_LINE */
+        }
+        zz_normalize(r);
+        if (q_negative && r->size) {
+            r->size = v->size;
+            mpn_sub_n(r->digits, v->digits, r->digits, v->size);
+            mpn_add_1(q->digits, q->digits, q->size, 1);
+        }
+        zz_normalize(q);
+        zz_normalize(r);
+    }
+    return MP_OK;
+    /* LCOV_EXCL_START */
+err:
+    zz_clear(q);
+    zz_clear(r);
+    return MP_MEM;
+    /* LCOV_EXCL_STOP */
+}
+
+static mp_err
+zz_quo(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    zz_t r;
+
+    if (zz_init(&r)) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+
+    mp_err ret = zz_divmod(w, &r, u, v);
+
+    zz_clear(&r);
+    return ret;
+}
+
+static mp_err
+zz_rem(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    zz_t q;
+
+    if (zz_init(&q)) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+
+    mp_err ret = zz_divmod(&q, w, u, v);
+
+    zz_clear(&q);
+    return ret;
+}
+
 typedef struct {
     PyObject_HEAD
     zz_t z;
@@ -960,95 +1055,80 @@ MPZ_mul(const MPZ_Object *u, const MPZ_Object *v)
     return res;
 }
 
-static int
+static MPZ_err
 MPZ_divmod(MPZ_Object **q, MPZ_Object **r,
            const MPZ_Object *u, const MPZ_Object *v)
 {
-    if (!SZ(v)) {
-        PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
-        return -1;
-    }
-    if (!SZ(u)) {
-        *q = MPZ_from_i64(0);
-        *r = MPZ_from_i64(0);
-    }
-    else if (SZ(u) < SZ(v)) {
-        if (ISNEG(u) != ISNEG(v)) {
-            *q = MPZ_from_i64(-1);
-            *r = MPZ_add(u, v);
-        }
-        else {
-            *q = MPZ_from_i64(0);
-            *r = MPZ_copy(u);
-        }
-    }
-    else {
-        bool q_negative = (ISNEG(u) != ISNEG(v));
-
-        *q = MPZ_new(SZ(u) - SZ(v) + 1 + q_negative, q_negative);
-        if (!*q) {
-            return -1; /* LCOV_EXCL_LINE */
-        }
-        if (q_negative) {
-            LS(*q)[SZ(*q) - 1] = 0;
-        }
-        *r = MPZ_new(SZ(v), ISNEG(v));
-        if (!*r) {
-            /* LCOV_EXCL_START */
-            Py_DECREF(*q);
-            return -1;
-            /* LCOV_EXCL_STOP */
-        }
-        if (ENOUGH_MEMORY) {
-            mpn_tdiv_qr(LS(*q), LS(*r), 0, LS(u), SZ(u),
-                        LS(v), SZ(v));
-        }
-        else {
-            goto err; /* LCOV_EXCL_LINE */
-        }
-        zz_normalize(&(*r)->z);
-        if (q_negative && SZ(*r)) {
-            SZ(*r) = SZ(v);
-            mpn_sub_n(LS(*r), LS(v), LS(*r), SZ(v));
-            mpn_add_1(LS(*q), LS(*q), SZ(*q), 1);
-        }
-        zz_normalize(&(*q)->z);
-        zz_normalize(&(*r)->z);
-        return 0;
-    }
+    *q = MPZ_new(0, 0);
+    *r = MPZ_new(0, 0);
     if (!*q || !*r) {
         /* LCOV_EXCL_START */
-    err:
         Py_XDECREF(*q);
         Py_XDECREF(*r);
-        return -1;
+        return MPZ_MEM;
         /* LCOV_EXCL_STOP */
     }
-    return 0;
+    mp_err ret = zz_divmod(&(*q)->z, &(*r)->z, &u->z, &v->z);
+
+    if (ret == MP_OK) {
+        return MPZ_OK;
+    }
+    Py_DECREF(*q);
+    Py_DECREF(*r);
+    if (ret == MP_VAL) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
+        return MPZ_VAL;
+    }
+    /* LCOV_EXCL_START */
+    PyErr_NoMemory();
+    return MPZ_MEM;
+    /* LCOV_EXCL_STOP */
 }
 
 static MPZ_Object *
-MPZ_quot(const MPZ_Object *u, const MPZ_Object *v)
+MPZ_quo(const MPZ_Object *u, const MPZ_Object *v)
 {
-    MPZ_Object *q, *r;
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    if (MPZ_divmod(&q, &r, u, v) == -1) {
+    if (!res) {
         return NULL; /* LCOV_EXCL_LINE */
     }
-    Py_DECREF(r);
-    return q;
+
+    mp_err ret = zz_quo(&u->z, &v->z, &res->z);
+
+    if (ret == MP_OK) {
+        return res;
+    }
+    if (ret == MP_VAL) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
+        return NULL;
+    }
+    /* LCOV_EXCL_START */
+    return (MPZ_Object *)PyErr_NoMemory();
+    /* LCOV_EXCL_STOP */
 }
 
 static MPZ_Object *
 MPZ_rem(MPZ_Object *u, MPZ_Object *v)
 {
-    MPZ_Object *q, *r;
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    if (MPZ_divmod(&q, &r, u, v) == -1) {
+    if (!res) {
         return NULL; /* LCOV_EXCL_LINE */
     }
-    Py_DECREF(q);
-    return r;
+
+    mp_err ret = zz_rem(&u->z, &v->z, &res->z);
+
+    if (ret == MP_OK) {
+        return res;
+    }
+    if (ret == MP_VAL) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
+        return NULL;
+    }
+    /* LCOV_EXCL_START */
+    return (MPZ_Object *)PyErr_NoMemory();
+    /* LCOV_EXCL_STOP */
 }
 
 static MPZ_Object *
@@ -1108,7 +1188,7 @@ MPZ_divmod_near(MPZ_Object **q, MPZ_Object **r, MPZ_Object *u, MPZ_Object *v)
 {
     int unexpect = ISNEG(v) ? -1 : 1;
 
-    if (MPZ_divmod(q, r, u, v) == -1) {
+    if (MPZ_divmod(q, r, u, v)) {
         return -1; /* LCOV_EXCL_LINE */
     }
 
@@ -1907,7 +1987,7 @@ MPZ_gcdext(const MPZ_Object *u, const MPZ_Object *v,
             /* LCOV_EXCL_STOP */
         }
 
-        MPZ_Object *q = MPZ_quot(x, v);
+        MPZ_Object *q = MPZ_quo(x, v);
 
         Py_DECREF(x);
         if (!q) {
@@ -2829,7 +2909,7 @@ divmod(PyObject *self, PyObject *other)
 
     MPZ_Object *q, *r;
 
-    if (MPZ_divmod(&q, &r, u, v) == -1) {
+    if (MPZ_divmod(&q, &r, u, v)) {
         goto end; /* LCOV_EXCL_LINE */
     }
     Py_DECREF(u);
@@ -2852,7 +2932,7 @@ numbers:
     Py_RETURN_NOTIMPLEMENTED;
 }
 
-BINOP(quot, PyNumber_FloorDivide)
+BINOP(quo, PyNumber_FloorDivide)
 BINOP(rem, PyNumber_Remainder)
 BINOP(truediv, PyNumber_TrueDivide)
 BINOP_INT(lshift)
@@ -3031,7 +3111,7 @@ static PyNumberMethods as_number = {
     .nb_subtract = nb_sub,
     .nb_multiply = nb_mul,
     .nb_divmod = divmod,
-    .nb_floor_divide = nb_quot,
+    .nb_floor_divide = nb_quo,
     .nb_true_divide = nb_truediv,
     .nb_remainder = nb_rem,
     .nb_power = power,
