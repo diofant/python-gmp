@@ -629,6 +629,30 @@ zz_rem(const zz_t *u, const zz_t *v, zz_t *w)
     return ret;
 }
 
+static mp_err
+zz_invert(const zz_t *u, zz_t *v)
+{
+    if (u->negative) {
+        if (zz_resize(v, u->size)) {
+            return MP_MEM; /* LCOV_EXCL_LINE */
+        }
+        mpn_sub_1(v->digits, u->digits, u->size, 1);
+        v->size -= v->digits[u->size - 1] == 0;
+    }
+    else if (!u->size) {
+        return zz_from_i64(v, -1);
+    }
+    else {
+        if (zz_resize(v, u->size + 1)) {
+            return MP_MEM; /* LCOV_EXCL_LINE */
+        }
+        v->negative = 1;
+        v->digits[u->size] = mpn_add_1(v->digits, u->digits, u->size, 1);
+        v->size -= v->digits[u->size] == 0;
+    }
+    return MP_OK;
+}
+
 typedef struct {
     PyObject_HEAD
     zz_t z;
@@ -1379,26 +1403,13 @@ MPZ_truediv(MPZ_Object *u, MPZ_Object *v)
 static MPZ_Object *
 MPZ_invert(MPZ_Object *u)
 {
-    MPZ_Object *res;
+    MPZ_Object *res = MPZ_new(0, 0);
 
-    if (ISNEG(u)) {
-        res = MPZ_new(SZ(u), 0);
-        if (!res) {
-            return NULL; /* LCOV_EXCL_LINE */
-        }
-        mpn_sub_1(LS(res), LS(u), SZ(u), 1);
-        SZ(res) -= LS(res)[SZ(u) - 1] == 0;
-    }
-    else if (!SZ(u)) {
-        return MPZ_from_i64(-1);
-    }
-    else {
-        res = MPZ_new(SZ(u) + 1, 1);
-        if (!res) {
-            return NULL; /* LCOV_EXCL_LINE */
-        }
-        LS(res)[SZ(u)] = mpn_add_1(LS(res), LS(u), SZ(u), 1);
-        SZ(res) -= LS(res)[SZ(u)] == 0;
+    if (!res || zz_invert(&u->z, &res->z)) {
+        /* LCOV_EXCL_START */
+        Py_XDECREF(res);
+        return (MPZ_Object *)PyErr_NoMemory();
+        /* LCOV_EXCL_STOP */
     }
     return res;
 }
