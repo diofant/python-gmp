@@ -3,9 +3,8 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
-#include <gmp.h>
-
 #include <float.h>
+#include <gmp.h>
 #include <setjmp.h>
 #include <stdbool.h>
 
@@ -95,10 +94,10 @@ typedef struct {
     mp_limb_t *digits;
 } zz_t;
 
-#define MP_OK    0
-#define MP_MEM  -1
-#define MP_VAL  -2
-#define MP_BUF  -3
+#define MP_OK   0
+#define MP_MEM -1
+#define MP_VAL -2
+#define MP_BUF -3
 
 typedef int8_t mp_err;
 
@@ -148,7 +147,7 @@ zz_normalize(zz_t *u)
 #define mp_ord int8_t
 
 #define MP_GT +1
-#define MP_EQ 0
+#define MP_EQ  0
 #define MP_LT -1
 
 static mp_ord
@@ -682,10 +681,10 @@ static gmp_global global = {
 
 typedef int8_t MPZ_err;
 
-#define MPZ_OK    0
-#define MPZ_MEM  -1
-#define MPZ_VAL  -2
-#define MPZ_BUF  -3
+#define MPZ_OK   0
+#define MPZ_MEM -1
+#define MPZ_VAL -2
+#define MPZ_BUF -3
 
 static MPZ_Object *
 MPZ_new(mp_size_t size, bool negative)
@@ -700,7 +699,7 @@ MPZ_new(mp_size_t size, bool negative)
             return (MPZ_Object *)PyErr_NoMemory();
             /* LCOV_EXCL_STOP */
         }
-        Py_INCREF((PyObject *) res);
+        Py_INCREF((PyObject *)res);
         SZ(res) = size;
     }
     else {
@@ -811,11 +810,11 @@ MPZ_from_str(PyObject *obj, int base)
     return res;
 }
 
-#define TMP_MPZ(z, u)                               \
-    mpz_t z;                                        \
-                                                    \
-    z->_mp_d = LS(u);                               \
-    z->_mp_size = (ISNEG(u) ? -1 : 1) * SZ(u);      \
+#define TMP_MPZ(z, u)                          \
+    mpz_t z;                                   \
+                                               \
+    z->_mp_d = LS(u);                          \
+    z->_mp_size = (ISNEG(u) ? -1 : 1) * SZ(u); \
     z->_mp_alloc = SZ(u);
 
 #if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
@@ -1080,8 +1079,8 @@ MPZ_mul(const MPZ_Object *u, const MPZ_Object *v)
 }
 
 static MPZ_err
-MPZ_divmod(MPZ_Object **q, MPZ_Object **r,
-           const MPZ_Object *u, const MPZ_Object *v)
+MPZ_divmod(MPZ_Object **q, MPZ_Object **r, const MPZ_Object *u,
+           const MPZ_Object *v)
 {
     *q = MPZ_new(0, 0);
     *r = MPZ_new(0, 0);
@@ -1912,8 +1911,8 @@ MPZ_powm(MPZ_Object *u, MPZ_Object *v, MPZ_Object *w)
 }
 
 MPZ_err
-MPZ_gcdext(const MPZ_Object *u, const MPZ_Object *v,
-           MPZ_Object *g, MPZ_Object *s, MPZ_Object *t)
+MPZ_gcdext(const MPZ_Object *u, const MPZ_Object *v, MPZ_Object *g,
+           MPZ_Object *s, MPZ_Object *t)
 {
     if (SZ(u) < SZ(v)) {
         SWAP(const MPZ_Object *, u, v);
@@ -1962,8 +1961,7 @@ MPZ_gcdext(const MPZ_Object *u, const MPZ_Object *v,
                                LS(arg_v), SZ(v));
         ISNEG(tmp_g) = 0;
         SZ(tmp_s) = Py_ABS(ssize);
-        ISNEG(tmp_s) = ((ISNEG(u) && ssize > 0)
-                           || (!ISNEG(u) && ssize < 0));
+        ISNEG(tmp_s) = (ISNEG(u) && ssize > 0) || (!ISNEG(u) && ssize < 0);
     }
     else {
         /* LCOV_EXCL_START */
@@ -2389,7 +2387,7 @@ PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
 }
 #else
 #  define PyUnicode_TransformDecimalAndSpaceToASCII \
-          _PyUnicode_TransformDecimalAndSpaceToASCII
+      _PyUnicode_TransformDecimalAndSpaceToASCII
 #endif
 
 static PyObject *
@@ -2779,7 +2777,8 @@ plus(PyObject *self)
 static PyObject *
 minus(PyObject *self)
 {
-    MPZ_Object *u = (MPZ_Object *)self;;
+    MPZ_Object *u = (MPZ_Object *)self;
+    ;
     MPZ_Object *res = MPZ_new(0, 0);
 
     if (res && zz_neg(&u->z, &res->z)) {
@@ -3687,8 +3686,7 @@ gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
         }
     }
     else {
-        PyErr_SetString(PyExc_TypeError,
-                        "gcdext() expects integer arguments");
+        PyErr_SetString(PyExc_TypeError, "gcdext() expects integer arguments");
         goto err;
     }
     if (MPZ_Check(args[1])) {
@@ -3702,8 +3700,7 @@ gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
         }
     }
     else {
-        PyErr_SetString(PyExc_TypeError,
-                        "gcdext() expects integer arguments");
+        PyErr_SetString(PyExc_TypeError, "gcdext() expects integer arguments");
         goto err;
     }
 
@@ -3883,7 +3880,7 @@ build_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc)
 
     if (!(tup = PyTuple_New(4))) {
         /* LCOV_EXCL_START */
-        Py_DECREF((PyObject*)man);
+        Py_DECREF((PyObject *)man);
         Py_DECREF(exp);
         return NULL;
         /* LCOV_EXCL_STOP */
@@ -3891,7 +3888,7 @@ build_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc)
 
     if (!(tsign = PyLong_FromLong(sign))) {
         /* LCOV_EXCL_START */
-        Py_DECREF((PyObject*)man);
+        Py_DECREF((PyObject *)man);
         Py_DECREF(exp);
         Py_DECREF(tup);
         return NULL;
@@ -3900,7 +3897,7 @@ build_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc)
 
     if (!(tbc = PyLong_FromUnsignedLongLong(bc))) {
         /* LCOV_EXCL_START */
-        Py_DECREF((PyObject*)man);
+        Py_DECREF((PyObject *)man);
         Py_DECREF(exp);
         Py_DECREF(tup);
         Py_DECREF(tsign);
@@ -3909,8 +3906,8 @@ build_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc)
     }
 
     PyTuple_SET_ITEM(tup, 0, tsign);
-    PyTuple_SET_ITEM(tup, 1, (PyObject*)man);
-    PyTuple_SET_ITEM(tup, 2, (exp)?exp:PyLong_FromLong(0));
+    PyTuple_SET_ITEM(tup, 1, (PyObject *)man);
+    PyTuple_SET_ITEM(tup, 2, exp ? exp : PyLong_FromLong(0));
     PyTuple_SET_ITEM(tup, 3, tbc);
     return tup;
 }
@@ -3925,13 +3922,13 @@ normalize_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc,
 
     /* If the mantissa is 0, return the normalized representation. */
     if (!SZ(man)) {
-        Py_INCREF((PyObject*)man);
+        Py_INCREF((PyObject *)man);
         return build_mpf(0, man, 0, 0);
     }
     /* if bc <= prec and the number is odd return it */
-    if ((bc <= prec) && LS(man)[0]&1) {
-        Py_INCREF((PyObject*)man);
-        Py_INCREF((PyObject*)exp);
+    if ((bc <= prec) && LS(man)[0] & 1) {
+        Py_INCREF((PyObject *)man);
+        Py_INCREF((PyObject *)exp);
         return build_mpf(sign, man, exp, bc);
     }
     Py_INCREF(exp);
@@ -3940,7 +3937,7 @@ normalize_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc,
 
         switch (rnd) {
             case (Py_UCS4)'f':
-                if(sign) {
+                if (sign) {
                     res = MPZ_rshift1(man, shift, 1);
                     ISNEG(res) = 0;
                 }
@@ -3949,7 +3946,7 @@ normalize_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc,
                 }
                 break;
             case (Py_UCS4)'c':
-                if(sign) {
+                if (sign) {
                     res = MPZ_rshift1(man, shift, 0);
                 }
                 else {
@@ -3979,14 +3976,14 @@ normalize_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc,
         }
         if (!(tmp = PyLong_FromUnsignedLongLong(shift))) {
             /* LCOV_EXCL_START */
-            Py_DECREF((PyObject*)res);
+            Py_DECREF((PyObject *)res);
             Py_DECREF(exp);
             return NULL;
             /* LCOV_EXCL_STOP */
         }
         if (!(newexp = PyNumber_Add(exp, tmp))) {
             /* LCOV_EXCL_START */
-            Py_DECREF((PyObject*)res);
+            Py_DECREF((PyObject *)res);
             Py_DECREF(exp);
             Py_DECREF(tmp);
             return NULL;
@@ -4004,7 +4001,7 @@ normalize_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc,
         tmp = (PyObject *)MPZ_rshift1(res, zbits, 0);
         if (!tmp) {
             /* LCOV_EXCL_START */
-            Py_DECREF((PyObject*)res);
+            Py_DECREF((PyObject *)res);
             Py_DECREF(exp);
             return NULL;
             /* LCOV_EXCL_STOP */
@@ -4014,14 +4011,14 @@ normalize_mpf(long sign, MPZ_Object *man, PyObject *exp, mp_bitcnt_t bc,
     }
     if (!(tmp = PyLong_FromUnsignedLongLong(zbits))) {
         /* LCOV_EXCL_START */
-        Py_DECREF((PyObject*)res);
+        Py_DECREF((PyObject *)res);
         Py_DECREF(exp);
         return NULL;
         /* LCOV_EXCL_STOP */
     }
     if (!(newexp = PyNumber_Add(exp, tmp))) {
         /* LCOV_EXCL_START */
-        Py_DECREF((PyObject*)res);
+        Py_DECREF((PyObject *)res);
         Py_DECREF(tmp);
         Py_DECREF(exp);
         return NULL;
@@ -4127,7 +4124,7 @@ gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
             tmp = (PyObject *)MPZ_rshift1(man, zbits, 0);
             if (!tmp) {
                 /* LCOV_EXCL_START */
-                Py_DECREF((PyObject*)man);
+                Py_DECREF((PyObject *)man);
                 Py_DECREF(exp);
                 return NULL;
                 /* LCOV_EXCL_STOP */
@@ -4137,7 +4134,7 @@ gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
         }
         if (!(tmp = PyLong_FromUnsignedLongLong(zbits))) {
             /* LCOV_EXCL_START */
-            Py_DECREF((PyObject*)man);
+            Py_DECREF((PyObject *)man);
             Py_DECREF(exp);
             return NULL;
             /* LCOV_EXCL_STOP */
@@ -4145,7 +4142,7 @@ gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
         Py_INCREF(exp);
         if (!(newexp = PyNumber_Add(exp, tmp))) {
             /* LCOV_EXCL_START */
-            Py_DECREF((PyObject*)man);
+            Py_DECREF((PyObject *)man);
             Py_DECREF(tmp);
             Py_DECREF(exp);
             return NULL;
@@ -4187,7 +4184,8 @@ static PyMethodDef gmp_functions[] = {
      ("fib($module, n, /)\n--\n\n"
       "Return the n-th Fibonacci number.")},
     {"_from_bytes", _from_bytes, METH_O, NULL},
-    {"_mpmath_normalize", (PyCFunction)gmp__mpmath_normalize, METH_FASTCALL, NULL},
+    {"_mpmath_normalize", (PyCFunction)gmp__mpmath_normalize, METH_FASTCALL,
+     NULL},
     {"_mpmath_create", (PyCFunction)gmp__mpmath_create, METH_FASTCALL, NULL},
     {NULL} /* sentinel */
 };
