@@ -1,6 +1,8 @@
 [build-system]
-requires = ["setuptools>=77,<=79.0.1", "setuptools_scm[toml]>=6.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.24", "scikit-build-core", "hatch-vcs"]
+build-backend = "hatchling.build"
+#requires = ["scikit-build-core", "hatch-vcs", "setuptools_scm[toml]>=6.0"]
+#build-backend = "scikit_build_core.build"
 
 [project]
 name = "python-gmp"
@@ -44,11 +46,19 @@ Homepage = "https://github.com/diofant/python-gmp"
 "Bug Tracker" = "https://github.com/diofant/python-gmp/issues"
 Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 
-[tool.setuptools.dynamic]
-version = {attr = "setuptools_scm.get_version"}
+#[tool.scikit-build]
+#metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 
-[tool.setuptools.package-data]
-"*" = ["*.h"]
+#[tool.setuptools_scm]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel.hooks.scikit-build]
+experimental = true
+
+[tool.hatch.build.targets.wheel.force-include]
+"_gmp_fractions.py" = "_gmp_fractions.py"
 
 [project.optional-dependencies]
 tests = ["pytest", "hypothesis", "mpmath>=1.4.0a6"]
