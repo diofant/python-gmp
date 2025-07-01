@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 
 import gmp
@@ -17,3 +18,7 @@ def pytest_report_header(config):
   Bits per limb:       {gmp.gmp_info[0]}
   Size of a limb:      {gmp.gmp_info[1]}
 """)
+
+
+def pytest_sessionstart(session):
+    os.environ["MPMATH_NOGMPY"] = "Y"
