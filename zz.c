@@ -1719,6 +1719,10 @@ _zz_powm(const zz_t *u, const zz_t *v, const zz_t *w, zz_t *res)
         return MP_OK;
     }
     if (mpn_scan1(w->digits, 0)) {
+        /* w = n * 2**m
+           u**v mod w = zz_inverse(n, 2**m) * (u**v mod 2**m)
+                        + zz_inverse(2**m, n) * (u**v mod n)
+         */
         mpz_t z;
         TMP_ZZ(b, u)
         TMP_ZZ(e, v)
