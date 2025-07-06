@@ -1708,6 +1708,16 @@ extern mp_size_t __gmpn_binvert_itch (mp_size_t);
 static mp_err
 _zz_powm(const zz_t *u, const zz_t *v, const zz_t *w, zz_t *res)
 {
+    if (zz_resize(w->size, res)) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+    res->negative = false;
+    if (zz_cmp_i32(v, 1) == MP_EQ) {
+        if (zz_div(u, w, MP_RNDD, NULL, res)) {
+            return MP_MEM; /* LCOV_EXCL_LINE */
+        }
+        return MP_OK;
+    }
     if (mpn_scan1(w->digits, 0)) {
         mpz_t z;
         TMP_ZZ(b, u)
@@ -1727,16 +1737,6 @@ _zz_powm(const zz_t *u, const zz_t *v, const zz_t *w, zz_t *res)
         res->negative = false;
         mpn_copyi(res->digits, z->_mp_d, res->size);
         mpz_clear(z);
-        return MP_OK;
-    }
-    if (zz_resize(w->size, res)) {
-        return MP_MEM; /* LCOV_EXCL_LINE */
-    }
-    res->negative = false;
-    if (zz_cmp_i32(v, 1) == MP_EQ) {
-        if (zz_div(u, w, MP_RNDD, NULL, res)) {
-            return MP_MEM; /* LCOV_EXCL_LINE */
-        }
         return MP_OK;
     }
 
