@@ -1698,6 +1698,13 @@ zz_inverse(const zz_t *u, const zz_t *v, zz_t *w)
     z->_mp_size = (u->negative ? -1 : 1) * u->size; \
     z->_mp_alloc = u->alloc;
 
+extern void __gmpn_powm (mp_ptr rp, mp_srcptr bp, mp_size_t bn,
+                         mp_srcptr ep, mp_size_t en,
+                         mp_srcptr mp, mp_size_t n, mp_ptr tp);
+extern mp_size_t __gmpn_binvert_itch (mp_size_t);
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 static mp_err
 _zz_powm(const zz_t *u, const zz_t *v, const zz_t *w, zz_t *res)
 {
@@ -1726,9 +1733,14 @@ _zz_powm(const zz_t *u, const zz_t *v, const zz_t *w, zz_t *res)
         return MP_MEM; /* LCOV_EXCL_LINE */
     }
     res->negative = false;
+    if (zz_cmp_i32(v, 1) == MP_EQ) {
+        if (zz_div(u, w, MP_RNDD, NULL, res)) {
+            return MP_MEM; /* LCOV_EXCL_LINE */
+        }
+        return MP_OK;
+    }
 
-    mp_size_t enb = v->size * GMP_NUMB_BITS;
-    mp_size_t tmp_size = mpn_sec_powm_itch(u->size, enb, w->size);
+    mp_size_t tmp_size = MAX(__gmpn_binvert_itch(w->size), 2*w->size);
     mp_limb_t *volatile tmp = malloc(tmp_size * sizeof(mp_limb_t));
 
     if (!tmp || TMP_OVERFLOW) {
@@ -1738,8 +1750,8 @@ _zz_powm(const zz_t *u, const zz_t *v, const zz_t *w, zz_t *res)
         return MP_MEM;
         /* LCOV_EXCL_STOP */
     }
-    mpn_sec_powm(res->digits, u->digits, u->size, v->digits, enb, w->digits,
-                 w->size, tmp);
+    __gmpn_powm (res->digits, u->digits, u->size, v->digits, v->size,
+                 w->digits, w->size, tmp);
     free(tmp);
     zz_normalize(res);
     return MP_OK;
