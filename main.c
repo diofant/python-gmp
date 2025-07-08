@@ -115,6 +115,12 @@ static gmp_global global = {
     .gmp_cache_size = 0,
 };
 
+typedef struct {
+    void *(*default_allocate_func)(size_t);
+    void *(*default_reallocate_func)(void *, size_t, size_t);
+    void (*default_free_func)(void *, size_t);
+} gmp_state;
+
 static MPZ_Object *
 MPZ_new(mp_size_t size, bool negative)
 {
@@ -2488,6 +2494,11 @@ static PyStructSequence_Desc gmp_info_desc = {
 static int
 gmp_exec(PyObject *m)
 {
+    gmp_state *state = PyModule_GetState(m);
+
+    mp_get_memory_functions(&state->default_allocate_func,
+                            &state->default_reallocate_func,
+                            &state->default_free_func);
     mp_set_memory_functions(gmp_allocate_function, gmp_reallocate_function,
                             gmp_free_function);
     if (PyModule_AddType(m, &MPZ_Type) < 0) {
@@ -2600,6 +2611,23 @@ gmp_exec(PyObject *m)
     return 0;
 }
 
+static int
+gmp_clear(PyObject *module)
+{
+    gmp_state *state = (gmp_state *)PyModule_GetState(module);
+
+    mp_set_memory_functions(state->default_allocate_func,
+                            state->default_reallocate_func,
+                            state->default_free_func);
+    return 0;
+}
+
+static void
+gmp_free(void *module)
+{
+    (void)gmp_clear((PyObject *)module);
+}
+
 #ifdef __GNUC__
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wpedantic"
@@ -2621,9 +2649,11 @@ static struct PyModuleDef gmp_module = {
     PyModuleDef_HEAD_INIT,
     .m_name = "gmp",
     .m_doc = "Bindings to the GNU GMP for Python.",
-    .m_size = 0,
+    .m_size = sizeof(gmp_state),
     .m_methods = gmp_functions,
     .m_slots = gmp_slots,
+    .m_free = gmp_free,
+    .m_clear = gmp_clear,
 };
 
 PyMODINIT_FUNC
