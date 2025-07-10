@@ -693,20 +693,20 @@ static void
 dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
-    gmp_state *state = get_state(Py_TYPE(self));
+    PyTypeObject *type = Py_TYPE(self);
+    gmp_state *state = get_state(type);
 
     if (global.gmp_cache_size < CACHE_SIZE
         && SZ(u) <= MAX_CACHE_MPZ_LIMBS
-        && MPZ_CheckExact(state, (PyObject *)u))
+        && MPZ_CheckExact(state, self))
     {
         global.gmp_cache[(global.gmp_cache_size)++] = u;
     }
     else {
-        PyTypeObject *tp = Py_TYPE(self);
-
         PyObject_GC_UnTrack(self);
         zz_clear(&u->z);
-        tp->tp_free(self);
+        type->tp_free(self);
+        Py_DECREF(type);
     }
 }
 
@@ -2570,8 +2570,9 @@ gmp_exec(PyObject *m)
     mp_set_memory_functions(gmp_allocate_function, gmp_reallocate_function,
                             gmp_free_function);
 
-    state->MPZ_Type = (PyTypeObject *)PyType_FromMetaclass(NULL, m,
-                                                           &mpz_spec, NULL);
+    state->MPZ_Type = (PyTypeObject *)PyType_FromModuleAndSpec(m,
+                                                               &mpz_spec,
+                                                               NULL);
     if (!state->MPZ_Type) {
         return -1; /* LCOV_EXCL_LINE */
     }
