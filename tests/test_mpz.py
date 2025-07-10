@@ -366,6 +366,17 @@ def test_add_sub(x, y):
     assert x - my == r
 
 
+def test_add_int_subclasses():
+    x = 123
+    mx = mpz(x)
+    class int2(int):
+        pass
+    y = int2(321)
+    r = x + 321
+    assert mx + y == r
+    assert y + mx == r
+
+
 @given(integers(), floats(allow_nan=False), complex_numbers(allow_nan=False))
 def test_add_sub_mixed(x, y, z):
     mx = mpz(x)

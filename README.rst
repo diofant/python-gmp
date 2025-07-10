@@ -2,8 +2,8 @@ Python-GMP
 ==========
 
 Python extension module providing safe bindings to the GNU GMP.  This module
-shouldn't crash the interpreter!  It requires Python 3.9 or later versions and
-has been tested with CPython 3.9 through 3.14 and for PyPy 3.10 and 3.11.
+shouldn't crash the interpreter!  It requires Python 3.11 or later versions and
+has been tested with CPython 3.11 through 3.14 and for PyPy 3.11.
 
 This module can be used as a gmpy2/python-flint replacement to provide
 CPython-compatible integer (mpz) type.  It includes few functions (factorial,
