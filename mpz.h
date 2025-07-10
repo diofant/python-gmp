@@ -21,9 +21,21 @@ typedef struct {
     zz_t z;
 } MPZ_Object;
 
-extern PyTypeObject MPZ_Type;
+#define MPZ_CheckExact(st, u) Py_IS_TYPE((u), (st)->MPZ_Type)
+#define MPZ_Check(st, u) PyObject_TypeCheck((u), (st)->MPZ_Type)
 
-#define MPZ_CheckExact(u) Py_IS_TYPE((u), &MPZ_Type)
-#define MPZ_Check(u) PyObject_TypeCheck((u), &MPZ_Type)
+#if !defined(PYPY_VERSION)
+#  define CACHE_SIZE (99)
+#else
+#  define CACHE_SIZE (0)
+#endif
+#define MAX_CACHE_MPZ_LIMBS (64)
+
+typedef struct {
+    PyTypeObject *MPZ_Type;
+
+    MPZ_Object *gmp_cache[CACHE_SIZE + 1];
+    size_t gmp_cache_size;
+} gmp_state;
 
 #endif /* MPZ_H */

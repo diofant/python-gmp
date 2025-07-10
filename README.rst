@@ -8,7 +8,7 @@ This module can be used as a gmpy2/python-flint replacement to provide
 CPython-compatible integer (mpz) type.  It includes few functions (factorial,
 gcd and isqrt), compatible with the stdlib's module math.
 
-It requires Python 3.9 or later versions and has been tested with CPython 3.9
+It requires Python 3.11 or later versions and has been tested with CPython 3.11
 through 3.14, for PyPy 3.11 and for GraalPy 24.2.  Free-threading builds of the
 CPython are supported.
 
