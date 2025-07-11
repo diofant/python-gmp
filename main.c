@@ -1538,12 +1538,11 @@ to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
 }
 
 static PyObject *
-_from_bytes(PyObject *type, PyObject *arg)
+_from_bytes(PyObject *module, PyObject *arg)
 {
-    PyTypeObject *tp = (PyTypeObject *)type;
-    gmp_state *state = get_state(tp);
+    gmp_state *state = PyModule_GetState(module);
 
-    return (PyObject *)MPZ_from_bytes(state, tp, arg, 0, 1);
+    return (PyObject *)MPZ_from_bytes(state, state->MPZ_Type, arg, 0, 1);
 }
 
 static PyObject *
@@ -1706,9 +1705,9 @@ __reduce_ex__(PyObject *self, PyObject *Py_UNUSED(args))
 {
     MPZ_Object *u = (MPZ_Object *)self;
     Py_ssize_t len = zz_bitlen(&u->z);
+    gmp_state *state = get_state(Py_TYPE(self));
 
-    return Py_BuildValue("N(N)",
-                         PyObject_GetAttrString(self, "_from_bytes"),
+    return Py_BuildValue("O(N)", state->from_bytes_func,
                          MPZ_to_bytes(u, (len + 7)/8 + 1, 0, 1));
 }
 
@@ -1844,7 +1843,6 @@ static PyMethodDef methods[] = {
      ("digits($self, base=10, prefix=False)\n--\n\n"
       "Return Python string representing self in the given base.\n\n"
       "Values for base can range between 2 to 62.")},
-    {"_from_bytes", _from_bytes, METH_O | METH_CLASS, NULL},
     {NULL} /* sentinel */
 };
 
@@ -1867,7 +1865,6 @@ Base 0 means to interpret the base from the string as an integer literal.");
 #  pragma GCC diagnostic ignored "-Wpedantic"
 #endif
 static PyType_Slot mpz_slots[] = {
-//  {Py_tp_token, Py_TP_USE_SPEC},
     {Py_tp_dealloc, dealloc},
     {Py_tp_getattro, PyObject_GenericGetAttr},
     {Py_tp_traverse, traverse},
@@ -2521,6 +2518,7 @@ static PyMethodDef gmp_functions[] = {
     {"fib", gmp_fib, METH_O,
      ("fib($module, n, /)\n--\n\n"
       "Return the n-th Fibonacci number.")},
+    {"_from_bytes", _from_bytes, METH_O, NULL},
     {"_mpmath_normalize", (PyCFunction)gmp__mpmath_normalize, METH_FASTCALL,
      NULL},
     {"_mpmath_create", (PyCFunction)gmp__mpmath_create, METH_FASTCALL, NULL},
@@ -2666,12 +2664,15 @@ gmp_exec(PyObject *m)
     Py_DECREF(ns);
     Py_DECREF(importlib);
     Py_DECREF(res);
+    state->from_bytes_func = PyObject_GetAttrString(m, "_from_bytes");
+//  Py_INCREF(state->from_bytes_func);
     return 0;
 }
 
 static int
 gmp_clear(PyObject *module)
 {
+    printf("clear!\n");
     gmp_state *state = PyModule_GetState(module);
 
     mp_set_memory_functions(state->default_allocate_func,
@@ -2681,12 +2682,14 @@ gmp_clear(PyObject *module)
         Py_CLEAR(state->gmp_cache[i]);
     }
     Py_CLEAR(state->MPZ_Type);
+    Py_CLEAR(state->from_bytes_func);
     return 0;
 }
 
 static void
 gmp_free(void *module)
 {
+    printf("free!\n");
     (void)gmp_clear((PyObject *)module);
 }
 
@@ -2699,6 +2702,7 @@ gmp_traverse(PyObject *module, visitproc visit, void *arg)
         Py_VISIT(state->gmp_cache[i]);
     }
     Py_VISIT(state->MPZ_Type);
+    Py_VISIT(state->from_bytes_func);
     return 0;
 }
 

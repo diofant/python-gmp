@@ -30,6 +30,8 @@ typedef struct {
 
     MPZ_Object *gmp_cache[CACHE_SIZE + 1];
     size_t gmp_cache_size;
+
+    PyObject *from_bytes_func;
 } gmp_state;
 
 #endif /* MPZ_H */
