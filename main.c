@@ -2496,6 +2496,25 @@ gmp__mpmath_create(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     return res;
 }
 
+static PyObject *
+gmp__free_cache(PyObject *module, PyObject *Py_UNUSED(args))
+{
+    gmp_state *state = PyModule_GetState(module);
+
+    for (size_t i = 0; i < state->gmp_cache_size; i++) {
+        MPZ_Object *u = state->gmp_cache[i];
+        PyObject *self = (PyObject *)u;
+        PyTypeObject *type = Py_TYPE(self);
+
+        PyObject_GC_UnTrack(self);
+        zz_clear(&u->z);
+        type->tp_free(self);
+        Py_DECREF(type);
+    }
+    state->gmp_cache_size = 0;
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef gmp_functions[] = {
     {"gcd", (PyCFunction)gmp_gcd, METH_FASTCALL,
      ("gcd($module, /, *integers)\n--\n\n"
@@ -2522,6 +2541,7 @@ static PyMethodDef gmp_functions[] = {
     {"_mpmath_normalize", (PyCFunction)gmp__mpmath_normalize, METH_FASTCALL,
      NULL},
     {"_mpmath_create", (PyCFunction)gmp__mpmath_create, METH_FASTCALL, NULL},
+    {"_free_cache", gmp__free_cache, METH_NOARGS, NULL},
     {NULL} /* sentinel */
 };
 
@@ -2696,6 +2716,7 @@ gmp_free(void *module)
 static int
 gmp_traverse(PyObject *module, visitproc visit, void *arg)
 {
+    printf("visit!\n");
     gmp_state *state = PyModule_GetState(module);
 
     for (size_t i = 0; i < state->gmp_cache_size; i++) {
