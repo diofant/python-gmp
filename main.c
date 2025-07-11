@@ -99,34 +99,18 @@ gmp_free_function(void *ptr, size_t size)
 #define SZ(op) (((op)->z).size)
 #define ISNEG(op) (((op)->z).negative)
 
-#if !defined(PYPY_VERSION) && !defined(Py_GIL_DISABLED)
-#  define CACHE_SIZE (99)
-#else
-#  define CACHE_SIZE (0)
-#endif
-#define MAX_CACHE_MPZ_LIMBS (64)
-
-typedef struct {
-    MPZ_Object *gmp_cache[CACHE_SIZE + 1];
-    size_t gmp_cache_size;
-} gmp_global;
-
-static gmp_global global = {
-    .gmp_cache_size = 0,
-};
-
 static MPZ_Object *
 MPZ_new(gmp_state * state, PyTypeObject *type, mp_size_t size, bool negative)
 {
     MPZ_Object *res;
 
-    if (global.gmp_cache_size && size <= MAX_CACHE_MPZ_LIMBS
+    if (state->gmp_cache_size && size <= MAX_CACHE_MPZ_LIMBS
         && type == state->MPZ_Type)
     {
-        res = global.gmp_cache[--(global.gmp_cache_size)];
+        res = state->gmp_cache[--(state->gmp_cache_size)];
         if (SZ(res) < size && zz_resize(size, &res->z) == MP_MEM) {
             /* LCOV_EXCL_START */
-            global.gmp_cache[(global.gmp_cache_size)++] = res;
+            state->gmp_cache[(state->gmp_cache_size)++] = res;
             return (MPZ_Object *)PyErr_NoMemory();
             /* LCOV_EXCL_STOP */
         }
@@ -696,11 +680,11 @@ dealloc(PyObject *self)
     PyTypeObject *type = Py_TYPE(self);
     gmp_state *state = get_state(type);
 
-    if (global.gmp_cache_size < CACHE_SIZE
+    if (state->gmp_cache_size < CACHE_SIZE
         && SZ(u) <= MAX_CACHE_MPZ_LIMBS
         && MPZ_CheckExact(state, self))
     {
-        global.gmp_cache[(global.gmp_cache_size)++] = u;
+        state->gmp_cache[(state->gmp_cache_size)++] = u;
     }
     else {
         PyObject_GC_UnTrack(self);
@@ -2579,6 +2563,7 @@ gmp_exec(PyObject *m)
     if (PyModule_AddType(m, state->MPZ_Type) < 0) {
         return -1; /* LCOV_EXCL_LINE */
     }
+    state->gmp_cache_size = 0;
 
     PyTypeObject *GMP_InfoType = PyStructSequence_NewType(&gmp_info_desc);
 
@@ -2692,6 +2677,9 @@ gmp_clear(PyObject *module)
     mp_set_memory_functions(state->default_allocate_func,
                             state->default_reallocate_func,
                             state->default_free_func);
+    for (size_t i = 0; i < state->gmp_cache_size; i++) {
+        Py_CLEAR(state->gmp_cache[i]);
+    }
     Py_CLEAR(state->MPZ_Type);
     return 0;
 }
@@ -2707,6 +2695,9 @@ gmp_traverse(PyObject *module, visitproc visit, void *arg)
 {
     gmp_state *state = PyModule_GetState(module);
 
+    for (size_t i = 0; i < state->gmp_cache_size; i++) {
+        Py_VISIT(state->gmp_cache[i]);
+    }
     Py_VISIT(state->MPZ_Type);
     return 0;
 }
