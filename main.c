@@ -640,12 +640,28 @@ str:
     return NULL;
 }
 
+#if defined(PYPY_VERSION)
+PyObject *
+gmp_PyType_GetModuleByDef(PyTypeObject *type, struct PyModuleDef *def)
+{
+    if (type == &PyLong_Type || type == &PyFloat_Type || type == &PyBool_Type
+        || type == &PyComplex_Type || type == &PyBaseObject_Type)
+    {
+        PyErr_Format(PyExc_TypeError, "XXX");
+        return NULL;
+    }
+    return PyType_GetModuleByDef(type, def);
+}
+#else
+#  define gmp_PyType_GetModuleByDef PyType_GetModuleByDef
+#endif
+
 static struct PyModuleDef gmp_module;
 
 static gmp_state *
 get_state(PyTypeObject *type)
 {
-    PyObject *mod = PyType_GetModuleByDef(type, &gmp_module);
+    PyObject *mod = gmp_PyType_GetModuleByDef(type, &gmp_module);
 
     return PyModule_GetState(mod);
 }
@@ -857,7 +873,7 @@ static struct PyModuleDef gmp_module;
 static inline gmp_state *
 find_state_left_or_right(PyObject *left, PyObject *right)
 {
-    PyObject *mod = PyType_GetModuleByDef(Py_TYPE(left), &gmp_module);
+    PyObject *mod = gmp_PyType_GetModuleByDef(Py_TYPE(left), &gmp_module);
 
     if (mod) {
         return PyModule_GetState(mod);
@@ -1260,7 +1276,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
 {
     MPZ_Object *res = NULL;
     MPZ_Object *u = NULL, *v = NULL;
-    PyObject *mod = PyType_GetModuleByDef(Py_TYPE(self), &gmp_module);
+    PyObject *mod = gmp_PyType_GetModuleByDef(Py_TYPE(self), &gmp_module);
     gmp_state *state;
 
     if (mod) {
@@ -1268,7 +1284,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
     }
     else {
         PyErr_Clear();
-        mod = PyType_GetModuleByDef(Py_TYPE(other), &gmp_module);
+        mod = gmp_PyType_GetModuleByDef(Py_TYPE(other), &gmp_module);
         if (mod) {
             state = PyModule_GetState(mod);
         }
