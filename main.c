@@ -2675,7 +2675,6 @@ gmp_exec(PyObject *m)
 static int
 gmp_clear(PyObject *module)
 {
-    printf("clear!\n");
     gmp_state *state = PyModule_GetState(module);
 
     mp_set_memory_functions(state->default_allocate_func,
@@ -2692,14 +2691,12 @@ gmp_clear(PyObject *module)
 static void
 gmp_free(void *module)
 {
-    printf("free!\n");
     (void)gmp_clear((PyObject *)module);
 }
 
 static int
 gmp_traverse(PyObject *module, visitproc visit, void *arg)
 {
-    printf("visit!\n");
     gmp_state *state = PyModule_GetState(module);
 
     for (size_t i = 0; i < state->gmp_cache_size; i++) {
