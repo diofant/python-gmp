@@ -3,8 +3,8 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
-#include "zz.h"
 #include "mpz.h"
+#include "zz.h"
 
 #include <float.h>
 #include <gmp.h>
@@ -291,7 +291,7 @@ MPZ_from_str(gmp_state *state, PyTypeObject *type, PyObject *obj, int base)
     else if (ret == MP_VAL) {
         Py_DECREF(res);
         if (2 <= base && base <= 36) {
-        err:
+err:
             PyErr_Format(PyExc_ValueError,
                          "invalid literal for mpz() with base %d: %.200R",
                          base, obj);
@@ -837,7 +837,21 @@ str(PyObject *self)
         goto fallback;                               \
     }
 
-PyObject * to_float(PyObject *self);
+PyObject *
+to_float(PyObject *self)
+{
+    double d;
+    MPZ_Object *u = (MPZ_Object *)self;
+    mp_err ret = zz_to_double(&u->z, &d);
+
+    if (ret == MP_BUF) {
+        PyErr_SetString(PyExc_OverflowError,
+                        "integer too large to convert to float");
+        return NULL;
+    }
+    return PyFloat_FromDouble(d);
+}
+
 static struct PyModuleDef gmp_module;
 
 static inline gmp_state *
@@ -894,34 +908,15 @@ numbers:
     Py_XDECREF(u);
     Py_XDECREF(v);
 
-    PyObject *uf, *vf;
+    PyObject *uf = to_float(self), *vf = other;
 
-    if (Number_Check(self)) {
-        uf = self;
-        Py_INCREF(uf);
-    }
-    else {
-        uf = to_float(self);
-        if (!uf) {
-            return NULL;
-        }
-    }
-    if (Number_Check(other)) {
-        vf = other;
-        Py_INCREF(vf);
-    }
-    else {
-        vf = to_float(other);
-        if (!vf) {
-            Py_DECREF(uf);
-            return NULL;
-        }
+    if (!uf) {
+        return NULL; /* LCOV_EXCL_LINE */
     }
 
     PyObject *res = PyObject_RichCompare(uf, vf, op);
 
     Py_DECREF(uf);
-    Py_DECREF(vf);
     return res;
 }
 
@@ -963,20 +958,6 @@ PyObject *
 to_int(PyObject *self)
 {
     return MPZ_to_int((MPZ_Object *)self);
-}
-
-PyObject *
-to_float(PyObject *self)
-{
-    double d;
-    mp_err ret = zz_to_double(&((MPZ_Object *)self)->z, &d);
-
-    if (ret == MP_BUF) {
-        PyErr_SetString(PyExc_OverflowError,
-                        "integer too large to convert to float");
-        return NULL;
-    }
-    return PyFloat_FromDouble(d);
 }
 
 static int
@@ -1146,8 +1127,7 @@ nb_divmod(PyObject *self, PyObject *other)
         Py_DECREF(q);
         Py_DECREF(r);
         if (ret == MP_VAL) {
-            PyErr_SetString(PyExc_ZeroDivisionError,
-                            "division by zero");
+            PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
         }
         else {
             PyErr_NoMemory(); /* LCOV_EXCL_LINE */
@@ -1193,8 +1173,7 @@ nb_truediv(PyObject *self, PyObject *other)
         goto end;
     }
     if (ret == MP_VAL) {
-        PyErr_SetString(PyExc_ZeroDivisionError,
-                        "division by zero");
+        PyErr_SetString(PyExc_ZeroDivisionError, "division by zero");
     }
     else if (ret == MP_BUF) {
         PyErr_SetString(PyExc_OverflowError,
@@ -1224,7 +1203,7 @@ numbers:
     else {
         uf = to_float(self);
         if (!uf) {
-            return NULL;
+            return NULL; /* LCOV_EXCL_LINE */
         }
     }
     if (Number_Check(other)) {
@@ -1234,8 +1213,10 @@ numbers:
     else {
         vf = to_float(other);
         if (!vf) {
+            /* LCOV_EXCL_START */
             Py_DECREF(uf);
             return NULL;
+            /* LCOV_EXCL_STOP */
         }
     }
     res = PyNumber_TrueDivide(uf, vf);
@@ -1323,8 +1304,10 @@ power(PyObject *self, PyObject *other, PyObject *module)
         if (!res || SZ(v) > 1 || ISNEG(v)
             || zz_pow(&u->z, SZ(v) ? LS(v)[0] : 0, &res->z))
         {
+            /* LCOV_EXCL_START */
             Py_CLEAR(res);
-            PyErr_SetNone(PyExc_MemoryError); /* LCOV_EXCL_LINE */
+            PyErr_SetNone(PyExc_MemoryError);
+            /* LCOV_EXCL_END */
         }
         Py_DECREF(u);
         Py_DECREF(v);
@@ -1340,7 +1323,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
         else if (PyLong_Check(module)) {
             w = MPZ_from_int(state, state->MPZ_Type, module);
             if (!w) {
-                goto end;
+                goto end; /* LCOV_EXCL_LINE */
             }
         }
         else {
@@ -1461,7 +1444,7 @@ static PyObject *
 bit_count(PyObject *self, PyObject *Py_UNUSED(args))
 {
     MPZ_Object *u = (MPZ_Object *)self;
-    mp_bitcnt_t count = SZ(u) ? mpn_popcount(LS(u), SZ(u)) : 0;
+    mp_bitcnt_t count = zz_bitcnt(&u->z);
 
     return PyLong_FromUnsignedLongLong(count);
 }
@@ -2285,7 +2268,7 @@ normalize_mpf(gmp_state *state, long sign, MPZ_Object *man, PyObject *exp, mp_bi
                 res = MPZ_rshift1(state, state->MPZ_Type, man, shift - 1);
 
                 int t = (LS(res)[0]&1 && (LS(res)[0]&2
-                         || mpn_scan1(LS(man), 0) + 2 <= shift));
+                         || zz_scan1(&man->z, 0) + 2 <= shift));
 
                 zz_quo_2exp(&res->z, 1, &res->z);
                 if (t && zz_add_i32(&res->z, 1, &res->z)) {
@@ -2319,7 +2302,7 @@ normalize_mpf(gmp_state *state, long sign, MPZ_Object *man, PyObject *exp, mp_bi
         res = (MPZ_Object *)plus((PyObject *)man);
     }
     /* Strip trailing 0 bits. */
-    if (SZ(res) && (zbits = mpn_scan1(LS(res), 0))) {
+    if (SZ(res) && (zbits = zz_scan1(&res->z, 0))) {
         tmp = (PyObject *)MPZ_rshift1(state, state->MPZ_Type, res, zbits);
         if (!tmp) {
             /* LCOV_EXCL_START */
@@ -2366,7 +2349,7 @@ gmp__mpmath_normalize(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     }
 
     long sign = PyLong_AsLong(args[0]);
-    MPZ_Object *man = (MPZ_Object*)args[1];
+    MPZ_Object *man = (MPZ_Object *)args[1];
     PyObject *exp = args[2];
     mp_bitcnt_t bc = PyLong_AsUnsignedLongLong(args[3]);
     mp_bitcnt_t prec = PyLong_AsUnsignedLongLong(args[4]);
@@ -2409,7 +2392,7 @@ gmp__mpmath_create(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     else if (PyLong_Check(args[0])) {
         man = MPZ_from_int(state, state->MPZ_Type, args[0]);
         if (!man) {
-            return NULL;
+            return NULL; /* LCOV_EXCL_LINE */
         }
     }
     else {
@@ -2455,7 +2438,7 @@ gmp__mpmath_create(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         PyObject *tmp, *newexp;
 
         /* Strip trailing 0 bits. */
-        if (SZ(man) && (zbits = mpn_scan1(LS(man), 0))) {
+        if (SZ(man) && (zbits = zz_scan1(&man->z, 0))) {
             tmp = (PyObject *)MPZ_rshift1(state, state->MPZ_Type, man, zbits);
             if (!tmp) {
                 /* LCOV_EXCL_START */

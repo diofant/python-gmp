@@ -53,6 +53,8 @@ mp_err zz_from_bytes(const uint8_t *buffer, size_t length,
                      bool is_signed, zz_t *u);
 
 size_t zz_bitlen(const zz_t *u);
+mp_bitcnt_t zz_scan1(const zz_t *u, mp_bitcnt_t bit);
+mp_bitcnt_t zz_bitcnt(const zz_t *u);
 
 typedef struct {
     uint8_t bits_per_digit;

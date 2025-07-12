@@ -73,6 +73,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           gcov_ignore: pythoncapi_compat.h
-          gcov_include: src/main.c
+          gcov_include: fmt.c
+                        main.c
+                        zz.c
           gcov_args: --no-external
           fail_ci_if_error: true
