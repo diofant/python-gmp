@@ -14,7 +14,7 @@ typedef struct {
 #define MPZ_CheckExact(st, u) Py_IS_TYPE((u), (st)->MPZ_Type)
 #define MPZ_Check(st, u) PyObject_TypeCheck((u), (st)->MPZ_Type)
 
-#if !defined(Py_GIL_DISABLED)
+#if !defined(PYPY_VERSION)
 #  define CACHE_SIZE (99)
 #else
 #  define CACHE_SIZE (0)
