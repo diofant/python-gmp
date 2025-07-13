@@ -36,7 +36,7 @@ zz_resize(mp_size_t size, zz_t *u)
     if (!alloc) {
         alloc = 1;
     }
-    u->digits = realloc(u->digits, alloc*sizeof(mp_limb_t));
+    u->digits = realloc(u->digits, alloc * sizeof(mp_limb_t));
     if (u->digits) {
         u->alloc = alloc;
         u->size = size;
@@ -544,7 +544,7 @@ zz_to_bytes(const zz_t *u, size_t length, bool is_signed, uint8_t **buffer)
         || (is_signed && nbits
             && (nbits == 8 * length ? !is_negative : is_negative)))
     {
-    overflow:
+overflow:
         zz_clear(&tmp);
         return MP_BUF;
     }
@@ -595,6 +595,73 @@ zz_from_bytes(const uint8_t *buffer, size_t length, bool is_signed, zz_t *u)
         u->negative = true;
         zz_normalize(u);
     }
+    return MP_OK;
+}
+
+size_t
+zz_bitlen(const zz_t *u)
+{
+    return u->size ? mpn_sizeinbase(u->digits, u->size, 2) : 0;
+}
+
+mp_bitcnt_t
+zz_scan1(const zz_t *u, mp_bitcnt_t bit)
+{
+    if (!u->size || u->negative) {
+        return ~(mp_bitcnt_t)0; /* XXX */
+    }
+    else {
+        return mpn_scan1(u->digits, bit);
+    }
+}
+
+mp_bitcnt_t
+zz_bitcnt(const zz_t *u)
+{
+    return u->size ? mpn_popcount(u->digits, u->size) : 0;
+}
+
+#define TMP_ZZ(z, u)                                \
+    mpz_t z;                                        \
+                                                    \
+    z->_mp_d = u->digits;                           \
+    z->_mp_size = (u->negative ? -1 : 1) * u->size; \
+    z->_mp_alloc = u->alloc;
+
+#define BITS_TO_LIMBS(n) (((n) + (GMP_NUMB_BITS - 1))/GMP_NUMB_BITS)
+
+mp_err
+zz_import(size_t len, const void *digits, mp_layout layout, zz_t *u)
+{
+    mp_size_t size = BITS_TO_LIMBS(len * layout.bits_per_digit);
+
+    if (zz_resize(size, u)) {
+        return MP_MEM; /* LCOV_EXCL_LINE */
+    }
+
+    TMP_ZZ(z, u);
+    mpz_import(z, len, layout.digits_order, layout.digit_size,
+               layout.digit_endianness,
+               layout.digit_size*8 - layout.bits_per_digit, digits);
+    u->size = z->_mp_size;
+    return MP_OK;
+}
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+mp_err
+zz_export(const zz_t *u, mp_layout layout, size_t len, void *digits)
+{
+    if (len < MAX((zz_bitlen(u) + layout.bits_per_digit
+                   - 1)/layout.bits_per_digit, 1))
+    {
+        return MP_VAL;
+    }
+
+    TMP_ZZ(z, u);
+    mpz_export(digits, NULL, layout.digits_order, layout.digit_size,
+               layout.digit_endianness,
+               layout.digit_size*8 - layout.bits_per_digit, z);
     return MP_OK;
 }
 
@@ -779,7 +846,7 @@ zz_div(const zz_t *u, const zz_t *v, mp_rnd rnd, zz_t *q, zz_t *r)
             zz_t tmp;
 
             if (zz_init(&tmp)) {
-                return MP_MEM;  /* LCOV_EXCL_LINE */
+                return MP_MEM; /* LCOV_EXCL_LINE */
             }
 
             mp_err ret = zz_div(u, v, rnd, &tmp, r);
@@ -791,7 +858,7 @@ zz_div(const zz_t *u, const zz_t *v, mp_rnd rnd, zz_t *q, zz_t *r)
             zz_t tmp;
 
             if (zz_init(&tmp)) {
-                return MP_MEM;  /* LCOV_EXCL_LINE */
+                return MP_MEM; /* LCOV_EXCL_LINE */
             }
 
             mp_err ret = zz_div(u, v, rnd, q, &tmp);
@@ -877,32 +944,30 @@ zz_div(const zz_t *u, const zz_t *v, mp_rnd rnd, zz_t *q, zz_t *r)
         case MP_RNDD:
             return MP_OK;
         case MP_RNDN:
-            {
-                mp_ord unexpect = v->negative ? MP_LT : MP_GT;
-                zz_t halfQ;
+        {
+            mp_ord unexpect = v->negative ? MP_LT : MP_GT;
+            zz_t halfQ;
 
-                if (zz_init(&halfQ) || zz_quo_2exp(v, 1, &halfQ)) {
-                    /* LCOV_EXCL_START */
-                    zz_clear(&halfQ);
-                    goto err;
-                    /* LCOV_EXCL_STOP */
-                }
-
-                mp_ord cmp = zz_cmp(r, &halfQ);
-
+            if (zz_init(&halfQ) || zz_quo_2exp(v, 1, &halfQ)) {
+                /* LCOV_EXCL_START */
                 zz_clear(&halfQ);
-                if (cmp == MP_EQ && v->digits[0]%2 == 0
-                    && q->size && q->digits[0]%2 != 0)
-                {
-                    cmp = unexpect;
-                }
-                if (cmp == unexpect) {
-                    if (zz_add_i32(q, 1, q) || zz_sub(r, v, r)) {
-                        goto err; /* LCOV_EXCL_LINE */
-                    }
-                }
-                return MP_OK;
+                goto err;
+                /* LCOV_EXCL_STOP */
             }
+
+            mp_ord cmp = zz_cmp(r, &halfQ);
+
+            zz_clear(&halfQ);
+            if (cmp == MP_EQ && v->digits[0]%2 == 0 && q->size
+                && q->digits[0]%2 != 0)
+            {
+                cmp = unexpect;
+            }
+            if (cmp == unexpect && (zz_add_i32(q, 1, q) || zz_sub(r, v, r))) {
+                goto err; /* LCOV_EXCL_LINE */
+            }
+            return MP_OK;
+        }
         default:
             return MP_VAL;
     }
@@ -1057,7 +1122,7 @@ zz_truediv(const zz_t *u, const zz_t *v, double *res)
 
     if (zz_init(&tmp1) || zz_init(&tmp2)) {
         /* LCOV_EXCL_START */
-    tmp_clear:
+tmp_clear:
         zz_clear(&tmp1);
         zz_clear(&tmp2);
         return MP_MEM;
@@ -1140,7 +1205,7 @@ zz_and(const zz_t *u, const zz_t *v, zz_t *w)
 
         if (zz_init(&o1) || zz_init(&o2)) {
             /* LCOV_EXCL_START */
-        err:
+err:
             zz_clear(&o1);
             zz_clear(&o2);
             /* LCOV_EXCL_STOP */
@@ -1242,7 +1307,7 @@ zz_or(const zz_t *u, const zz_t *v, zz_t *w)
 
         if (zz_init(&o1) || zz_init(&o2)) {
             /* LCOV_EXCL_START */
-        err:
+err:
             zz_clear(&o1);
             zz_clear(&o2);
             /* LCOV_EXCL_STOP */
@@ -1346,7 +1411,7 @@ zz_xor(const zz_t *u, const zz_t *v, zz_t *w)
 
         if (zz_init(&o1) || zz_init(&o2)) {
             /* LCOV_EXCL_START */
-        err:
+err:
             zz_clear(&o1);
             zz_clear(&o2);
             /* LCOV_EXCL_STOP */
@@ -1436,7 +1501,7 @@ zz_xor(const zz_t *u, const zz_t *v, zz_t *w)
     return MP_OK;
 }
 
-#define GMP_LIMB_MAX ((mp_limb_t) ~ (mp_limb_t) 0)
+#define GMP_LIMB_MAX ((mp_limb_t) ~(mp_limb_t)0)
 
 mp_err
 zz_pow(const zz_t *u, uint64_t v, zz_t *w)
@@ -1691,13 +1756,6 @@ zz_inverse(const zz_t *u, const zz_t *v, zz_t *w)
     return MP_VAL;
 }
 
-#define TMP_ZZ(z, u)                                \
-    mpz_t z;                                        \
-                                                    \
-    z->_mp_d = u->digits;                           \
-    z->_mp_size = (u->negative ? -1 : 1) * u->size; \
-    z->_mp_alloc = u->alloc;
-
 extern void __gmpn_powm (mp_ptr rp, mp_srcptr bp, mp_size_t bn,
                          mp_srcptr ep, mp_size_t en,
                          mp_srcptr mp, mp_size_t n, mp_ptr tp);
@@ -1844,7 +1902,7 @@ zz_powm(const zz_t *u, const zz_t *v, const zz_t *w, zz_t *res)
             goto end3; /* LCOV_EXCL_LINE */
         }
         if (ret == MP_VAL) {
-        end3:
+end3:
             zz_clear(&o1);
             zz_clear(&o2);
             zz_clear(&o3);

@@ -52,6 +52,20 @@ mp_err zz_to_bytes(const zz_t *u, size_t length, bool is_signed,
 mp_err zz_from_bytes(const uint8_t *buffer, size_t length,
                      bool is_signed, zz_t *u);
 
+size_t zz_bitlen(const zz_t *u);
+mp_bitcnt_t zz_scan1(const zz_t *u, mp_bitcnt_t bit);
+mp_bitcnt_t zz_bitcnt(const zz_t *u);
+
+typedef struct {
+    uint8_t bits_per_digit;
+    uint8_t digit_size;
+    int8_t digits_order;
+    int8_t digit_endianness;
+} mp_layout;
+
+mp_err zz_import(size_t len, const void *digits, mp_layout layout, zz_t *u);
+mp_err zz_export(const zz_t *u, mp_layout layout, size_t len, void *digits);
+
 mp_err zz_add(const zz_t *u, const zz_t *v, zz_t *w);
 mp_err zz_add_i32(const zz_t *u, int32_t v, zz_t *w);
 mp_err zz_sub(const zz_t *u, const zz_t *v, zz_t *w);

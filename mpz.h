@@ -1,0 +1,19 @@
+#ifndef MPZ_H
+#define MPZ_H
+
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+
+#include "zz.h"
+
+typedef struct {
+    PyObject_HEAD
+    zz_t z;
+} MPZ_Object;
+
+extern PyTypeObject MPZ_Type;
+
+#define MPZ_CheckExact(u) Py_IS_TYPE((u), &MPZ_Type)
+#define MPZ_Check(u) PyObject_TypeCheck((u), &MPZ_Type)
+
+#endif /* MPZ_H */

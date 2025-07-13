@@ -18,7 +18,7 @@ jobs:
                          3.11, 3.12, 3.13, 3.13t, 3.14]
     runs-on: ubuntu-24.04
     env:
-      PYTEST_ADDOPTS: --verbose --capture=no
+      PYTEST_ADDOPTS: --verbose
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,10 +31,11 @@ jobs:
       - run: pip install --upgrade pip
       - run: pip --verbose install --editable .[tests]
         env:
+          PKG_CONFIG_PATH: .local/lib/pkgconfig
           CFLAGS: -Wpedantic -Werror -std=c17
       - run: pytest
         env:
-          LD_LIBRARY_PATH: .local/lib/
+          LD_LIBRARY_PATH: .local/lib
   macos:
     needs:
       - linux
@@ -73,13 +74,13 @@ jobs:
           update: true
           install: >-
             git
-            gcc
             gmp-devel
-            python-setuptools
             python-pip
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-gcc
       - run: |
           python -m venv .test-venv
           source .test-venv/bin/activate
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip --verbose install -e .[tests]
           pytest

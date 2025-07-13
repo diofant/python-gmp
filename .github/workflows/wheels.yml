@@ -18,9 +18,17 @@ jobs:
           install: >-
             mingw-w64-ucrt-x86_64-gcc
             autotools
+            patch
           msystem: ucrt64
-          path-type: inherit
         if: ${{ startsWith(matrix.os, 'windows') }}
+      # Install pkgconfig on Windows from choco rather than from msys and
+      # avoid using the Strawberry one.
+      - run: choco install -y --stoponfirstfailure --checksum 6004DF17818F5A6DBF19CB335CC92702 pkgconfiglite
+        if: ${{ startsWith( matrix.os , 'windows' ) }}
+      # We have to set this here rather than in the cibuildwheel config
+      # This is probably something to do with \ vs / in paths...
+      - run: echo "PKG_CONFIG_PATH=${{ github.workspace }}/.local/lib/pkgconfig" >> $env:GITHUB_ENV
+        if: ${{ startsWith( matrix.os , 'windows' ) }}
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.0.0
       - uses: actions/upload-artifact@v4

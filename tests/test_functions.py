@@ -139,6 +139,7 @@ def test__mpmath_create(man, exp, prec, rnd):
 
 def test_interfaces():
     assert gcd() == 0
+    assert gcd(2, 3, 4) == 1
     assert factorial(123) == fac(123)
     with pytest.raises(TypeError):
         gcd(1j)

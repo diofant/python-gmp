@@ -61,7 +61,7 @@ def test_underscores_auto(s):
 
 
 @composite
-def fmt_str(draw, types="bdoxX"):
+def fmt_str(draw, types="bdoxXn"):
     res = ""
     type = draw(sampled_from(types))
 
@@ -98,7 +98,8 @@ def fmt_str(draw, types="bdoxX"):
     # grouping character (thousand_separators)
     gchar = draw(sampled_from([""] + list(",_")))
     if (gchar and not skip_thousand_separators
-            and not (gchar == "," and type in ["b", "o", "x", "X"])):
+            and not (gchar == "," and type in ["b", "o", "x", "X"])
+            and not type == "n"):
         res += gchar
 
     # Type
@@ -108,10 +109,31 @@ def fmt_str(draw, types="bdoxX"):
 
 
 @given(integers(), fmt_str())
-def test___format__(x, fmt):
+@example(69, "r<-6_b")
+@example(3351, "e=+8o")
+@example(-3912, "1=28d")
+@example(-3912, "0=28d")
+@example(-3912, "028d")
+@example(-3912, "28n")
+def test___format___bulk(x, fmt):
     mx = mpz(x)
     r = format(x, fmt)
     assert format(mx, fmt) == r
+
+
+def test___format___interface():
+    mx = mpz(123)
+    pytest.raises(ValueError, lambda: format(mx, "q"))
+    pytest.raises(ValueError, lambda: format(mx, "\x81"))
+    pytest.raises(ValueError, lambda: format(mx, "zd"))
+    pytest.raises(ValueError, lambda: format(mx, ".10d"))
+    pytest.raises(ValueError, lambda: format(mx, "_n"))
+    pytest.raises(ValueError, lambda: format(mx, "_c"))
+    pytest.raises(ValueError, lambda: format(mx, "f=10dx"))
+    pytest.raises(ValueError, lambda: format(mx, ".d"))
+    pytest.raises(ValueError, lambda: format(mx, "f=10000000000000000000d"))
+    assert format(mx, ".2f") == "123.00"
+    assert format(mx, "") == "123"
 
 
 @given(integers())
@@ -120,6 +142,7 @@ def test___format__(x, fmt):
 @example(75424656551107706)
 @example(1284673497348563845623546741523784516734143215346712)
 @example(65869376547959985897597359)
+@example(-1329227995784915872903807060280344576)
 def test_from_to_int(x):
     sx = str(x)
     bx = bytes(sx, "ascii")
@@ -156,6 +179,8 @@ def test_mpz_interface():
         mpz("1", base=10**1000)
     with pytest.raises(ValueError):
         mpz(" ")
+    with pytest.raises(ValueError):
+        mpz("ыыы")
     assert mpz() == mpz(0) == 0
     assert mpz("  -123") == -123
     assert mpz("123  ") == 123
@@ -163,6 +188,8 @@ def test_mpz_interface():
     assert mpz("+123") == 123
     assert mpz("١٢٣٤") == 1234  # unicode decimal digits
     assert mpz("١23") == 123
+    assert mpz("\t123") == 123
+    assert mpz("\xa0123") == 123
 
     class with_int:
         def __init__(self, value):
@@ -404,6 +431,8 @@ def test_divmod_errors():
         divmod(mx, 1j)
     with pytest.raises(TypeError):
         divmod(mx, object())
+    with pytest.raises(ZeroDivisionError):
+        divmod(mx, 0)
 
 
 @pytest.mark.skipif(platform.python_implementation() == "GraalVM",
@@ -434,6 +463,17 @@ def test_truediv(x, y):
 @given(integers(), floats(allow_nan=False), complex_numbers(allow_nan=False))
 def test_truediv_mixed(x, y, z):
     mx = mpz(x)
+    if not x:
+        with pytest.raises(ZeroDivisionError):
+            y / mx
+    else:
+        try:
+            r = y / mx
+        except OverflowError:
+            with pytest.raises(OverflowError):
+                y / mx
+        else:
+            assert y / mx == r
     if not y:
         with pytest.raises(ZeroDivisionError):
             mx / y
@@ -459,6 +499,12 @@ def test_truediv_mixed(x, y, z):
                 assert cmath.isnan(mx / z)
             else:
                 assert mx / z == r
+
+
+def test_truediv_errors():
+    mx = mpz(123)
+    pytest.raises(TypeError, lambda: mx / object())
+    pytest.raises(TypeError, lambda: object() / mx)
 
 
 @pytest.mark.skipif(platform.python_implementation() == "GraalVM",
@@ -610,6 +656,8 @@ def test_xor(x, y):
 @example(1, 1<<128)
 @example(90605555449081991889354259339521952450308780844225461, 64)
 def test_lshift(x, y):
+    if platform.python_implementation() == "GraalVM" and y < 0:
+        return  # XXX: oracle/graalpython#516
     mx = mpz(x)
     my = mpz(y)
     try:

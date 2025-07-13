@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=77,<=79.0.1", "setuptools_scm[toml]>=6.0"]
-build-backend = "setuptools.build_meta"
+build-backend = "mesonpy"
+requires = ["meson-python", "setuptools_scm[toml]>=6.0"]
 
 [project]
 name = "python-gmp"
@@ -44,11 +44,7 @@ Homepage = "https://github.com/diofant/python-gmp"
 "Bug Tracker" = "https://github.com/diofant/python-gmp/issues"
 Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 
-[tool.setuptools.dynamic]
-version = {attr = "setuptools_scm.get_version"}
-
-[tool.setuptools.package-data]
-"*" = ["*.h"]
+[tool.setuptools_scm]
 
 [project.optional-dependencies]
 tests = ["pytest", "hypothesis", "mpmath>=1.4.0a6"]
@@ -87,10 +83,18 @@ enable = "pypy cpython-prerelease cpython-freethreading graalpy"
 skip = "*-win32 *-manylinux_i686 *-musllinux_* *-manylinux_armv7l pp*aarch64* gp3*win*"
 before-all = "bash scripts/cibw_before_all.sh"
 test-extras = "tests"
-test-command = "pytest --verbose --capture=no {package}/tests"
+test-command = "pytest {package}/tests"
 repair-wheel-command = "bash scripts/cibw_repair_wheel_command.sh {dest_dir} {wheel}"
 
 [tool.cibuildwheel.windows]
 before-all = "msys2 -c scripts/cibw_before_all.sh"
 before-build = "pip install wheel delvewheel"
-repair-wheel-command = "scripts\\cibw_repair_wheel_command_windows.bat {dest_dir} {wheel}"
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --add-path .local/bin --no-mangle-all --include-imports"
+
+[tool.cibuildwheel.environment]
+LD_LIBRARY_PATH = "$(pwd)/.local/lib:$LD_LIBRARY_PATH"
+PKG_CONFIG_PATH = "$(pwd)/.local/lib/pkgconfig"
+PYTEST_ADDOPTS = "--verbose"
+
+[tool.cibuildwheel.windows.environment]
+PYTEST_ADDOPTS = "--verbose"

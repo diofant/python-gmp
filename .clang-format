@@ -32,3 +32,4 @@ BreakBeforeBinaryOperators: NonAssignment
 IndentPPDirectives: AfterHash
 PPIndentWidth: 2
 PenaltyBreakAssignment: 41
+IndentGotoLabels: false

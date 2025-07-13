@@ -3,11 +3,14 @@ on:
   workflow_call:
 jobs:
   coverage:
-    runs-on: ubuntu-24.04
+    # Meson doesn't support lcov>=2.0, see mesonbuild/meson#11995
+    runs-on: ubuntu-22.04
+    env:
+      PYTEST_ADDOPTS: --verbose
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.x", pypy3.11]
+        python-version: [pypy3.11, "3.x", 3.14]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -15,22 +18,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - run: |
           sudo apt-get update
-          sudo apt-get install lcov
+          sudo apt-get install lcov ninja-build
       - run: bash scripts/cibw_before_all.sh
-      - run: pip install --upgrade pip 'setuptools<=79.0.1' setuptools_scm
-      - run: pip --verbose install --editable .[tests]
+      - run: pip install --upgrade pip
+      - run: pip install --upgrade meson setuptools_scm
+      - run: pip install --verbose .[tests]
+        env:
+          PKG_CONFIG_PATH: .local/lib/pkgconfig
       - name: Build and run coverage tests
         run: |
-          python setup.py clean
-          python setup.py develop
-          pytest --hypothesis-profile=default --verbose
-          lcov --capture --directory . --no-external \
-              --output-file build/coverage-${{ matrix.python-version }}.info
+          meson setup build --prefix=/usr -Db_coverage=true
+          meson install -C build --destdir ../build-install
+          export PYTHONPATH="$(find build-install -name site-packages)"
+          python -m pytest --hypothesis-profile=default
+          ninja -C build coverage-html
+          cp build/meson-logs/coverage.info \
+             build/coverage-${{ matrix.python-version }}.info
         env:
-          CFLAGS: -coverage
-          LD_LIBRARY_PATH: .local/lib/
+          PKG_CONFIG_PATH: .local/lib/pkgconfig
+          LD_LIBRARY_PATH: .local/lib
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python-version }}
@@ -64,6 +73,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           gcov_ignore: pythoncapi_compat.h
-          gcov_include: src/main.c
+          gcov_include: fmt.c
+                        main.c
+                        zz.c
           gcov_args: --no-external
           fail_ci_if_error: true
