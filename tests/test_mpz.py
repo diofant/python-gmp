@@ -162,6 +162,7 @@ def test___format___interface():
         locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
         s = locale.localeconv()["thousands_sep"]
         assert format(mpz(123456789), "n") == f"123{s}456{s}789"
+        assert format(mpz(123), "011n") == f"000{s}000{s}123"
         locale.setlocale(locale.LC_ALL, "C")
         if platform.python_implementation() == "GraalVM":
             return  # issue oracle/graalpython#521
