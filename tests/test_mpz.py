@@ -126,9 +126,7 @@ def test___format___bulk(x, fmt):
 def test___format___interface():
     mx = mpz(123)
     pytest.raises(ValueError, lambda: format(mx, "q"))
-    if (platform.python_implementation() != "PyPy"
-            or sys.version_info >= (3, 11)):
-        pytest.raises(ValueError, lambda: format(mx, "\x81"))
+    pytest.raises(ValueError, lambda: format(mx, "\x81"))
     pytest.raises(ValueError, lambda: format(mx, "zd"))
     pytest.raises(ValueError, lambda: format(mx, ".10d"))
     pytest.raises(ValueError, lambda: format(mx, "_n"))
