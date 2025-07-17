@@ -160,9 +160,6 @@ def test___format___interface():
         assert format(mx, ".,f") == "123.000,000"
         assert format(mx, "._f") == "123.000_000"
 
-    if platform.python_implementation() == "PyPy":
-        return  # issue pypy/pypy#5311
-
     try:
         locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
         s = locale.localeconv()["thousands_sep"]

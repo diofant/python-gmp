@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: [3.9, '3.10', 'pypy3.10', pypy3.11, graalpy-24.2,
+        python-version: [3.9, '3.10', pypy3.11-nightly, graalpy-24.2,
                          3.11, 3.12, 3.13, 3.13t, 3.14]
     runs-on: ubuntu-24.04
     env:
