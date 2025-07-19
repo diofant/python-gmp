@@ -5,7 +5,6 @@ from datetime import timedelta
 import gmp
 from hypothesis import settings
 
-
 default = settings.get_profile("default")
 settings.register_profile("default",
                           settings(default,

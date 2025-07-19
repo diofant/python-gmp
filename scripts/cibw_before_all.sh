@@ -15,6 +15,9 @@ if [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "cygwin" ]
 then
   patch -N -Z -p0 < ../scripts/dll-importexport.diff
 fi
+
+unset CFLAGS
+
 # config.guess uses microarchitecture and configfsf.guess doesn't
 # We replace config.guess with configfsf.guess to avoid microarchitecture
 # specific code in common code.

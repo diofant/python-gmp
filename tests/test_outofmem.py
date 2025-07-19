@@ -5,7 +5,6 @@ from gmp import fac, mpz
 from hypothesis import given
 from hypothesis.strategies import integers
 
-
 if platform.system() != "Linux":
     pytest.skip("FIXME: setrlimit fails with ValueError on MacOS",
                 allow_module_level=True)

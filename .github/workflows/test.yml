@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: [3.9, '3.10', 'pypy3.10', pypy3.11, graalpy-24.2,
+        python-version: [3.9, '3.10', pypy3.11, graalpy-24.2,
                          3.11, 3.12, 3.13, 3.13t, 3.14]
     runs-on: ubuntu-24.04
     env:
@@ -32,7 +32,7 @@ jobs:
       - run: pip --verbose install --editable .[tests]
         env:
           PKG_CONFIG_PATH: .local/lib/pkgconfig
-          CFLAGS: -Wpedantic -Werror -std=c17
+          CFLAGS: -Wall -Wpedantic -Werror -std=c17
       - run: pytest
         env:
           LD_LIBRARY_PATH: .local/lib
@@ -41,7 +41,7 @@ jobs:
       - linux
     runs-on: macos-14
     env:
-      CFLAGS: -Wpedantic -Werror -std=c17
+      CFLAGS: -Wall -Wpedantic -Werror -std=c17
       PYTEST_ADDOPTS: --verbose
     steps:
       - uses: actions/checkout@v4
@@ -62,6 +62,7 @@ jobs:
     runs-on: windows-2022
     env:
       PYTEST_ADDOPTS: --verbose
+      CFLAGS: -Wall -Wpedantic -Werror -std=c17
     defaults:
       run:
         shell: msys2 {0}

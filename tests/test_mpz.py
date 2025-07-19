@@ -1,4 +1,5 @@
 import cmath
+import locale
 import math
 import operator
 import pickle
@@ -21,6 +22,24 @@ from hypothesis.strategies import (
     text,
 )
 
+
+class with_int:
+    def __init__(self, value):
+        self.value = value
+    def __int__(self):
+        try:
+            exc = issubclass(self.value, Exception)
+        except TypeError:
+            exc = False
+        if exc:
+            raise self.value
+        return self.value
+
+class int2(int):
+    pass
+
+class mpz2(mpz):
+    pass
 
 @given(integers())
 @example(0)
@@ -114,6 +133,7 @@ def fmt_str(draw, types="bdoxXn"):
 @example(-3912, "1=28d")
 @example(-3912, "0=28d")
 @example(-3912, "028d")
+@example(-3912, "028_d")
 @example(-3912, "28n")
 def test___format___bulk(x, fmt):
     mx = mpz(x)
@@ -124,16 +144,62 @@ def test___format___bulk(x, fmt):
 def test___format___interface():
     mx = mpz(123)
     pytest.raises(ValueError, lambda: format(mx, "q"))
-    pytest.raises(ValueError, lambda: format(mx, "\x81"))
+    if (platform.python_implementation() != "PyPy"
+            or sys.version_info >= (3, 11)):
+        pytest.raises(ValueError, lambda: format(mx, "\x81"))
     pytest.raises(ValueError, lambda: format(mx, "zd"))
     pytest.raises(ValueError, lambda: format(mx, ".10d"))
     pytest.raises(ValueError, lambda: format(mx, "_n"))
+    pytest.raises(ValueError, lambda: format(mx, ",n"))
     pytest.raises(ValueError, lambda: format(mx, "_c"))
     pytest.raises(ValueError, lambda: format(mx, "f=10dx"))
     pytest.raises(ValueError, lambda: format(mx, ".d"))
     pytest.raises(ValueError, lambda: format(mx, "f=10000000000000000000d"))
+    pytest.raises(ValueError, lambda: format(mx, ".10000000000000000000f"))
+    pytest.raises(ValueError, lambda: format(mx, ",_d"))
+    pytest.raises(ValueError, lambda: format(mx, "_,d"))
+    pytest.raises(ValueError, lambda: format(mx, ",x"))
+    pytest.raises(ValueError, lambda: format(mx, ",\xa0"))
+    pytest.raises(ValueError, lambda: format(mx, "+c"))
+    pytest.raises(ValueError, lambda: format(mx, "#c"))
+    pytest.raises(OverflowError, lambda: format(mpz(123456789), "c"))
+    pytest.raises(OverflowError, lambda: format(mpz(10**100), "c"))
+    pytest.raises(OverflowError, lambda: format(mpz(-1), "c"))
+    pytest.raises(OverflowError, lambda: format(mpz(1<<32), "c"))
+    if sys.version_info >= (3, 14):
+        pytest.raises(ValueError, lambda: format(mx, ".10,_f"))
+        pytest.raises(ValueError, lambda: format(mx, ".10_,f"))
+        pytest.raises(ValueError, lambda: format(mx, ".10_n"))
+        pytest.raises(ValueError, lambda: format(mx, ".10,n"))
     assert format(mx, ".2f") == "123.00"
     assert format(mx, "") == "123"
+    assert format(mx, "c") == "{"
+    assert format(mpz(0), "c") == "\x00"
+    assert format(mx, "010c") == "000000000{"
+    assert format(mx, "<10c") == "{         "
+
+    if sys.version_info >= (3, 14):
+        assert format(mx, ".,f") == "123.000,000"
+        assert format(mx, "._f") == "123.000_000"
+
+    if (platform.python_implementation() == "PyPy"
+            and sys.pypy_version_info[:3] <= (7, 3, 20)):
+        return  # issue pypy/pypy#5311
+
+    try:
+        locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
+        s = locale.localeconv()["thousands_sep"]
+        assert format(mpz(123456789), "n") == f"123{s}456{s}789"
+        assert format(mpz(123), "011n") == f"000{s}000{s}123"
+        locale.setlocale(locale.LC_ALL, "C")
+        if platform.python_implementation() == "GraalVM":
+            return  # issue oracle/graalpython#521
+        locale.setlocale(locale.LC_NUMERIC, "ps_AF.UTF-8")
+        s = locale.localeconv()["thousands_sep"]
+        assert format(mpz(123456789), "n") == f"123{s}456{s}789"
+    except locale.Error:
+        pass
+    locale.setlocale(locale.LC_ALL, "C")
 
 
 @given(integers())
@@ -143,6 +209,7 @@ def test___format___interface():
 @example(1284673497348563845623546741523784516734143215346712)
 @example(65869376547959985897597359)
 @example(-1329227995784915872903807060280344576)
+@example(1<<63)
 def test_from_to_int(x):
     sx = str(x)
     bx = bytes(sx, "ascii")
@@ -163,6 +230,8 @@ def test_mpz_interface():
         mpz(123).digits(-1)
     with pytest.raises(ValueError):
         mpz(123).digits(123)
+    with pytest.raises(ValueError):
+        mpz(-123).digits(123, prefix=True)
     with pytest.raises(ValueError):
         mpz("123", 1)
     with pytest.raises(ValueError):
@@ -190,16 +259,12 @@ def test_mpz_interface():
     assert mpz("١23") == 123
     assert mpz("\t123") == 123
     assert mpz("\xa0123") == 123
-
-    class with_int:
-        def __init__(self, value):
-            self.value = value
-        def __int__(self):
-            return self.value
-    class int2(int):
-        pass
+    assert mpz("-010") == -10
+    assert mpz("-10") == -10
 
     assert mpz(with_int(123)) == 123
+    with pytest.raises(RuntimeError):
+        mpz(with_int(RuntimeError))
     with pytest.deprecated_call():
         assert mpz(with_int(int2(123))) == 123
     with warnings.catch_warnings():
@@ -211,9 +276,6 @@ def test_mpz_interface():
 
 
 def test_mpz_subclasses():
-    class mpz2(mpz):
-        pass
-
     assert issubclass(mpz2, mpz)
     x = mpz2(123)
     assert type(x) is mpz2
@@ -227,15 +289,9 @@ def test_mpz_subclasses():
     with pytest.raises(TypeError):
         mpz2(1, spam=2)
 
-    class with_int:
-        def __init__(self, value):
-            self.value = value
-        def __int__(self):
-            return self.value
-    class int2(int):
-        pass
-
     assert mpz2(with_int(123)) == 123
+    with pytest.raises(RuntimeError):
+        mpz2(with_int(RuntimeError))
     with pytest.deprecated_call():
         assert mpz2(with_int(int2(123))) == 123
     with warnings.catch_warnings():
@@ -338,6 +394,7 @@ def test_add_sub_mixed(x, y, z):
 
 
 @given(integers(), integers())
+@example(123 + (1<<64), 1<<200)
 def test_mul(x, y):
     mx = mpz(x)
     my = mpz(y)
@@ -395,6 +452,7 @@ def test_mul_mixed(x, y, z):
 @example(18446744073709551615<<64, -1<<64)
 @example(int("0x"+"f"*32, 0), -1<<64)  # XXX: assuming limb_size == 64
 @example(-68501870735943706700000000000000000001, 10**20)  # issue 117
+@example(0, 123)
 def test_divmod(x, y):
     mx = mpz(x)
     my = mpz(y)
@@ -442,6 +500,7 @@ def test_divmod_errors():
 @example(0, 123)
 @example(10**1000, 2)
 @example(2, 18446744073709551616)
+@example(11811160064<<606, 11<<11)
 def test_truediv(x, y):
     mx = mpz(x)
     my = mpz(y)
@@ -567,6 +626,8 @@ def test_power_mixed(x, y):
 @example(123, 111, 1)
 @example(123, 1, 12)
 @example(1, 123, 12)
+@example(0, 123, 7)
+@example(123, 0, 7)
 def test_power_mod(x, y, z):
     mx = mpz(x)
     my = mpz(y)
@@ -761,6 +822,7 @@ def test_methods(x):
 @example(-65281, 3, "big", True)
 @example(-65281, 3, "little", True)
 @example(128, 1, "big", False)
+@example(-32383289396013590652, 0, "big", True)
 def test_to_bytes(x, length, byteorder, signed):
     try:
         rx = x.to_bytes(length, byteorder, signed=signed)
@@ -870,6 +932,9 @@ def test_from_bytes_interface():
 @example(9007199254740993)
 @example(10965857771245191)
 @example(10<<10000)
+@example((1<<53) + 1)
+@example(1<<116)
+@example(646541478744828163276576707651635923929979156076518566789121)
 def test___float__(x):
     mx = mpz(x)
     try:
@@ -883,6 +948,7 @@ def test___float__(x):
 @given(integers(), integers(min_value=-20, max_value=30))
 @example(-75, -1)
 @example(-68501870735943706700000000000000000001, -20)  # issue 117
+@example(20775, -1)
 def test___round__(x, n):
     mx = mpz(x)
     mn = mpz(n)
@@ -903,9 +969,9 @@ def test___round__interface():
                     reason="sys.getsizeof raises TypeError")
 def test___sizeof__():
     limb_size = gmp_info[1]
-    ms = [mpz(1<<i*(8*limb_size)) for i in range(3)]
-    sz = sys.getsizeof(ms[1]) - sys.getsizeof(ms[0])
-    assert sys.getsizeof(ms[2]) - sys.getsizeof(ms[1]) == sz
+    for i in [1, 20, 300]:
+        ms = mpz(1<<i*(8*limb_size))
+        assert sys.getsizeof(ms) >= limb_size*i
 
 
 def to_digits(n, base):

@@ -96,6 +96,7 @@ def python_gcdext(a, b):
 
 @given(integers(), integers())
 @example(1<<(67*2), 1<<65)
+@example(123, 1<<70)
 def test_gcdext(x, y):
     mx = mpz(x)
     my = mpz(y)
