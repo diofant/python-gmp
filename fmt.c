@@ -353,7 +353,8 @@ parse_internal_render_format_spec(PyObject *obj,
                 break;
             }
         default:
-            invalid_thousands_separator_type(format->thousands_separators, format->type);
+            invalid_thousands_separator_type((char)format->thousands_separators,
+                                             format->type);
             return 0;
         }
     }
@@ -361,7 +362,7 @@ parse_internal_render_format_spec(PyObject *obj,
     if (format->type == 'n'
         && format->frac_thousands_separator != LT_NO_LOCALE)
     {
-        invalid_thousands_separator_type(format->frac_thousands_separator,
+        invalid_thousands_separator_type((char)format->frac_thousands_separator,
                                          format->type);
         return 0;
     }
