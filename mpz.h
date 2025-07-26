@@ -32,6 +32,10 @@ typedef struct {
 #define MAX_CACHE_MPZ_LIMBS (64)
 
 typedef struct {
+    void *(*default_allocate_func)(size_t);
+    void *(*default_reallocate_func)(void *, size_t, size_t);
+    void (*default_free_func)(void *, size_t);
+
     PyTypeObject *MPZ_Type;
 
     MPZ_Object *gmp_cache[CACHE_SIZE + 1];
