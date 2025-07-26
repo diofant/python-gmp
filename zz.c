@@ -1165,7 +1165,9 @@ zz_quo_2exp(const zz_t *u, uint64_t shift, zz_t *v)
     }
     v->negative = u->negative;
     if (shift) {
-        if (mpn_rshift(v->digits, u->digits + whole, size, shift)) {
+        if (mpn_rshift(v->digits, u->digits + whole, size,
+            (unsigned int)shift)) /* XXX */
+        {
             carry = u->negative;
         }
     }
@@ -1201,9 +1203,10 @@ zz_mul_2exp(const zz_t *u, uint64_t shift, zz_t *v)
     }
     v->negative = u->negative;
     if (shift) {
+        /* XXX */
         v->size -= !(bool)(v->digits[v_size] = mpn_lshift(v->digits + whole,
                                                           u->digits, u_size,
-                                                          shift));
+                                                          (unsigned int)shift));
     }
     else {
         mpn_copyd(v->digits + whole, u->digits, u_size);
