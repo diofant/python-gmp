@@ -31,7 +31,7 @@ typedef struct {
 } zz_t;
 
 zz_err zz_init(zz_t *u);
-zz_err zz_resize(zz_size_t size, zz_t *u);
+zz_err zz_resize(size_t size, zz_t *u);
 void zz_clear(zz_t *u);
 
 typedef enum {

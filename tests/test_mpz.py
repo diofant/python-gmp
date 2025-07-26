@@ -190,6 +190,8 @@ def test_mpz_interface():
     with pytest.raises(ValueError):
         mpz("123", 123)
     with pytest.raises(ValueError):
+        mpz("123", 129)
+    with pytest.raises(ValueError):
         mpz("0123", 0)
     with pytest.raises(ValueError):
         mpz("0x", 0)

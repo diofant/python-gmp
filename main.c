@@ -78,7 +78,9 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
 {
     size_t len;
 
-    if (zz_sizeinbase(&u->z, base, &len)) {
+    if ((base < -128 || base > 127)
+        || zz_sizeinbase(&u->z, (int8_t)base, &len))
+    {
         goto bad_base;
     }
     if (options & OPT_TAG) {
@@ -125,7 +127,7 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
         (void)zz_abs(&u->z, &u->z);
     }
 
-    zz_err ret = zz_to_str(&u->z, base, p, &len);
+    zz_err ret = zz_to_str(&u->z, (int8_t)base, p, &len);
 
     if (ret) {
         if (cast_abs) {
@@ -163,6 +165,9 @@ MPZ_from_str(PyObject *obj, int base)
 
     if (!str) {
         return NULL; /* LCOV_EXCL_LINE */
+    }
+    if (base < 0 || base > 127) {
+        goto bad_base;
     }
 
     MPZ_Object *res = MPZ_new(0);
@@ -230,7 +235,7 @@ skip_negation:
         len--;
     }
 
-    zz_err ret = zz_from_str(str, len, base, &res->z);
+    zz_err ret = zz_from_str(str, len, (int8_t)base, &res->z);
 
     if (ret == ZZ_MEM) {
         /* LCOV_EXCL_START */
@@ -247,6 +252,7 @@ err:
                          base, obj);
         }
         else {
+bad_base:
             PyErr_SetString(PyExc_ValueError,
                             "mpz base must be >= 2 and <= 36, or 0");
         }
@@ -481,7 +487,7 @@ PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
         Py_UCS4 ch = PyUnicode_READ(kind, data, i);
 
         if (ch < 127) {
-            out[i] = ch;
+            out[i] = (Py_UCS1)ch;
         }
         else if (Py_UNICODE_ISSPACE(ch)) {
             out[i] = ' ';
@@ -494,7 +500,7 @@ PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
                 out[i + 1] = '\0';
                 break;
             }
-            out[i] = '0' + decimal;
+            out[i] = '0' + (Py_UCS1)decimal;
         }
     }
     return result;

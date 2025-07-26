@@ -10,7 +10,7 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14]
     env:
       PYTEST_ADDOPTS: --verbose
-      CFLAGS: -Wpedantic -Werror -std=c17
+      CFLAGS: -Wall -Wpedantic -Werror -std=c17 -Wconversion -Wno-sign-conversion
     steps:
       - uses: actions/checkout@v4
         with:

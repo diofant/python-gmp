@@ -8,10 +8,12 @@ from ctypes import (
     c_int8,
     c_int32,
     c_int64,
+    c_size_t,
     c_uint8,
     c_uint64,
     c_ulong,
     cast,
+    sizeof,
 )
 from enum import IntEnum
 
@@ -48,6 +50,7 @@ class zz_rnd(IntEnum):
     ZZ_RNDN = 1
 
 libzz = CDLL("libzz.so")
+zz_resize = libzz.zz_resize
 zz_from_i64 = libzz.zz_from_i64
 zz_cmp_i32 = libzz.zz_cmp_i32
 zz_cmp = libzz.zz_cmp
@@ -65,6 +68,11 @@ zz_sqrtrem = libzz.zz_sqrtrem
 
 u, v, w = map(byref, map(zz_t_struct, [[]]*3))
 int_layout = zz_layout(30, 4, -1, -1)
+
+
+@pytest.mark.skipif(sizeof(c_size_t) < 8, reason="Can't overflow zz_size_t")
+def test_zz_resize():
+    assert zz_resize(c_size_t(1<<34), u) == zz_err.ZZ_MEM
 
 
 def test_zz_cmp_i32():

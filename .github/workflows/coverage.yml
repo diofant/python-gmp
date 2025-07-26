@@ -6,7 +6,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       PYTEST_ADDOPTS: --verbose
-      CFLAGS: -Wall -Wpedantic -Werror -std=c17
+      CFLAGS: -Wall -Wpedantic -Werror -std=c17 -Wconversion -Wno-sign-conversion
     strategy:
       fail-fast: true
       matrix:
