@@ -20,9 +20,6 @@ typedef enum {
     ZZ_BUF = -3,
 } zz_err;
 
-zz_err zz_setup(uint8_t *, char **);
-void zz_finish(void);
-
 typedef struct {
     bool negative;
     zz_size_t alloc;
