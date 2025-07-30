@@ -29,7 +29,7 @@
 #  define _Thread_local __declspec(thread)
 #endif
 
-#if !defined(PYPY_VERSION)
+#if !defined(PYPY_VERSION) && !defined(Py_GIL_DISABLED)
 #  define CACHE_SIZE (99)
 #else
 #  define CACHE_SIZE (0)
