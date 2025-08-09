@@ -61,7 +61,7 @@ def test_underscores_bulk(s):
     try:
         i = int(s)
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="invalid literal"):
             mpz(s)
     else:
         assert mpz(s) == i
@@ -75,7 +75,7 @@ def test_underscores_auto(s):
     try:
         i = int(s, base=0)
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="invalid literal"):
             mpz(s, base=0)
     else:
         assert mpz(s, base=0) == i
@@ -99,33 +99,65 @@ def test___format___bulk(x, fmt):
 
 def test___format___interface():
     mx = mpz(123)
-    pytest.raises(ValueError, lambda: format(mx, "q"))
+    with pytest.raises(ValueError, match="Unknown format code"):
+        format(mx, "q")
     if platform.python_implementation() != "PyPy":  # XXX
-        pytest.raises(ValueError, lambda: format(mx, "\x81"))
-    pytest.raises(ValueError, lambda: format(mx, "zd"))
-    pytest.raises(ValueError, lambda: format(mx, ".10d"))
-    pytest.raises(ValueError, lambda: format(mx, "_n"))
-    pytest.raises(ValueError, lambda: format(mx, ",n"))
-    pytest.raises(ValueError, lambda: format(mx, "_c"))
-    pytest.raises(ValueError, lambda: format(mx, "f=10dx"))
-    pytest.raises(ValueError, lambda: format(mx, ".d"))
-    pytest.raises(ValueError, lambda: format(mx, "f=10000000000000000000d"))
-    pytest.raises(ValueError, lambda: format(mx, ".10000000000000000000f"))
-    pytest.raises(ValueError, lambda: format(mx, ",_d"))
-    pytest.raises(ValueError, lambda: format(mx, "_,d"))
-    pytest.raises(ValueError, lambda: format(mx, ",x"))
-    pytest.raises(ValueError, lambda: format(mx, ",\xa0"))
-    pytest.raises(ValueError, lambda: format(mx, "+c"))
-    pytest.raises(ValueError, lambda: format(mx, "#c"))
+        with pytest.raises(ValueError, match="Unknown format code"):
+            format(mx, "\x81")
+    with pytest.raises(ValueError,
+                       match=(r"Negative zero coercion \(z\) not allowed|"
+                              "Invalid conversion specification")):
+        format(mx, "zd")
+    with pytest.raises(ValueError, match="Precision not allowed"):
+        format(mx, ".10d")
+    with pytest.raises(ValueError, match="Cannot specify '_' with 'n'."):
+        format(mx, "_n")
+    with pytest.raises(ValueError, match="Cannot specify ',' with 'n'."):
+        format(mx, ",n")
+    with pytest.raises(ValueError, match="Cannot specify '_' with 'c'."):
+        format(mx, "_c")
+    with pytest.raises(ValueError,
+                       match=("Invalid format specifier|"
+                              "Invalid conversion specification")):
+        format(mx, "f=10dx")
+    with pytest.raises(ValueError,
+                       match=("Format specifier missing precision"
+                              "|no precision given")):
+        format(mx, ".d")
+    with pytest.raises(ValueError, match="many decimal digits|width too big"):
+        format(mx, "f=10000000000000000000d")
+    with pytest.raises(ValueError, match=("many decimal digits|"
+                                          "precision too big")):
+        format(mx, ".10000000000000000000f")
+    with pytest.raises(ValueError, match="Cannot specify both ',' and '_'."):
+        format(mx, ",_d")
+    with pytest.raises(ValueError, match="Cannot specify both ',' and '_'."):
+        format(mx, "_,d")
+    with pytest.raises(ValueError, match="Cannot specify ',' with 'x'."):
+        format(mx, ",x")
+    with pytest.raises(ValueError,
+                       match=("Cannot specify ',' with|"
+                              "Invalid format specifier")):
+        format(mx, ",\xa0")
+    with pytest.raises(ValueError, match="Sign not allowed"):
+        format(mx, "+c")
+    with pytest.raises(ValueError, match=r"Alternate form \(#\) not allowed"):
+        format(mx, "#c")
     pytest.raises(OverflowError, lambda: format(mpz(123456789), "c"))
     pytest.raises(OverflowError, lambda: format(mpz(10**100), "c"))
     pytest.raises(OverflowError, lambda: format(mpz(-1), "c"))
     pytest.raises(OverflowError, lambda: format(mpz(1<<32), "c"))
     if sys.version_info >= (3, 14):
-        pytest.raises(ValueError, lambda: format(mx, ".10,_f"))
-        pytest.raises(ValueError, lambda: format(mx, ".10_,f"))
-        pytest.raises(ValueError, lambda: format(mx, ".10_n"))
-        pytest.raises(ValueError, lambda: format(mx, ".10,n"))
+        with pytest.raises(ValueError,
+                           match="Cannot specify both ',' and '_'."):
+            format(mx, ".10,_f")
+        with pytest.raises(ValueError,
+                           match="Cannot specify both ',' and '_'."):
+            format(mx, ".10_,f")
+        with pytest.raises(ValueError, match="Cannot specify '_' with 'n'."):
+            format(mx, ".10_n")
+        with pytest.raises(ValueError, match="Cannot specify ',' with 'n'."):
+            format(mx, ".10,n")
     assert format(mx, ".2f") == "123.00"
     assert format(mx, "") == "123"
     assert format(mx, "c") == "{"
@@ -181,21 +213,24 @@ def test_from_floats(x):
 
 
 def test_mpz_interface():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="mpz base must be >= 2 and <= 36"):
         mpz(123).digits(-1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="mpz base must be >= 2 and <= 36"):
         mpz(123).digits(123)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="mpz base must be >= 2 and <= 36"):
         mpz(-123).digits(123, prefix=True)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="mpz base must be >= 2 and <= 36, or 0"):
         mpz("123", 1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="mpz base must be >= 2 and <= 36, or 0"):
         mpz("123", 123)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="mpz base must be >= 2 and <= 36, or 0"):
         mpz("123", 129)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal"):
         mpz("0123", 0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal"):
         mpz("0x", 0)
     with pytest.raises(TypeError):
         mpz(1j, 10)
@@ -203,9 +238,9 @@ def test_mpz_interface():
         mpz(123, spam=321)
     with pytest.raises(OverflowError):
         mpz("1", base=10**1000)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal"):
         mpz(" ")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal"):
         mpz("ыыы")
     assert mpz() == mpz(0) == 0
     assert mpz("  -123") == -123
@@ -292,7 +327,7 @@ def test_richcompare_errors():
     with pytest.raises(TypeError):
         mx > object()
     with pytest.raises(OverflowError):
-        1.1 > mpz(10**1000)
+        mpz(10**1000) < 1.1
     with pytest.raises(OverflowError):
         mpz(10**1000) > 1.1
 
@@ -616,7 +651,7 @@ def test_power_mod(x, y, z):
     try:
         r = pow(x, y, z)
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="base is not invertible"):
             pow(mx, my, mz)
     except ZeroDivisionError:
         with pytest.raises(ZeroDivisionError):
@@ -714,11 +749,11 @@ def test_lshift(x, y):
         with pytest.raises(OverflowError):
             mx << y
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             mx << my
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             x << my
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             mx << y
     else:
         assert mx << my == r
@@ -748,11 +783,11 @@ def test_rshift(x, y):
         with pytest.raises(OverflowError):
             mx >> y
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             mx >> my
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             x >> my
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             mx >> y
     else:
         assert mx >> my == r
@@ -836,9 +871,11 @@ def test_to_bytes_interface():
     with pytest.raises(TypeError):
         x.to_bytes(spam=1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="byteorder must be either 'little' or 'big'"):
         x.to_bytes(2, "spam")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="length argument must be non-negative"):
         x.to_bytes(-1)
 
     assert x.to_bytes(2) == x.to_bytes(length=2)
@@ -899,7 +936,8 @@ def test_from_bytes_interface():
     with pytest.raises(TypeError):
         mpz.from_bytes(a=1, b=2, c=3, d=4)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="byteorder must be either 'little' or 'big'"):
         mpz.from_bytes(b"", "spam")
 
     assert (mpz.from_bytes(b"\x01", byteorder="little")
@@ -980,7 +1018,7 @@ def test_digits_interface():
         x.digits(a=1, b=2, c=3)
     with pytest.raises(OverflowError):
         x.digits(base=10**100)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="mpz base must be >= 2 and <= 36"):
         x.digits(37)
     assert x.digits(10) == x.digits(base=10) == x.digits()
     assert x.digits(16, prefix=True) == x.digits(16, True)
@@ -1000,7 +1038,7 @@ def test_digits_frombase(x, base):
     try:
         i = int(smx, smaller_base)
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="invalid literal"):
             mpz(smx, smaller_base)
     else:
         assert mpz(smx, smaller_base) == i

@@ -92,7 +92,7 @@ def fmt_str(draw, types="bdoxXn"):
     gchar = draw(sampled_from([""] + list(",_")))
     if (gchar and not skip_thousand_separators
             and not (gchar == "," and type in ["b", "o", "x", "X"])
-            and not type == "n"):
+            and type != "n"):
         res += gchar
 
     # Type
@@ -117,10 +117,8 @@ def bigints(draw, min_value=None, max_value=None):
     max_abs = max_digit**ndigits
     if min_value is None:
         min_value = -max_abs
-    else:
-        min_value = max(min_value, -max_abs)
     if max_value is None:
         max_value = max_abs
-    else:
-        max_value = min(max_value, max_abs)
+    min_value = max(min_value, -max_abs)
+    max_value = min(max_value, +max_abs)
     return draw(integers(min_value=min_value, max_value=max_value))
