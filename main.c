@@ -1,29 +1,11 @@
-#if defined(__clang__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wnewline-eof"
-#endif
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wsign-conversion"
-#endif
-
-#include "pythoncapi_compat.h"
-
-#define PY_SSIZE_T_CLEAN
-#include <Python.h>
-
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
-#if defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
-
 #include "mpz.h"
 
+#include <ctype.h>
 #include <float.h>
 #include <setjmp.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 #if defined(_MSC_VER)
 #  define _Thread_local __declspec(thread)
@@ -269,7 +251,8 @@ bad_base:
 static MPZ_Object *
 MPZ_from_int(PyObject *obj)
 {
-#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
+#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON) \
+    && !defined(Py_LIMITED_API)
     PyLongExport long_export = {0, 0, 0, 0, 0};
     const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
     MPZ_Object *res = NULL;
@@ -331,7 +314,8 @@ MPZ_to_int(MPZ_Object *u)
         return PyLong_FromInt64(value);
     }
 
-#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
+#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON) \
+    && !defined(Py_LIMITED_API)
     const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
     size_t size = (zz_bitlen(&u->z) + int_layout->bits_per_digit
                    - 1)/int_layout->bits_per_digit;
