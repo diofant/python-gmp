@@ -1,9 +1,9 @@
+import gc
 import platform
+import random
 
 import pytest
 from gmp import fac, mpz
-from hypothesis import given
-from hypothesis.strategies import integers
 
 if platform.system() != "Linux":
     pytest.skip("FIXME: setrlimit fails with ValueError on MacOS",
@@ -11,37 +11,45 @@ if platform.system() != "Linux":
 if platform.python_implementation() == "GraalVM":
     pytest.skip("XXX: module 'resource' has no attribute 'setrlimit'",
                 allow_module_level=True)
-if platform.python_implementation() == "PyPy":
-    pytest.skip("XXX: diofant/python-gmp#73", allow_module_level=True)
+if platform.python_implementation() != "PyPy":
+    VMEM_LIMIT = 64*1000**2
+else:
+    VMEM_LIMIT = 128*1000**2
 
 resource = pytest.importorskip("resource")
 
 
-@given(integers(min_value=12811, max_value=24984))
-def test_fac_outofmem(x):
-    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-    resource.setrlimit(resource.RLIMIT_AS, (1024*32*1024, hard))
-    a = mpz(x)
-    while True:
-        try:
-            fac(a)
-            a *= 2
-        except MemoryError:
-            break
-    resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+def test_fac_outofmem():
+    for _ in range(100):
+        x = random.randint(12811, 24984)
+        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        resource.setrlimit(resource.RLIMIT_AS, (VMEM_LIMIT, hard))
+        a = mpz(x)
+        while True:
+            try:
+                fac(a)
+                a *= 2
+            except MemoryError:
+                del a
+                gc.collect()
+                break
+        resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
 
 
-@given(integers(min_value=49846727467293, max_value=249846727467293))
-def test_square_outofmem(x):
-    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-    resource.setrlimit(resource.RLIMIT_AS, (1024*32*1024, hard))
-    mx = mpz(x)
-    i = 1
-    while True:
-        try:
-            mx = mx*mx
-        except MemoryError:
-            assert i > 5
-            break
-        i += 1
-    resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+def test_square_outofmem():
+    for _ in range(100):
+        x = random.randint(49846727467293, 249846727467293)
+        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        resource.setrlimit(resource.RLIMIT_AS, (VMEM_LIMIT, hard))
+        mx = mpz(x)
+        i = 1
+        while True:
+            try:
+                mx = mx*mx
+            except MemoryError:
+                del mx
+                gc.collect()
+                assert i > 5
+                break
+            i += 1
+        resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
