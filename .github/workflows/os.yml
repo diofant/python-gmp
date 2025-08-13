@@ -27,8 +27,6 @@ jobs:
           python-version: "3.x"
       - run: $env:PATH
         shell: pwsh
-      - run: echo $PATH
-      - run: echo 'export PATH=$PATH:/c/hostedtoolcache/windows/Python/3.13.5/x64/Scripts:/c/hostedtoolcache/windows/Python/3.13.5/x64' >> .bashrc
       - uses: msys2/setup-msys2@v2.27.0
         with:
           install: >-
@@ -44,6 +42,8 @@ jobs:
         with:
           path: .local
           key: ${{ matrix.os }}-${{ hashFiles('scripts/*') }}
+      - run: echo $PATH
+      - run: echo 'export PATH=$PATH:/c/hostedtoolcache/windows/Python/3.13.5/x64/Scripts:/c/hostedtoolcache/windows/Python/3.13.5/x64' >> .bashrc
       - run: bash scripts/cibw_before_all.sh
         if: steps.cache-gmp.outputs.cache-hit != 'true'
       - run: pip install --upgrade pip
