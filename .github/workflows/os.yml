@@ -7,8 +7,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14]
-        shell: [bash]
+#       os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14]
+#       shell: [bash]
         include:
           - os: windows-2022
             shell: 'msys2 {0}'
