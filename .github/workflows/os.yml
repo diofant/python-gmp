@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      - run: $env:PATH
+        shell: pwsh
+      - run: exit 1
       - uses: msys2/setup-msys2@v2.27.0
         with:
           install: >-
