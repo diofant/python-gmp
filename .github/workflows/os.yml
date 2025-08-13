@@ -27,7 +27,8 @@ jobs:
           python-version: "3.x"
       - run: $env:PATH
         shell: pwsh
-      - run: exit 1
+      - run: echo $PATH
+      - run: echo 'export PATH=$PATH:/c/hostedtoolcache/windows/Python/3.13.5/x64/Scripts:/c/hostedtoolcache/windows/Python/3.13.5/x64' >> .bashrc
       - uses: msys2/setup-msys2@v2.27.0
         with:
           install: >-
