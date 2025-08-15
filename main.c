@@ -504,12 +504,9 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
             return Py_NewRef(arg);
         }
         if (PyNumber_Check(arg)) {
-            PyObject *integer = NULL;
-            
-            // Try __int__ first
+            PyObject *integer = NULL;          
             if (Py_TYPE(arg)->tp_as_number->nb_int) {
                 integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
-                
                 if (!integer) {
                     return NULL;
                 }
@@ -533,22 +530,12 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                     return NULL;
                 }
             }
-            // Fallback to __index__ if __int__ is not available
-            else if (Py_TYPE(arg)->tp_as_number->nb_index) {
-                integer = Py_TYPE(arg)->tp_as_number->nb_index(arg);
-                
+            else {
+                integer = PyNumber_Index(arg);
                 if (!integer) {
                     return NULL;
                 }
-                if (!PyLong_Check(integer)) {
-                    PyErr_Format(PyExc_TypeError,
-                                 "__index__ returned non-int (type %.200s)",
-                                 Py_TYPE(integer)->tp_name);
-                    Py_DECREF(integer);
-                    return NULL;
-                }
-            }
-            
+            }            
             if (integer) {
                 Py_SETREF(integer, (PyObject *)MPZ_from_int(integer));
                 return integer;
