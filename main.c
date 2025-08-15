@@ -504,7 +504,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
             return Py_NewRef(arg);
         }
         if (PyNumber_Check(arg)) {
-            PyObject *integer = NULL;          
+            PyObject *integer = NULL;
             if (Py_TYPE(arg)->tp_as_number->nb_int) {
                 integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
                 if (!integer) {
