@@ -36,6 +36,18 @@ class with_int:
             raise self.value
         return self.value
 
+class with_index:
+    def __init__(self, value):
+        self.value = value
+    def __index__(self):
+        try:
+            exc = issubclass(self.value, Exception)
+        except TypeError:
+            exc = False
+        if exc:
+            raise self.value
+        return self.value
+
 class int2(int):
     pass
 
@@ -267,6 +279,18 @@ def test_mpz_interface():
     with pytest.raises(TypeError):
         mpz(with_int(1j))
 
+    assert mpz(with_index(123)) == 123
+    with pytest.raises(RuntimeError):
+        mpz(with_index(RuntimeError))
+    with pytest.deprecated_call():
+        assert mpz(with_index(int2(123))) == 123
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        with pytest.raises(DeprecationWarning):
+            mpz(with_index(int2(123)))
+    with pytest.raises(TypeError):
+        mpz(with_index(1j))
+
 
 def test_mpz_subclasses():
     assert issubclass(mpz2, mpz)
@@ -293,6 +317,18 @@ def test_mpz_subclasses():
             mpz2(with_int(int2(123)))
     with pytest.raises(TypeError):
         mpz2(with_int(1j))
+
+    assert mpz2(with_index(123)) == 123
+    with pytest.raises(RuntimeError):
+        mpz2(with_index(RuntimeError))
+    with pytest.deprecated_call():
+        assert mpz2(with_index(int2(123))) == 123
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        with pytest.raises(DeprecationWarning):
+            mpz2(with_index(int2(123)))
+    with pytest.raises(TypeError):
+        mpz2(with_index(1j))
 
 
 @given(bigints())
