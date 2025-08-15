@@ -1,10 +1,6 @@
 #ifndef MPZ_H
 #define MPZ_H
 
-#if defined(__clang__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wnewline-eof"
-#endif
 #if defined(__GNUC__) || defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -16,9 +12,6 @@
 #include <Python.h>
 
 #if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
-#if defined(__clang__)
 #  pragma GCC diagnostic pop
 #endif
 
