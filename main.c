@@ -536,7 +536,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                 if (!integer) {
                     return NULL;
                 }
-            }            
+            }
             if (integer) {
                 Py_SETREF(integer, (PyObject *)MPZ_from_int(integer));
                 return integer;
