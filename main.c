@@ -1754,8 +1754,7 @@ static PyMethodDef methods[] = {
 PyDoc_STRVAR(mpz_doc,
              "mpz(number=0, /)\nmpz(string, /, base=10)\n\n\
 Convert a number or a string to an integer.  If numeric argument is not\n\
-an int subclass, return mpz(number.__int__()).  If __int__ is not available,\n\
-fall back to mpz(number.__index__()).\n\n\
+an int subclass, return mpz(int(number)).\n\n\
 If argument is not a number or if base is given, then it must be a string,\n\
 bytes, or bytearray instance representing an integer literal in the\n\
 given base.  The literal can be preceded by '+' or '-' and be surrounded\n\
