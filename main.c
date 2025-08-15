@@ -506,10 +506,8 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
         if (PyNumber_Check(arg)) {
             PyObject *integer = NULL;
             
-            // Try __int__ first
             if (Py_TYPE(arg)->tp_as_number->nb_int) {
                 integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
-                
                 if (!integer) {
                     return NULL;
                 }
@@ -533,10 +531,8 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                     return NULL;
                 }
             }
-            // Fallback to __index__ if __int__ is not available
             else if (Py_TYPE(arg)->tp_as_number->nb_index) {
                 integer = Py_TYPE(arg)->tp_as_number->nb_index(arg);
-                
                 if (!integer) {
                     return NULL;
                 }
