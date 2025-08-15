@@ -503,34 +503,56 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
         if (MPZ_CheckExact(arg)) {
             return Py_NewRef(arg);
         }
-        if (PyNumber_Check(arg) && Py_TYPE(arg)->tp_as_number->nb_int) {
-            PyObject *integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
-
-            if (!integer) {
-                return NULL;
+        if (PyNumber_Check(arg)) {
+            PyObject *integer = NULL;
+            
+            // Try __int__ first
+            if (Py_TYPE(arg)->tp_as_number->nb_int) {
+                integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
+                
+                if (!integer) {
+                    return NULL;
+                }
+                if (!PyLong_Check(integer)) {
+                    PyErr_Format(PyExc_TypeError,
+                                 "__int__ returned non-int (type %.200s)",
+                                 Py_TYPE(integer)->tp_name);
+                    Py_DECREF(integer);
+                    return NULL;
+                }
+                if (!PyLong_CheckExact(integer)
+                    && PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
+                                        "__int__ returned non-int (type %.200s).  "
+                                        "The ability to return an instance of a "
+                                        "strict subclass of int "
+                                        "is deprecated, and may be removed "
+                                        "in a future version of Python.",
+                                        Py_TYPE(integer)->tp_name))
+                {
+                    Py_DECREF(integer);
+                    return NULL;
+                }
             }
-            if (!PyLong_Check(integer)) {
-                PyErr_Format(PyExc_TypeError,
-                             "__int__ returned non-int (type %.200s)",
-                             Py_TYPE(integer)->tp_name);
-                Py_DECREF(integer);
-                return NULL;
+            // Fallback to __index__ if __int__ is not available
+            else if (Py_TYPE(arg)->tp_as_number->nb_index) {
+                integer = Py_TYPE(arg)->tp_as_number->nb_index(arg);
+                
+                if (!integer) {
+                    return NULL;
+                }
+                if (!PyLong_Check(integer)) {
+                    PyErr_Format(PyExc_TypeError,
+                                 "__index__ returned non-int (type %.200s)",
+                                 Py_TYPE(integer)->tp_name);
+                    Py_DECREF(integer);
+                    return NULL;
+                }
             }
-            if (!PyLong_CheckExact(integer)
-                && PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
-                                    "__int__ returned non-int (type %.200s).  "
-                                    "The ability to return an instance of a "
-                                    "strict subclass of int "
-                                    "is deprecated, and may be removed "
-                                    "in a future version of Python.",
-                                    Py_TYPE(integer)->tp_name))
-            {
-                Py_DECREF(integer);
-                return NULL;
+            
+            if (integer) {
+                Py_SETREF(integer, (PyObject *)MPZ_from_int(integer));
+                return integer;
             }
-
-            Py_SETREF(integer, (PyObject *)MPZ_from_int(integer));
-            return integer;
         }
         goto str;
     }
@@ -1744,7 +1766,8 @@ static PyMethodDef methods[] = {
 PyDoc_STRVAR(mpz_doc,
              "mpz(number=0, /)\nmpz(string, /, base=10)\n\n\
 Convert a number or a string to an integer.  If numeric argument is not\n\
-an int subclass, return mpz(number.__int__()).\n\n\
+an int subclass, return mpz(number.__int__()).  If __int__ is not available,\n\
+fall back to mpz(number.__index__()).\n\n\
 If argument is not a number or if base is given, then it must be a string,\n\
 bytes, or bytearray instance representing an integer literal in the\n\
 given base.  The literal can be preceded by '+' or '-' and be surrounded\n\
