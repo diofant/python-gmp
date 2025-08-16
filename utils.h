@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+/* For GraalVM: unicodeobject.h, implicit conversion changes
+   signedness: 'enum PyUnicode_Kind' to 'int' */
 #if defined(__GNUC__) || defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -13,6 +15,7 @@
 
 #if defined(__GNUC__) || defined(__clang__)
 #  pragma GCC diagnostic pop
+#endif
 
 typedef struct gmp_pyargs {
     Py_ssize_t maxpos;
