@@ -1,10 +1,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#if defined(__clang__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wnewline-eof"
-#endif
 #if defined(__GNUC__) || defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -17,10 +13,6 @@
 
 #if defined(__GNUC__) || defined(__clang__)
 #  pragma GCC diagnostic pop
-#endif
-#if defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
 
 typedef struct gmp_pyargs {
     Py_ssize_t maxpos;
