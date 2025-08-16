@@ -21,13 +21,32 @@ from hypothesis.strategies import (
     sampled_from,
     text,
 )
-from test_utils import BITS_PER_LIMB, SIZEOF_LIMB, bigints, fmt_str, to_digits
+from test_utils import (
+    BITS_PER_LIMB,
+    SIZEOF_LIMB,
+    bigints,
+    fmt_str,
+    numbers,
+    to_digits,
+)
 
 
 class with_int:
     def __init__(self, value):
         self.value = value
     def __int__(self):
+        try:
+            exc = issubclass(self.value, Exception)
+        except TypeError:
+            exc = False
+        if exc:
+            raise self.value
+        return self.value
+
+class with_index:
+    def __init__(self, value):
+        self.value = value
+    def __index__(self):
         try:
             exc = issubclass(self.value, Exception)
         except TypeError:
@@ -61,7 +80,7 @@ def test_underscores_bulk(s):
     try:
         i = int(s)
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="invalid literal"):
             mpz(s)
     else:
         assert mpz(s) == i
@@ -75,12 +94,10 @@ def test_underscores_auto(s):
     try:
         i = int(s, base=0)
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="invalid literal"):
             mpz(s, base=0)
     else:
         assert mpz(s, base=0) == i
-
-
 
 
 @given(bigints(), fmt_str())
@@ -91,41 +108,73 @@ def test_underscores_auto(s):
 @example(-3912, "028d")
 @example(-3912, "028_d")
 @example(-3912, "28n")
-def test___format___bulk(x, fmt):
+def test_format_bulk(x, fmt):
     mx = mpz(x)
     r = format(x, fmt)
     assert format(mx, fmt) == r
 
 
-def test___format___interface():
+def test_format_interface():
     mx = mpz(123)
-    pytest.raises(ValueError, lambda: format(mx, "q"))
-    if platform.python_implementation() != "PyPy":  # XXX
-        pytest.raises(ValueError, lambda: format(mx, "\x81"))
-    pytest.raises(ValueError, lambda: format(mx, "zd"))
-    pytest.raises(ValueError, lambda: format(mx, ".10d"))
-    pytest.raises(ValueError, lambda: format(mx, "_n"))
-    pytest.raises(ValueError, lambda: format(mx, ",n"))
-    pytest.raises(ValueError, lambda: format(mx, "_c"))
-    pytest.raises(ValueError, lambda: format(mx, "f=10dx"))
-    pytest.raises(ValueError, lambda: format(mx, ".d"))
-    pytest.raises(ValueError, lambda: format(mx, "f=10000000000000000000d"))
-    pytest.raises(ValueError, lambda: format(mx, ".10000000000000000000f"))
-    pytest.raises(ValueError, lambda: format(mx, ",_d"))
-    pytest.raises(ValueError, lambda: format(mx, "_,d"))
-    pytest.raises(ValueError, lambda: format(mx, ",x"))
-    pytest.raises(ValueError, lambda: format(mx, ",\xa0"))
-    pytest.raises(ValueError, lambda: format(mx, "+c"))
-    pytest.raises(ValueError, lambda: format(mx, "#c"))
+    with pytest.raises(ValueError, match="Unknown format code"):
+        format(mx, "q")
+    if platform.python_implementation() != "PyPy":  # XXX: pypy/pypy#5311
+        with pytest.raises(ValueError, match="Unknown format code"):
+            format(mx, "\x81")
+    with pytest.raises(ValueError,
+                       match=(r"Negative zero coercion \(z\) not allowed|"
+                              "Invalid conversion specification")):
+        format(mx, "zd")
+    with pytest.raises(ValueError, match="Precision not allowed"):
+        format(mx, ".10d")
+    with pytest.raises(ValueError, match="Cannot specify '_' with 'n'."):
+        format(mx, "_n")
+    with pytest.raises(ValueError, match="Cannot specify ',' with 'n'."):
+        format(mx, ",n")
+    with pytest.raises(ValueError, match="Cannot specify '_' with 'c'."):
+        format(mx, "_c")
+    with pytest.raises(ValueError,
+                       match=("Invalid format specifier|"
+                              "Invalid conversion specification")):
+        format(mx, "f=10dx")
+    with pytest.raises(ValueError,
+                       match=("Format specifier missing precision"
+                              "|no precision given")):
+        format(mx, ".d")
+    with pytest.raises(ValueError, match="many decimal digits|width too big"):
+        format(mx, "f=10000000000000000000d")
+    with pytest.raises(ValueError, match=("many decimal digits|"
+                                          "precision too big")):
+        format(mx, ".10000000000000000000f")
+    with pytest.raises(ValueError, match="Cannot specify both ',' and '_'."):
+        format(mx, ",_d")
+    with pytest.raises(ValueError, match="Cannot specify both ',' and '_'."):
+        format(mx, "_,d")
+    with pytest.raises(ValueError, match="Cannot specify ',' with 'x'."):
+        format(mx, ",x")
+    with pytest.raises(ValueError,
+                       match=("Cannot specify ',' with|"
+                              "Invalid format specifier")):
+        format(mx, ",\xa0")
+    with pytest.raises(ValueError, match="Sign not allowed"):
+        format(mx, "+c")
+    with pytest.raises(ValueError, match=r"Alternate form \(#\) not allowed"):
+        format(mx, "#c")
     pytest.raises(OverflowError, lambda: format(mpz(123456789), "c"))
     pytest.raises(OverflowError, lambda: format(mpz(10**100), "c"))
     pytest.raises(OverflowError, lambda: format(mpz(-1), "c"))
     pytest.raises(OverflowError, lambda: format(mpz(1<<32), "c"))
     if sys.version_info >= (3, 14):
-        pytest.raises(ValueError, lambda: format(mx, ".10,_f"))
-        pytest.raises(ValueError, lambda: format(mx, ".10_,f"))
-        pytest.raises(ValueError, lambda: format(mx, ".10_n"))
-        pytest.raises(ValueError, lambda: format(mx, ".10,n"))
+        with pytest.raises(ValueError,
+                           match="Cannot specify both ',' and '_'."):
+            format(mx, ".10,_f")
+        with pytest.raises(ValueError,
+                           match="Cannot specify both ',' and '_'."):
+            format(mx, ".10_,f")
+        with pytest.raises(ValueError, match="Cannot specify '_' with 'n'."):
+            format(mx, ".10_n")
+        with pytest.raises(ValueError, match="Cannot specify ',' with 'n'."):
+            format(mx, ".10,n")
     assert format(mx, ".2f") == "123.00"
     assert format(mx, "") == "123"
     assert format(mx, "c") == "{"
@@ -139,7 +188,7 @@ def test___format___interface():
 
     if (platform.python_implementation() == "PyPy"
             and sys.pypy_version_info[:3] <= (7, 3, 20)):
-        return  # issue pypy/pypy#5311
+        return  # XXX: pypy/pypy#5311
 
     try:
         locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
@@ -148,7 +197,7 @@ def test___format___interface():
         assert format(mpz(123), "011n") == f"000{s}000{s}123"
         locale.setlocale(locale.LC_ALL, "C")
         if platform.python_implementation() == "GraalVM":
-            return  # issue oracle/graalpython#521
+            return  # XXX: oracle/graalpython#521
         locale.setlocale(locale.LC_NUMERIC, "ps_AF.UTF-8")
         s = locale.localeconv()["thousands_sep"]
         assert format(mpz(123456789), "n") == f"123{s}456{s}789"
@@ -181,31 +230,34 @@ def test_from_floats(x):
 
 
 def test_mpz_interface():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="mpz base must be >= 2 and <= 36"):
         mpz(123).digits(-1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="mpz base must be >= 2 and <= 36"):
         mpz(123).digits(123)
-    with pytest.raises(ValueError):
-        mpz(-123).digits(123, prefix=True)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="mpz base must be >= 2 and <= 36, or 0"):
         mpz("123", 1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="mpz base must be >= 2 and <= 36, or 0"):
         mpz("123", 123)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="mpz base must be >= 2 and <= 36, or 0"):
         mpz("123", 129)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal"):
         mpz("0123", 0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal"):
         mpz("0x", 0)
     with pytest.raises(TypeError):
         mpz(1j, 10)
     with pytest.raises(TypeError):
+        mpz(object())
+    with pytest.raises(TypeError):
         mpz(123, spam=321)
     with pytest.raises(OverflowError):
         mpz("1", base=10**1000)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal"):
         mpz(" ")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid literal"):
         mpz("ыыы")
     assert mpz() == mpz(0) == 0
     assert mpz("  -123") == -123
@@ -231,6 +283,18 @@ def test_mpz_interface():
             mpz(with_int(int2(123)))
     with pytest.raises(TypeError):
         mpz(with_int(1j))
+
+    assert mpz(with_index(123)) == 123
+    with pytest.raises(RuntimeError):
+        mpz(with_index(RuntimeError))
+    with pytest.deprecated_call():
+        assert mpz(with_index(int2(123))) == 123
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        with pytest.raises(DeprecationWarning):
+            mpz(with_index(int2(123)))
+    with pytest.raises(TypeError):
+        mpz(with_index(1j))
 
 
 def test_mpz_subclasses():
@@ -259,21 +323,23 @@ def test_mpz_subclasses():
     with pytest.raises(TypeError):
         mpz2(with_int(1j))
 
+    assert mpz2(with_index(123)) == 123
+    with pytest.raises(RuntimeError):
+        mpz2(with_index(RuntimeError))
+    with pytest.deprecated_call():
+        assert mpz2(with_index(int2(123))) == 123
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        with pytest.raises(DeprecationWarning):
+            mpz2(with_index(int2(123)))
+    with pytest.raises(TypeError):
+        mpz2(with_index(1j))
+
 
 @given(bigints())
 def test_repr(x):
     mx = mpz(x)
     assert repr(mx) == f"mpz({x!s})"
-
-
-@given(bigints(), bigints())
-def test_richcompare_bulk(x, y):
-    mx = mpz(x)
-    my = mpz(y)
-    for op in [operator.eq, operator.ne, operator.lt, operator.le,
-               operator.gt, operator.ge]:
-        assert op(mx, my) == op(x, y)
-    assert bool(mx) == bool(x)
 
 
 @given(bigints(), floats(allow_nan=False))
@@ -292,18 +358,9 @@ def test_richcompare_errors():
     with pytest.raises(TypeError):
         mx > object()
     with pytest.raises(OverflowError):
-        1.1 > mpz(10**1000)
+        mpz(10**1000) < 1.1
     with pytest.raises(OverflowError):
         mpz(10**1000) > 1.1
-
-
-@given(bigints())
-@example(0)
-@example(-1)
-@example(-2)
-def test_hash_bulk(x):
-    mx = mpz(x)
-    assert hash(mx) == hash(x)
 
 
 def test_hash_caching():
@@ -314,80 +371,80 @@ def test_hash_caching():
 
 @given(bigints())
 @example(0)
+@example(-1)
+@example(-2)
 @example(123)
 @example(75424656551107706)
 @example(1284673497348563845623546741523784516734143215346712)
 @example(65869376547959985897597359)
-def test_plus_minus_abs(x):
+def test_unary_bulk(x):
     mx = mpz(x)
-    assert +(+mx) == mx
-    assert +mx == x
-    assert -(-mx) == mx
-    assert -mx == -x
-    assert abs(mx) == abs(x)
+    for op in [operator.pos, operator.neg, operator.abs,
+               operator.invert, math.trunc, math.floor,
+               math.ceil, hash, bool, str]:
+        rx = op(x)
+        rmx = op(mx)
+        assert rmx == rx
+        if op not in [operator.abs, hash, bool, str]:
+            assert op(rmx) == mx
+        if op not in [operator.neg, operator.invert, hash]:
+            assert op(rmx) == rmx  # idempotence
 
 
 @given(bigints(), bigints())
-def test_add_sub_bulk(x, y):
+@example(1, 1<<67)
+@example(1, -(1<<67))
+@example(-2, -1)
+@example(-1, -1)
+def test_binary_bulk(x, y):
     mx = mpz(x)
     my = mpz(y)
-    r = x + y
-    assert mx + my == my + mx
-    assert mx + my == r
-    assert mx + y == r
-    assert x + my == r
-    r = x - y
-    assert mx - my == r
-    assert mx - y == r
-    assert x - my == r
+    for op in [operator.add, operator.sub, operator.mul,
+               operator.and_, operator.or_, operator.xor,
+               operator.eq, operator.ne, operator.lt, operator.le,
+               operator.gt, operator.ge]:
+        r = op(x, y)
+        assert op(mx, my) == r
+        assert op(mx, y) == r
+        assert op(x, my) == r
+
+
+@given(bigints(), bigints())
+def test_binary_commutative(x, y):
+    mx = mpz(x)
+    my = mpz(y)
+    for op in [operator.add, operator.mul, operator.and_,
+               operator.or_, operator.xor, operator.eq, operator.ne]:
+        assert op(mx, my) == op(my, mx)
 
 
 def test_add_int_subclasses():
     x = 123
     mx = mpz(x)
-    class int2(int):
-        pass
     y = int2(321)
     r = x + 321
     assert mx + y == r
     assert y + mx == r
 
 
-@given(bigints(), floats(allow_nan=False), complex_numbers(allow_nan=False))
-def test_add_sub_mixed(x, y, z):
+@given(bigints(), numbers())
+def test_binary_mixed(x, y):
     mx = mpz(x)
-    r = x + y
-    assert mx + y == y + mx
-    assert mx + y == r
-    r = x - y
-    assert mx - y == r
-    r = x + z
-    assert mx + z == z + mx
-    assert mx + z == r
-    r = x - z
-    assert mx - z == r
-
-
-@given(bigints(), bigints())
-@example(123 + (1<<64), 1<<200)
-def test_mul_bulk(x, y):
-    mx = mpz(x)
-    my = mpz(y)
-    assert mx * mx == x * x
-    r = x * y
-    assert mx * my == my * mx
-    assert mx * my == r
-    assert mx * y == r
-    assert x * my == r
+    for op in [operator.add, operator.mul, operator.sub]:
+        assert op(mx, y) == op(x, y)
+        assert op(y, mx) == op(y, x)
+        if op != operator.sub:
+            assert op(mx, y) == op(y, mx)
 
 
 @given(bigints(), bigints(), bigints())
-def test_addmul_associativity(x, y, z):
+def test_binary_associativity(x, y, z):
     mx = mpz(x)
     my = mpz(y)
     mz = mpz(z)
-    assert (mx + my) + mz == mx + (my + mz)
-    assert (mx * my) * mz == mx * (my * mz)
+    for op in [operator.add, operator.mul, operator.and_,
+               operator.or_, operator.xor]:
+        assert op(op(mx, my), mz) == op(mx, op(my, mz))
 
 
 @given(bigints(), bigints(), bigints())
@@ -395,31 +452,13 @@ def test_mul_distributivity(x, y, z):
     mx = mpz(x)
     my = mpz(y)
     mz = mpz(z)
-    assert (mx + my) * mz == mx*mz + my*mz
-    assert (mx - my) * mz == mx*mz - my*mz
-
-
-@given(bigints(), floats(allow_nan=False), complex_numbers(allow_nan=False))
-def test_mul_mixed(x, y, z):
-    mx = mpz(x)
-    r = x * y
-    if math.isnan(r):
-        assert math.isnan(mx * y)
-        assert math.isnan(y * mx)
-    else:
-        assert mx * y == y * mx
-        assert mx * y == r
-    r = x * z
-    if cmath.isnan(r):
-        assert cmath.isnan(mx * z)
-        assert cmath.isnan(z * mx)
-    else:
-        assert mx * z == z * mx
-        assert mx * z == r
+    mul = operator.mul
+    for op in [operator.add, operator.sub]:
+        assert mul(op(mx, my), mz) == op(mul(mx, mz), mul(my, mz))
 
 
 @pytest.mark.skipif(platform.python_implementation() == "GraalVM",
-                    reason="XXX: fails in CI for x,y=0,-1382074480823709287")
+                    reason="XXX: oracle/graalpython#534")
 @given(bigints(), bigints())
 @example(18446744073709551615, -1)
 @example(-2, 1<<64)
@@ -616,7 +655,7 @@ def test_power_mod(x, y, z):
     try:
         r = pow(x, y, z)
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="base is not invertible"):
             pow(mx, my, mz)
     except ZeroDivisionError:
         with pytest.raises(ZeroDivisionError):
@@ -643,54 +682,8 @@ def test_power_errors():
         pow(mpz(10**1000), 1j)
     with pytest.raises(TypeError):
         pow(object(), mpz(321))
-
-
-@given(bigints())
-def test_invert(x):
-    mx = mpz(x)
-    assert ~mx == ~x
-
-
-@given(bigints(), bigints())
-@example(1, 1<<67)
-@example(1, -(1<<67))
-@example(-2, -1)
-@example(-1, -1)
-def test_and(x, y):
-    mx = mpz(x)
-    my = mpz(y)
-    r = x & y
-    assert mx & my == r
-    assert mx & y == r
-    assert x & my == r
-
-
-@given(bigints(), bigints())
-@example(1, 1<<67)
-@example(1, -(1<<67))
-@example(-2, -1)
-@example(2, -1)
-def test_or(x, y):
-    mx = mpz(x)
-    my = mpz(y)
-    r = x | y
-    assert mx | my == r
-    assert mx | y == r
-    assert x | my == r
-
-
-@given(bigints(), bigints())
-@example(1, 1<<67)
-@example(1, -(1<<67))
-@example(-2, -1)
-@example(-1, -1)
-def test_xor(x, y):
-    mx = mpz(x)
-    my = mpz(y)
-    r = x ^ y
-    assert mx ^ my == r
-    assert mx ^ y == r
-    assert x ^ my == r
+    with pytest.raises(MemoryError):
+        pow(mpz(123), 111111111111111111)
 
 
 @given(bigints(), integers(max_value=12345))
@@ -712,11 +705,11 @@ def test_lshift(x, y):
         with pytest.raises(OverflowError):
             mx << y
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             mx << my
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             x << my
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             mx << y
     else:
         assert mx << my == r
@@ -746,11 +739,11 @@ def test_rshift(x, y):
         with pytest.raises(OverflowError):
             mx >> y
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             mx >> my
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             x >> my
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="negative shift count"):
             mx >> y
     else:
         assert mx >> my == r
@@ -759,27 +752,23 @@ def test_rshift(x, y):
 
 
 @given(bigints())
-def test_getseters(x):
+def test_getters(x):
     mx = mpz(x)
-    assert mx.numerator == x.numerator
-    assert mx.denominator == x.denominator
-    assert mx.real == x.real
-    assert mx.imag == x.imag
+    for name in ["numerator", "denominator", "real", "imag"]:
+        assert getattr(mx, name) == getattr(x, name)
 
 
 @given(bigints())
 def test_methods(x):
     mx = mpz(x)
-    assert mx.conjugate() == x.conjugate()
-    assert mx.bit_length() == x.bit_length()
+    methods = ["conjugate", "bit_length", "as_integer_ratio"]
     if sys.version_info >= (3, 10):
-        assert mx.bit_count() == x.bit_count()
-    assert mx.as_integer_ratio() == x.as_integer_ratio()
+        methods.append("bit_count")
     if sys.version_info >= (3, 12):
-        assert mx.is_integer() == x.is_integer()
-    assert math.trunc(mx) == math.trunc(x)
-    assert math.floor(mx) == math.floor(x)
-    assert math.ceil(mx) == math.ceil(x)
+        methods.append("is_integer")
+    for name in methods:
+        meth = operator.methodcaller(name)
+        assert meth(mx) == meth(x)
 
 
 @given(bigints(), integers(min_value=0, max_value=10000),
@@ -834,9 +823,11 @@ def test_to_bytes_interface():
     with pytest.raises(TypeError):
         x.to_bytes(spam=1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="byteorder must be either 'little' or 'big'"):
         x.to_bytes(2, "spam")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="length argument must be non-negative"):
         x.to_bytes(-1)
 
     assert x.to_bytes(2) == x.to_bytes(length=2)
@@ -897,7 +888,8 @@ def test_from_bytes_interface():
     with pytest.raises(TypeError):
         mpz.from_bytes(a=1, b=2, c=3, d=4)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError,
+                       match="byteorder must be either 'little' or 'big'"):
         mpz.from_bytes(b"", "spam")
 
     assert (mpz.from_bytes(b"\x01", byteorder="little")
@@ -917,7 +909,7 @@ def test_from_bytes_interface():
 @example((1<<53) + 1)
 @example(1<<116)
 @example(646541478744828163276576707651635923929979156076518566789121)
-def test___float__(x):
+def test_to_float(x):
     mx = mpz(x)
     try:
         fx = float(x)
@@ -931,7 +923,7 @@ def test___float__(x):
 @example(-75, -1)
 @example(-68501870735943706700000000000000000001, -20)  # issue 117
 @example(20775, -1)
-def test___round__bulk(x, n):
+def test_round_bulk(x, n):
     mx = mpz(x)
     mn = mpz(n)
     assert round(mx, n) == round(mx, mn) == round(x, n)
@@ -939,7 +931,7 @@ def test___round__bulk(x, n):
         assert round(mx) == round(x)
 
 
-def test___round__interface():
+def test_round_interface():
     x = mpz(133)
     with pytest.raises(TypeError):
         x.__round__(1, 2)
@@ -949,7 +941,7 @@ def test___round__interface():
 
 @pytest.mark.skipif(platform.python_implementation() == "PyPy",
                     reason="sys.getsizeof raises TypeError")
-def test___sizeof__():
+def test_sizeof():
     for i in [1, 20, 300]:
         ms = mpz(1 << i*BITS_PER_LIMB)
         assert sys.getsizeof(ms) >= i*SIZEOF_LIMB
@@ -965,24 +957,20 @@ def test_digits_bulk(x, base):
 def test_digits_interface():
     x = mpz(123)
     with pytest.raises(TypeError):
-        x.digits(1, 2, 3)
+        x.digits(1, 2)
     with pytest.raises(TypeError):
-        x.digits("", 2)
+        x.digits("")
     with pytest.raises(TypeError):
         x.digits(10, base=16)
     with pytest.raises(TypeError):
-        x.digits(1, True, prefix=True)
-    with pytest.raises(TypeError):
         x.digits(spam=1)
     with pytest.raises(TypeError):
-        x.digits(a=1, b=2, c=3)
+        x.digits(a=1, b=2)
     with pytest.raises(OverflowError):
         x.digits(base=10**100)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="mpz base must be >= 2 and <= 36"):
         x.digits(37)
     assert x.digits(10) == x.digits(base=10) == x.digits()
-    assert x.digits(16, prefix=True) == x.digits(16, True)
-    assert x.digits(16, prefix=False) == x.digits(16, False) == x.digits(16)
 
 
 @pytest.mark.skipif(platform.python_implementation() == "GraalVM",
@@ -998,7 +986,7 @@ def test_digits_frombase(x, base):
     try:
         i = int(smx, smaller_base)
     except ValueError:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="invalid literal"):
             mpz(smx, smaller_base)
     else:
         assert mpz(smx, smaller_base) == i
@@ -1008,9 +996,9 @@ def test_digits_frombase(x, base):
 def test_frombase_auto(x):
     mx = mpz(x)
     smx10 = mx.digits(10)
-    smx2 = mx.digits(2, prefix=True)
-    smx8 = mx.digits(8, prefix=True)
-    smx16 = mx.digits(16, prefix=True)
+    smx2 = format(mx, "#b")
+    smx8 = format(mx, "#o")
+    smx16 = format(mx, "#x")
     assert mpz(smx10, 0) == mx
     assert mpz(smx2, 0) == mx
     assert mpz(smx8, 0) == mx

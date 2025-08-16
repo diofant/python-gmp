@@ -1,5 +1,5 @@
-#ifndef MPZ_H
-#define MPZ_H
+#ifndef UTILS_H
+#define UTILS_H
 
 #if defined(__clang__)
 #  pragma GCC diagnostic push
@@ -24,19 +24,18 @@
 #  pragma GCC diagnostic pop
 #endif
 
-#include "zz.h"
+typedef struct gmp_pyargs {
+    Py_ssize_t maxpos;
+    Py_ssize_t minargs;
+    Py_ssize_t maxargs;
+    const char *fname;
+    const char *const *keywords;
+} gmp_pyargs;
 
-typedef struct {
-    PyObject_HEAD
-    Py_hash_t hash_cache;
-    zz_t z;
-} MPZ_Object;
+int gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
+                     PyObject *const *args, Py_ssize_t nargs,
+                     PyObject *kwnames);
 
-#define MPZ_CheckExact(st, u) Py_IS_TYPE((u), (st)->MPZ_Type)
-#define MPZ_Check(st, u) PyObject_TypeCheck((u), (st)->MPZ_Type)
+PyObject * gmp_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode);
 
-typedef struct {
-    PyTypeObject *MPZ_Type;
-} gmp_state;
-
-#endif /* MPZ_H */
+#endif /* UTILS_H */

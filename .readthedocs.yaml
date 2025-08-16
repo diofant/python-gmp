@@ -3,7 +3,7 @@ formats:
     - htmlzip
     - pdf
 build:
-    os: ubuntu-22.04
+    os: ubuntu-24.04
     apt_packages:
         - libgmp-dev
         - gcc
@@ -11,8 +11,7 @@ build:
         python: "3"
 python:
     install:
-        - method: pip
-          path: .
+        - path: .
           extra_requirements:
               - docs
 sphinx:

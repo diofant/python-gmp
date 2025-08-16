@@ -24,6 +24,8 @@ typedef struct {
     uint8_t version[3];
     uint8_t bits_per_limb;
     uint8_t limb_bytes;
+    uint8_t limbcnt_bytes;
+    uint8_t bitcnt_bytes;
 } zz_info;
 
 zz_err zz_setup(zz_info *info);

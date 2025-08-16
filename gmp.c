@@ -1,29 +1,12 @@
-#if defined(__clang__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wnewline-eof"
-#endif
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wsign-conversion"
-#endif
-
-#include "pythoncapi_compat.h"
-
-#define PY_SSIZE_T_CLEAN
-#include <Python.h>
-
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
-#if defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
-
 #include "mpz.h"
+#include "utils.h"
 
+#include <ctype.h>
 #include <float.h>
 #include <setjmp.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
 #if defined(_MSC_VER)
 #  define _Thread_local __declspec(thread)
@@ -279,7 +262,8 @@ bad_base:
 static MPZ_Object *
 MPZ_from_int(gmp_state *state, PyTypeObject *type, PyObject *obj)
 {
-#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
+#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON) \
+    && !defined(Py_LIMITED_API)
     PyLongExport long_export = {0, 0, 0, 0, 0};
     const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
     MPZ_Object *res = NULL;
@@ -341,7 +325,8 @@ MPZ_to_int(MPZ_Object *u)
         return PyLong_FromInt64(value);
     }
 
-#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
+#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON) \
+    && !defined(Py_LIMITED_API)
     const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
     size_t size = (zz_bitlen(&u->z) + int_layout->bits_per_digit
                    - 1)/int_layout->bits_per_digit;
@@ -461,62 +446,6 @@ MPZ_from_bytes(gmp_state *state, PyTypeObject *type, PyObject *obj, int is_littl
     return res;
 }
 
-#if (PY_VERSION_HEX >= 0x030D0000 || defined(PYPY_VERSION) \
-     || defined(GRAALVM_PYTHON))
-/* copied from CPython internals */
-static PyObject *
-PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
-{
-    if (PyUnicode_IS_ASCII(unicode)) {
-        return Py_NewRef(unicode);
-    }
-
-    Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
-    PyObject *result = PyUnicode_New(len, 127);
-
-    if (result == NULL) {
-        return NULL; /* LCOV_EXCL_LINE */
-    }
-
-    Py_UCS1 *out = PyUnicode_1BYTE_DATA(result);
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wsign-conversion"
-#endif
-    int kind = PyUnicode_KIND(unicode);
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
-    const void *data = PyUnicode_DATA(unicode);
-
-    for (Py_ssize_t i = 0; i < len; ++i) {
-        Py_UCS4 ch = PyUnicode_READ(kind, data, i);
-
-        if (ch < 127) {
-            out[i] = (Py_UCS1)ch;
-        }
-        else if (Py_UNICODE_ISSPACE(ch)) {
-            out[i] = ' ';
-        }
-        else {
-            int decimal = Py_UNICODE_TODECIMAL(ch);
-
-            if (decimal < 0) {
-                out[i] = '?';
-                out[i + 1] = '\0';
-                break;
-            }
-            assert(decimal < 127);
-            out[i] = '0' + (Py_UCS1)decimal;
-        }
-    }
-    return result;
-}
-#else
-#  define PyUnicode_TransformDecimalAndSpaceToASCII \
-      _PyUnicode_TransformDecimalAndSpaceToASCII
-#endif
-
 static PyObject *
 new_impl(gmp_state *state, PyTypeObject *type, PyObject *arg, PyObject *base_arg)
 {
@@ -529,34 +458,45 @@ new_impl(gmp_state *state, PyTypeObject *type, PyObject *arg, PyObject *base_arg
         if (MPZ_CheckExact(state, arg)) {
             return Py_NewRef(arg);
         }
-        if (PyNumber_Check(arg) && Py_TYPE(arg)->tp_as_number->nb_int) {
-            PyObject *integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
+        if (PyNumber_Check(arg)) {
+            PyObject *integer = NULL;
 
-            if (!integer) {
-                return NULL;
+            if (Py_TYPE(arg)->tp_as_number->nb_int) {
+                integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
+                if (!integer) {
+                    return NULL;
+                }
+                if (!PyLong_Check(integer)) {
+                    PyErr_Format(PyExc_TypeError,
+                                 "__int__ returned non-int (type %.200s)",
+                                 Py_TYPE(integer)->tp_name);
+                    Py_DECREF(integer);
+                    return NULL;
+                }
+                if (!PyLong_CheckExact(integer)
+                    && PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
+                                        "__int__ returned non-int (type %.200s).  "
+                                        "The ability to return an instance of a "
+                                        "strict subclass of int "
+                                        "is deprecated, and may be removed "
+                                        "in a future version of Python.",
+                                        Py_TYPE(integer)->tp_name))
+                {
+                    Py_DECREF(integer);
+                    return NULL;
+                }
             }
-            if (!PyLong_Check(integer)) {
-                PyErr_Format(PyExc_TypeError,
-                             "__int__ returned non-int (type %.200s)",
-                             Py_TYPE(integer)->tp_name);
-                Py_DECREF(integer);
-                return NULL;
+            else {
+                integer = PyNumber_Index(arg);
+                if (!integer) {
+                    return NULL;
+                }
             }
-            if (!PyLong_CheckExact(integer)
-                && PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
-                                    "__int__ returned non-int (type %.200s).  "
-                                    "The ability to return an instance of a "
-                                    "strict subclass of int "
-                                    "is deprecated, and may be removed "
-                                    "in a future version of Python.",
-                                    Py_TYPE(integer)->tp_name))
-            {
-                Py_DECREF(integer);
-                return NULL;
+            if (integer) {
+                Py_SETREF(integer, (PyObject *)MPZ_from_int(state, type,
+                                                            integer));
+                return integer;
             }
-
-            Py_SETREF(integer, (PyObject *)MPZ_from_int(state, type, integer));
-            return integer;
         }
         goto str;
     }
@@ -568,7 +508,7 @@ new_impl(gmp_state *state, PyTypeObject *type, PyObject *arg, PyObject *base_arg
     }
 str:
     if (PyUnicode_Check(arg)) {
-        PyObject *asciistr = PyUnicode_TransformDecimalAndSpaceToASCII(arg);
+        PyObject *asciistr = gmp_PyUnicode_TransformDecimalAndSpaceToASCII(arg);
 
         if (!asciistr) {
             return NULL; /* LCOV_EXCL_LINE */
@@ -600,8 +540,14 @@ str:
         Py_DECREF(str);
         return res;
     }
-    PyErr_SetString(PyExc_TypeError,
-                    "can't convert non-string with explicit base");
+    if (Py_IsNone(base_arg)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "argument must be a number or a string");
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError,
+                        "can't convert non-string with explicit base");
+    }
     return NULL;
 }
 
@@ -693,75 +639,6 @@ static int
 traverse(PyObject *self, visitproc visit, void *arg)
 {
     Py_VISIT(Py_TYPE(self));
-    return 0;
-}
-
-typedef struct gmp_pyargs {
-    Py_ssize_t maxpos;
-    Py_ssize_t minargs;
-    Py_ssize_t maxargs;
-    const char *fname;
-    const char *const *keywords;
-} gmp_pyargs;
-
-static int
-gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
-                 PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
-{
-    if (nargs > fnargs->maxpos) {
-        PyErr_Format(PyExc_TypeError,
-                     "%s() takes at most %zu positional arguments",
-                     fnargs->fname, fnargs->maxpos);
-        return -1;
-    }
-    for (Py_ssize_t i = 0; i < nargs; i++) {
-        argidx[i] = i;
-    }
-
-    Py_ssize_t nkws = 0;
-
-    if (kwnames) {
-        nkws = PyTuple_GET_SIZE(kwnames);
-    }
-    if (nkws > fnargs->maxpos) {
-        PyErr_Format(PyExc_TypeError,
-                     "%s() takes at most %zu keyword arguments", fnargs->fname,
-                     fnargs->maxargs);
-        return -1;
-    }
-    if (nkws + nargs < fnargs->minargs) {
-        PyErr_Format(PyExc_TypeError,
-                     ("%s() takes at least %zu positional or "
-                      "keyword arguments"),
-                     fnargs->fname, fnargs->minargs);
-        return -1;
-    }
-    for (Py_ssize_t i = 0; i < nkws; i++) {
-        const char *kwname = PyUnicode_AsUTF8(PyTuple_GET_ITEM(kwnames, i));
-        Py_ssize_t j = 0;
-
-        for (; j < fnargs->maxargs; j++) {
-            if (strcmp(kwname, fnargs->keywords[j]) == 0) {
-                if (j > fnargs->maxpos || nargs <= j) {
-                    argidx[j] = (int)(nargs + i);
-                    break;
-                }
-                else {
-                    PyErr_Format(PyExc_TypeError,
-                                 ("argument for %s() given by name "
-                                  "('%s') and position (%zu)"),
-                                 fnargs->fname, fnargs->keywords[j], j + 1);
-                    return -1;
-                }
-            }
-        }
-        if (j == fnargs->maxargs) {
-            PyErr_Format(PyExc_TypeError,
-                         "%s() got an unexpected keyword argument '%s'",
-                         fnargs->fname, kwname);
-            return -1;
-        }
-    }
     return 0;
 }
 
@@ -1255,6 +1132,18 @@ BINOP_INT(and)
 BINOP_INT(or)
 BINOP_INT(xor)
 
+#define CHECK_OP_INT(u, a)                           \
+    if (MPZ_Check(state, a)) {                       \
+        u = (MPZ_Object *)a;                         \
+        Py_INCREF(u);                                \
+    }                                                \
+    else {                                           \
+        u = MPZ_from_int(state, state->MPZ_Type, a); \
+        if (!u) {                                    \
+            goto end;                                \
+        }                                            \
+    }                                                \
+
 static PyObject *
 power(PyObject *self, PyObject *other, PyObject *module)
 {
@@ -1319,22 +1208,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
     else {
         MPZ_Object *w = NULL;
 
-        if (MPZ_Check(state, module)) {
-            w = (MPZ_Object *)module;
-            Py_INCREF(w);
-        }
-        else if (PyLong_Check(module)) {
-            w = MPZ_from_int(state, state->MPZ_Type, module);
-            if (!w) {
-                goto end; /* LCOV_EXCL_LINE */
-            }
-        }
-        else {
-            PyErr_SetString(PyExc_TypeError,
-                            ("pow() 3rd argument not allowed "
-                             "unless all arguments are integers"));
-            goto end;
-        }
+        CHECK_OP_INT(w, module);
 
         zz_err ret = ZZ_OK;
 
@@ -1424,12 +1298,12 @@ get_zero(PyObject *self, void *Py_UNUSED(closure))
 
 static PyGetSetDef getsetters[] = {
     {"numerator", (getter)get_copy, NULL,
-     "the numerator of a rational number in lowest terms", NULL},
+     "the numerator of self (the value itself)", NULL},
     {"denominator", (getter)get_one, NULL,
-     "the denominator of a rational number in lowest terms", NULL},
-    {"real", (getter)get_copy, NULL, "the real part of a complex number",
+     "the denominator of self (mpz(1))", NULL},
+    {"real", (getter)get_copy, NULL, "the real part of self (the value itself)",
      NULL},
-    {"imag", (getter)get_zero, NULL, "the imaginary part of a complex number",
+    {"imag", (getter)get_zero, NULL, "the imaginary part of self (mpz(0))",
      NULL},
     {NULL} /* sentinel */
 };
@@ -1717,84 +1591,69 @@ static PyObject *
 digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
        PyObject *kwnames)
 {
-    static const char *const keywords[] = {"base", "prefix"};
+    static const char *const keywords[] = {"base"};
     const static gmp_pyargs fnargs = {
         .keywords = keywords,
-        .maxpos = 2,
+        .maxpos = 1,
         .minargs = 0,
-        .maxargs = 2,
+        .maxargs = 1,
         .fname = "digits",
     };
-    Py_ssize_t argidx[2] = {-1, -1};
+    Py_ssize_t argidx[1] = {-1};
 
     if (gmp_parse_pyargs(&fnargs, argidx, args, nargs, kwnames) == -1) {
         return NULL;
     }
 
-    int base = 10, prefix = 0;
+    int base = 10;
 
     if (argidx[0] != -1) {
         PyObject *arg = args[argidx[0]];
 
         if (PyLong_Check(arg)) {
-            base = PyLong_AsInt(arg);
+            base = PyLong_AsInt(args[argidx[0]]);
             if (base == -1 && PyErr_Occurred()) {
                 return NULL;
             }
         }
         else {
             PyErr_SetString(PyExc_TypeError,
-                            "digits() takes an integer argument 'length'");
+                            "digits() takes an integer argument 'base'");
             return NULL;
         }
     }
-    if (argidx[1] != -1 && PyObject_IsTrue(args[argidx[1]])) {
-        prefix = OPT_PREFIX;
-    }
-    return MPZ_to_str((MPZ_Object *)self, base, prefix);
+    return MPZ_to_str((MPZ_Object *)self, base, 0);
 }
 
 PyDoc_STRVAR(
     to_bytes__doc__,
     "to_bytes($self, /, length=1, byteorder=\'big\', *, signed=False)\n--\n\n\
-Return an array of bytes representing an integer.\n\n\
-  length\n\
-    Length of bytes object to use.  An OverflowError is raised if the\n\
-    integer is not representable with the given number of bytes.  Default\n\
-    is length 1.\n\
-  byteorder\n\
-    The byte order used to represent the integer.  If byteorder is \'big\',\n\
-    the most significant byte is at the beginning of the byte array.  If\n\
-    byteorder is \'little\', the most significant byte is at the end of the\n\
-    byte array.  To request the native byte order of the host system, use\n\
-    sys.byteorder as the byte order value.  Default is to use \'big\'.\n\
-  signed\n\
-    Determines whether two\'s complement is used to represent the integer.\n\
-    If signed is False and a negative integer is given, an OverflowError\n\
-    is raised.");
+Return an array of bytes representing self.\n\n\
+The integer is represented using length bytes.  An OverflowError is\n\
+raised if self is not representable with the given number of bytes.\n\n\
+The byteorder argument determines the byte order used to represent self.\n\
+Accepted values are \'big\' and \'little\', when the most significant\n\
+byte is at the beginning or at the end of the byte array, respectively.\n\n\
+The signed argument determines whether two\'s complement is used to\n\
+represent self.  If signed is False and a negative integer is given,\n\
+an OverflowError is raised.");
 PyDoc_STRVAR(
     from_bytes__doc__,
     "from_bytes($type, /, bytes, byteorder=\'big\', *, signed=False)\n--\n\n\
 Return the integer represented by the given array of bytes.\n\n\
-  bytes\n\
-    Holds the array of bytes to convert.  The argument must either\n\
-    support the buffer protocol or be an iterable object producing bytes.\n\
-    Bytes and bytearray are examples of built-in objects that support the\n\
-    buffer protocol.\n\
-  byteorder\n\
-    The byte order used to represent the integer.  If byteorder is \'big\',\n\
-    the most significant byte is at the beginning of the byte array.  If\n\
-    byteorder is \'little\', the most significant byte is at the end of the\n\
-    byte array.  To request the native byte order of the host system, use\n\
-    sys.byteorder as the byte order value.  Default is to use \'big\'.\n\
-  signed\n\
-    Indicates whether two\'s complement is used to represent the integer.");
+The argument bytes must either be a bytes-like object or an iterable\n\
+producing bytes.\n\n\
+The byteorder argument determines the byte order used to represent the\n\
+integer.  Accepted values are \'big\' and \'little\', when the most\n\
+significant byte is at the beginning or at the end of the byte array,\n\
+respectively.\n\n\
+The signed argument indicates whether two’s complement is used.");
 
 extern PyObject * __format__(PyObject *self, PyObject *format_spec);
 
 static PyMethodDef methods[] = {
     {"conjugate", (PyCFunction)plus, METH_NOARGS,
-     "Returns self, the complex conjugate of any int."},
+     "Returns self."},
     {"bit_length", bit_length, METH_NOARGS,
      "Number of bits necessary to represent self in binary."},
     {"bit_count", bit_count, METH_NOARGS,
@@ -1805,49 +1664,42 @@ static PyMethodDef methods[] = {
     {"from_bytes", (PyCFunction)from_bytes,
      METH_FASTCALL | METH_KEYWORDS | METH_CLASS, from_bytes__doc__},
     {"as_integer_ratio", as_integer_ratio, METH_NOARGS,
-     ("Return a pair of integers, whose ratio is equal to "
-      "the original int.\n\nThe ratio is in lowest terms "
-      "and has a positive denominator.")},
-    {"__trunc__", (PyCFunction)plus, METH_NOARGS,
-     "Truncating an Integral returns itself."},
-    {"__floor__", (PyCFunction)plus, METH_NOARGS,
-     "Flooring an Integral returns itself."},
-    {"__ceil__", (PyCFunction)plus, METH_NOARGS,
-     "Ceiling of an Integral returns itself."},
+     ("Return a pair of integers, whose ratio is equal to self.\n\n"
+      "The ratio is in lowest terms and has a positive denominator.")},
+    {"__trunc__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
+    {"__floor__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
+    {"__ceil__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
     {"__round__", (PyCFunction)__round__, METH_FASTCALL,
-     ("__round__($self, ndigits=None, /)\n--\n\n"
-      "Rounding an Integral returns itself.\n\n"
-      "Rounding with an ndigits argument also returns an integer.")},
-    {"__reduce_ex__", __reduce_ex__, METH_O, NULL},
+     ("__round__($self, ndigits=0, /)\n--\n\n"
+      "Round self to to the closest multiple of 10**-ndigits\n\n"
+      "Always return an integer.  If two multiples are equally close,\n"
+      "rounding is done toward the even choice.")},
+    {"__reduce_ex__", __reduce_ex__, METH_O,
+     ("__reduce_ex__($self, protocol, /)\n--\n\n"
+      "Return state information for pickling.")},
     {"__format__", __format__, METH_O,
      ("__format__($self, format_spec, /)\n--\n\n"
-      "Convert to a string according to format_spec.")},
+      "Convert self to a string according to format_spec.")},
     {"__sizeof__", __sizeof__, METH_NOARGS,
-     "Returns size in memory, in bytes."},
-    {"is_integer", is_integer, METH_NOARGS,
-     ("Returns True.  Exists for duck type compatibility "
-      "with float.is_integer.")},
+     "Returns size of self in memory, in bytes."},
+    {"is_integer", is_integer, METH_NOARGS, "Returns True."},
     {"digits", (PyCFunction)digits, METH_FASTCALL | METH_KEYWORDS,
-     ("digits($self, base=10, prefix=False)\n--\n\n"
-      "Return Python string representing self in the given base.\n\n"
-      "Values for base can range between 2 to 62.")},
+     ("digits($self, base=10)\n--\n\n"
+      "Return string representing self in the given base.\n\n"
+      "Values for base can range between 2 to 36.")},
     {"_from_bytes", _from_bytes, METH_O | METH_CLASS, NULL},
     {NULL} /* sentinel */
 };
 
 PyDoc_STRVAR(mpz_doc,
-             "mpz(x, /)\n\
-mpz(x, /, base=10)\n\
-\n\
-Convert a number or string to an integer, or return 0 if no arguments\n\
-are given.  If x is a number, return x.__int__().  For floating-point\n\
-numbers, this truncates towards zero.\n\
-\n\
-If x is not a number or if base is given, then x must be a string,\n\
+             "mpz(number=0, /)\nmpz(string, /, base=10)\n\n\
+Convert a number or a string to an integer.  If numeric argument is not\n\
+an int subclass, return mpz(int(number)).\n\n\
+If argument is not a number or if base is given, then it must be a string,\n\
 bytes, or bytearray instance representing an integer literal in the\n\
 given base.  The literal can be preceded by '+' or '-' and be surrounded\n\
-by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\n\
-Base 0 means to interpret the base from the string as an integer literal.");
+by whitespace.  Valid bases are 0 and 2-36.  Base 0 means to interpret \n\
+the base from the string as an integer literal.");
 
 #ifdef __GNUC__
 #  pragma GCC diagnostic push
@@ -1924,30 +1776,11 @@ gmp_gcd(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     for (Py_ssize_t i = 0; i < nargs; i++) {
         MPZ_Object *arg;
 
-        if (MPZ_Check(state, args[i])) {
-            arg = (MPZ_Object *)args[i];
-            Py_INCREF(arg);
-        }
-        else if (PyLong_Check(args[i])) {
-            arg = MPZ_from_int(state, state->MPZ_Type, args[i]);
-            if (!arg) {
-                /* LCOV_EXCL_START */
-                Py_DECREF(res);
-                return NULL;
-                /* LCOV_EXCL_STOP */
-            }
-        }
-        else {
-            Py_DECREF(res);
-            PyErr_SetString(PyExc_TypeError,
-                            "gcd() arguments must be integers");
-            return NULL;
-        }
+        CHECK_OP_INT(arg, args[i]);
         if (zz_cmp_i32(&res->z, 1) == ZZ_EQ) {
             Py_DECREF(arg);
             continue;
         }
-
         if (zz_gcd(&res->z, &arg->z, &res->z)) {
             /* LCOV_EXCL_START */
             Py_DECREF(res);
@@ -1958,6 +1791,9 @@ gmp_gcd(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         Py_DECREF(arg);
     }
     return (PyObject *)res;
+end:
+    Py_DECREF(res);
+    return NULL;
 }
 
 static PyObject *
@@ -1980,34 +1816,8 @@ gmp_gcdext(PyObject *module, PyObject *const *args,
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
-    if (MPZ_Check(state, args[0])) {
-        x = (MPZ_Object *)args[0];
-        Py_INCREF(x);
-    }
-    else if (PyLong_Check(args[0])) {
-        x = MPZ_from_int(state, state->MPZ_Type, args[0]);
-        if (!x) {
-            goto err; /* LCOV_EXCL_LINE */
-        }
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError, "gcdext() expects integer arguments");
-        goto err;
-    }
-    if (MPZ_Check(state, args[1])) {
-        y = (MPZ_Object *)args[1];
-        Py_INCREF(y);
-    }
-    else if (PyLong_Check(args[1])) {
-        y = MPZ_from_int(state, state->MPZ_Type, args[1]);
-        if (!y) {
-            goto err; /* LCOV_EXCL_LINE */
-        }
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError, "gcdext() expects integer arguments");
-        goto err;
-    }
+    CHECK_OP_INT(x, args[0]);
+    CHECK_OP_INT(y, args[1]);
 
     zz_err ret = zz_gcdext(&x->z, &y->z, &g->z, &s->z, &t->z);
 
@@ -2022,7 +1832,7 @@ gmp_gcdext(PyObject *module, PyObject *const *args,
     Py_DECREF(s);
     Py_DECREF(t);
     return tup;
-err:
+end:
     Py_DECREF(g);
     Py_DECREF(s);
     Py_DECREF(t);
@@ -2040,21 +1850,7 @@ gmp_isqrt(PyObject *module, PyObject *arg)
     if (!root) {
         return NULL; /* LCOV_EXCL_LINE */
     }
-    if (MPZ_Check(state, arg)) {
-        x = (MPZ_Object *)arg;
-        Py_INCREF(x);
-    }
-    else if (PyLong_Check(arg)) {
-        x = MPZ_from_int(state, state->MPZ_Type, arg);
-        if (!x) {
-            goto err; /* LCOV_EXCL_LINE */
-        }
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError,
-                        "isqrt() argument must be an integer");
-        goto err;
-    }
+    CHECK_OP_INT(x, arg);
 
     zz_err ret = zz_sqrtrem(&x->z, &root->z, NULL);
 
@@ -2069,7 +1865,7 @@ gmp_isqrt(PyObject *module, PyObject *arg)
     if (ret == ZZ_MEM) {
         PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-err:
+end:
     Py_DECREF(root);
     return NULL;
 }
@@ -2088,21 +1884,7 @@ gmp_isqrt_rem(PyObject *module, PyObject *arg)
         return NULL;
         /* LCOV_EXCL_STOP */
     }
-    if (MPZ_Check(state, arg)) {
-        x = (MPZ_Object *)arg;
-        Py_INCREF(x);
-    }
-    else if (PyLong_Check(arg)) {
-        x = MPZ_from_int(state, state->MPZ_Type, arg);
-        if (!x) {
-            goto err; /* LCOV_EXCL_LINE */
-        }
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError,
-                        "isqrt() argument must be an integer");
-        goto err;
-    }
+    CHECK_OP_INT(x, arg);
 
     zz_err ret = zz_sqrtrem(&x->z, &root->z, &rem->z);
 
@@ -2117,7 +1899,7 @@ gmp_isqrt_rem(PyObject *module, PyObject *arg)
     if (ret == ZZ_MEM) {
         PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-err:
+end:
     Py_DECREF(root);
     Py_DECREF(rem);
     return tup;
@@ -2133,21 +1915,7 @@ err:
         if (!res) {                                                      \
             return NULL; /* LCOV_EXCL_LINE */                            \
         }                                                                \
-        if (MPZ_Check(state, arg)) {                                     \
-            x = (MPZ_Object *)arg;                                       \
-            Py_INCREF(x);                                                \
-        }                                                                \
-        else if (PyLong_Check(arg)) {                                    \
-            x = MPZ_from_int(state, state->MPZ_Type, arg);               \
-            if (!x) {                                                    \
-                goto err; /* LCOV_EXCL_LINE */                           \
-            }                                                            \
-        }                                                                \
-        else {                                                           \
-            PyErr_SetString(PyExc_TypeError,                             \
-                            #name "() argument must be an integer");     \
-            goto err;                                                    \
-        }                                                                \
+        CHECK_OP_INT(x, arg);                                            \
         if (zz_isneg(&x->z)) {                                           \
             PyErr_SetString(PyExc_ValueError,                            \
                             #name "() not defined for negative values"); \
@@ -2171,6 +1939,7 @@ err:
         }                                                                \
         return (PyObject *)res;                                          \
     err:                                                                 \
+    end:                                                                 \
         Py_DECREF(res);                                                  \
         return NULL;                                                     \
     }
@@ -2272,25 +2041,14 @@ gmp__mpmath_create(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     if (nargs < 2 || nargs > 4) {
         PyErr_Format(PyExc_TypeError,
                      "_mpmath_create() takes from 2 to 4 arguments");
+end:
         return NULL;
     }
 
     MPZ_Object *man;
     gmp_state *state = PyModule_GetState(module);
 
-    if (MPZ_Check(state, args[0])) {
-        man = (MPZ_Object *)plus(args[0]);
-    }
-    else if (PyLong_Check(args[0])) {
-        man = MPZ_from_int(state, state->MPZ_Type, args[0]);
-        if (!man) {
-            return NULL; /* LCOV_EXCL_LINE */
-        }
-    }
-    else {
-        PyErr_Format(PyExc_TypeError, "_mpmath_create() expects an integer");
-        return NULL;
-    }
+    CHECK_OP_INT(man, args[0]);
     if (!PyLong_Check(args[1])) {
         Py_DECREF(man);
         PyErr_Format(PyExc_TypeError,
@@ -2374,16 +2132,16 @@ static PyMethodDef gmp_functions[] = {
       "Compute extended GCD.")},
     {"isqrt", gmp_isqrt, METH_O,
      ("isqrt($module, n, /)\n--\n\n"
-      "Return the integer part of the square root of the input.")},
+      "Return the integer part of the square root of n.")},
     {"isqrt_rem", gmp_isqrt_rem, METH_O,
      ("isqrt_rem($module, n, /)\n--\n\n"
-      "Return a 2-element tuple (s,t) such that s=isqrt(x) and t=x-s*s.")},
+      "Return a 2-element tuple (s,t) such that s=isqrt(n) and t=n-s*s.")},
     {"factorial", gmp_fac, METH_O,
      ("factorial($module, n, /)\n--\n\n"
       "Find n!.")},
     {"double_fac", gmp_fac2, METH_O,
      ("double_fac($module, n, /)\n--\n\n"
-      "Return the exact double factorial (n!!) of n.")},
+      "Return the exact double factorial n!!.")},
     {"fib", gmp_fib, METH_O,
      ("fib($module, n, /)\n--\n\n"
       "Return the n-th Fibonacci number.")},
@@ -2395,20 +2153,23 @@ static PyMethodDef gmp_functions[] = {
 };
 
 PyDoc_STRVAR(gmp_info__doc__,
-             "gmp.gmplib_info\n\
-\n\
+             "gmp.gmplib_info\n\n\
 A named tuple that holds information about GNU GMP\n\
 and it's internal representation of integers.\n\
 The attributes are read only.");
 
 static PyStructSequence_Field gmp_info_fields[] = {
     {"bits_per_limb", "size of a limb in bits"},
-    {"sizeof_limb", "size in bytes of the C type used to represent a limb"},
+    {"sizeof_limb", "size in bytes of the C type, used to represent a limb"},
+    {"sizeof_limbcnt", ("size in bytes of the C type, used to"
+                        " represent a count of limbs")},
+    {"sizeof_bitcnt", ("size in bytes of the C type, used to"
+                       " represent a count of bits")},
     {"version", "the GNU GMP version"},
     {NULL}};
 
 static PyStructSequence_Desc gmp_info_desc = {
-    "gmp.gmplib_info", gmp_info__doc__, gmp_info_fields, 3};
+    "gmp.gmplib_info", gmp_info__doc__, gmp_info_fields, 5};
 
 static int
 gmp_exec(PyObject *m)
@@ -2446,6 +2207,10 @@ gmp_exec(PyObject *m)
     PyStructSequence_SET_ITEM(gmp_info, 1,
                               PyLong_FromLong(info.limb_bytes));
     PyStructSequence_SET_ITEM(gmp_info, 2,
+                              PyLong_FromLong(info.limbcnt_bytes));
+    PyStructSequence_SET_ITEM(gmp_info, 3,
+                              PyLong_FromLong(info.bitcnt_bytes));
+    PyStructSequence_SET_ITEM(gmp_info, 4,
                               PyUnicode_FromFormat("%d.%d.%d",
                                                    info.version[0],
                                                    info.version[1],
