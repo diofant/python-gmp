@@ -17,67 +17,51 @@ from gmp import (
 )
 from hypothesis import example, given
 from hypothesis.strategies import booleans, integers, lists, sampled_from
-from test_utils import bigints, python_gcdext
+from test_utils import (
+    bigints,
+    python_fac2,
+    python_fib,
+    python_gcdext,
+    python_isqrtrem,
+)
 
 
 @given(bigints(min_value=0))
-def test_isqrt_root(x):
+def test_isqrt(x):
     mx = mpz(x)
-    r = math.isqrt(x)
-    assert isqrt(mx) == r
-    assert isqrt(x) == r
-
-
-@given(bigints(min_value=0))
-def test_isqrt_rem(x):
-    mpmath = pytest.importorskip("mpmath")
-    mx = mpz(x)
-    r = mpmath.libmp.libintmath.sqrtrem_python(x)
-    assert isqrt_rem(mx) == r
-    assert isqrt_rem(x) == r
+    for fm, f in [(isqrt, math.isqrt), (isqrt_rem, python_isqrtrem)]:
+        r = f(x)
+        assert fm(mx) == r
+        assert fm(x) == r
 
 
 @given(integers(min_value=0, max_value=12345))
-def test_double_fac(x):
-    mpmath = pytest.importorskip("mpmath")
+def test_factorials(x):
     mx = mpz(x)
-    r = mpmath.libmp.libintmath.ifac2_python(x)
-    assert double_fac(mx) == r
-    assert double_fac(x) == r
-
-
-@given(integers(min_value=0, max_value=12345))
-def test_fib(x):
-    mpmath = pytest.importorskip("mpmath")
-    mx = mpz(x)
-    r = mpmath.libmp.libintmath.ifib_python(x)
-    assert fib(mx) == r
-    assert fib(x) == r
-
-
-@given(integers(min_value=0, max_value=12345))
-def test_fac_bulk(x):
-    mx = mpz(x)
-    r = math.factorial(x)
-    assert factorial(mx) == r
-    assert factorial(x) == r
+    for fm, f in [(factorial, math.factorial), (fib, python_fib),
+                  (double_fac, python_fac2)]:
+        r = f(x)
+        assert fm(mx) == r
+        assert fm(x) == r
 
 
 @given(bigints(), bigints(), bigints())
 @example(1<<(67*2), 1<<65, 1)
+@example(123, 1<<70, 1)
 @example(6277101735386680763835789423207666416102355444464034512895,
          6277101735386680763835789423207666416102355444464034512895,
          340282366920938463463374607431768211456)
-def test_gcd_binary(x, y, c):
+def test_gcdext_binary(x, y, c):
     x *= c
     y *= c
     mx = mpz(x)
     my = mpz(y)
-    r = math.gcd(x, y)
-    assert gcd(mx, my) == r
-    assert gcd(x, my) == r
-    assert gcd(mx, y) == r
-    assert gcd(x, y) == r
+    for fm, f in [(gcd, math.gcd), (gcdext, python_gcdext)]:
+        r = f(x, y)
+        assert fm(mx, my) == r
+        assert fm(x, my) == r
+        assert fm(mx, y) == r
+        assert fm(x, y) == r
 
 
 @given(lists(bigints(), max_size=6), bigints())
@@ -93,22 +77,6 @@ def test_gcd_nary(xs, c):
     assert gcd(*xs) == r
 
 
-@given(bigints(), bigints(), bigints())
-@example(1<<(67*2), 1<<65, 1)
-@example(123, 1<<70, 1)
-def test_gcdext(x, y, c):
-    x *= c
-    y *= c
-    mx = mpz(x)
-    my = mpz(y)
-    r = python_gcdext(x, y)
-    r = r[2], r[0], r[1]
-    assert gcdext(mx, my) == r
-    assert gcdext(x, my) == r
-    assert gcdext(mx, y) == r
-    assert gcdext(x, y) == r
-
-
 @given(booleans(), bigints(min_value=0), bigints(),
        integers(min_value=1, max_value=1<<30),
        sampled_from(["n", "f", "c", "u", "d"]))
@@ -122,7 +90,7 @@ def test_gcdext(x, y, c):
 @example(1, 9727076909039105, -48, 53, "u")
 @example(1, 6277101735386680763495507056286727952638980837032266301441,
          0, 64, "f")
-def test__mpmath_normalize(sign, man, exp, prec, rnd):
+def test_mpmath_normalize(sign, man, exp, prec, rnd):
     mpmath = pytest.importorskip("mpmath")
     mman = mpz(man)
     sign = int(sign)
@@ -136,7 +104,7 @@ def test__mpmath_normalize(sign, man, exp, prec, rnd):
        sampled_from(["n", "f", "c", "u", "d"]))
 @example(-6277101735386680763495507056286727952638980837032266301441,
          0, 64, "f")
-def test__mpmath_create(man, exp, prec, rnd):
+def test_mpmath_create(man, exp, prec, rnd):
     mpmath = pytest.importorskip("mpmath")
     mman = mpz(man)
     res = mpmath.libmp.from_man_exp(man, exp, prec, rnd)
@@ -192,4 +160,4 @@ def test_interfaces():
         _mpmath_normalize(1, mpz(111), 1j, 12, 13, "c")
     with pytest.raises(ValueError, match="invalid rounding mode specified"):
         _mpmath_normalize(1, mpz(111), 11, 12, 13, 1j)
-    gmp._free_cache()
+    gmp._free_cache()  # just for coverage
