@@ -19,8 +19,8 @@
 #if GMP_NAIL_BITS != 0
 #  error "GMP_NAIL_BITS expected to be 0"
 #endif
-#if GMP_NUMB_BITS < 16
-#  error "GMP_NUMB_BITS expected to be >= 16"
+#if GMP_NUMB_BITS != 64
+#  error "GMP_NUMB_BITS expected to be 64"
 #endif
 
 #if GMP_NUMB_BITS < DBL_MANT_DIG
