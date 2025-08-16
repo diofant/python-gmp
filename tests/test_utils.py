@@ -1,23 +1,29 @@
+import math
 import string
+from functools import lru_cache
 
 from gmp import gmp_info
 from hypothesis.strategies import (
+    booleans,
+    complex_numbers,
     composite,
+    floats,
     integers,
     sampled_from,
 )
 
 BITS_PER_LIMB = gmp_info[0]
 SIZEOF_LIMB = gmp_info[1]
+MAX_FACTORIAL_CACHE = 1000
 
 
 def python_gcdext(a, b):
     if not a and not b:
         return 0, 0, 0
     if not a:
-        return 0, b//abs(b), abs(b)
+        return abs(b), 0, b//abs(b)
     if not b:
-        return a//abs(a), 0, abs(a)
+        return abs(a), a//abs(a), 0
     if a < 0:
         a, x_sign = -a, -1
     else:
@@ -30,7 +36,48 @@ def python_gcdext(a, b):
     while b:
         c, q = a % b, a // b
         a, b, r, s, x, y = b, c, x - q*r, y - q*s, r, s
-    return x*x_sign, y*y_sign, a
+    return a, x*x_sign, y*y_sign
+
+
+def python_isqrtrem(x):
+    y = math.isqrt(x)
+    return y, x - y*y
+
+
+@lru_cache(maxsize=250)
+def python_fib(n):
+    if n < 0:
+        return (-1)**(-n+1) * python_fib(-n)
+    # Use Dijkstra's logarithmic algorithm
+    # The following implementation is basically equivalent to
+    # http://en.literateprograms.org/Fibonacci_numbers_(Scheme)
+    a, b, p, q = 1, 0, 0, 1
+    while n:
+        if n & 1:
+            aq = a*q
+            a, b = b*q + aq + a*p, b*p + aq
+            n -= 1
+        else:
+            qq = q*q
+            p, q = p*p + qq, qq + 2*p*q
+            n >>= 1
+    return b
+
+
+def python_fac2(n, _memo_pair=[{0:1}, {1:1}]):
+    """Return n!! (double factorial), integers n >= 0 only."""
+    memo = _memo_pair[n&1]
+    f = memo.get(n)
+    if f:
+        return f
+    k = max(memo)
+    p = memo[k]
+    while k < n:
+        k += 2
+        p *= k
+        if k <= MAX_FACTORIAL_CACHE:
+            memo[k] = p
+    return p
 
 
 def to_digits(n, base):
@@ -122,3 +169,10 @@ def bigints(draw, min_value=None, max_value=None):
     min_value = max(min_value, -max_abs)
     max_value = min(max_value, +max_abs)
     return draw(integers(min_value=min_value, max_value=max_value))
+
+
+@composite
+def numbers(draw):
+    if draw(booleans()):
+        return draw(floats(allow_nan=False, allow_infinity=False))
+    return draw(complex_numbers(allow_nan=False, allow_infinity=False))
