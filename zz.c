@@ -1,12 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <float.h>
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wsign-conversion"
 #include <gmp.h>
-#  pragma GCC diagnostic pop
-#endif
 #include <inttypes.h>
 #include <math.h>
 #include <setjmp.h>
