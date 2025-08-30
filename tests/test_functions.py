@@ -1,3 +1,4 @@
+import inspect
 import math
 
 import gmp
@@ -5,6 +6,7 @@ import pytest
 from gmp import (
     _mpmath_create,
     _mpmath_normalize,
+    comb,
     double_fac,
     fac,
     factorial,
@@ -13,7 +15,9 @@ from gmp import (
     gcdext,
     isqrt,
     isqrt_rem,
+    lcm,
     mpz,
+    perm,
 )
 from hypothesis import example, given
 from hypothesis.strategies import booleans, integers, lists, sampled_from
@@ -45,6 +49,33 @@ def test_factorials(x):
         assert fm(x) == r
 
 
+@given(integers(min_value=0, max_value=12345),
+       integers(min_value=0, max_value=12345))
+def test_comb(x, y):
+    mx = mpz(x)
+    my = mpz(y)
+    r = math.comb(x, y)
+    assert comb(mx, my) == r
+    assert comb(mx, y) == r
+    assert comb(x, my) == r
+    assert comb(x, y) == r
+
+
+@given(integers(min_value=0, max_value=12345),
+       integers(min_value=0, max_value=12345))
+def test_perm(x, y):
+    mx = mpz(x)
+    my = mpz(y)
+    r = math.perm(x, y)
+    assert perm(mx, my) == r
+    assert perm(mx, y) == r
+    assert perm(x, my) == r
+    assert perm(x, y) == r
+    rx = math.factorial(x)
+    assert perm(mx) == rx
+    assert perm(x) == rx
+
+
 @given(bigints(), bigints(), bigints())
 @example(1<<(67*2), 1<<65, 1)
 @example(123, 1<<70, 1)
@@ -64,6 +95,17 @@ def test_gcdext_binary(x, y, c):
         assert fm(x, y) == r
 
 
+@given(bigints(), bigints())
+def test_lcm_binary(x, y):
+    mx = mpz(x)
+    my = mpz(y)
+    r = math.lcm(x, y)
+    assert lcm(mx, my) == r
+    assert lcm(mx, y) == r
+    assert lcm(x, my) == r
+    assert lcm(x, y) == r
+
+
 @given(lists(bigints(), max_size=6), bigints())
 @example([], 1)
 @example([2, 3, 4], 1)
@@ -75,6 +117,15 @@ def test_gcd_nary(xs, c):
     r = math.gcd(*xs)
     assert gcd(*mxs) == r
     assert gcd(*xs) == r
+
+
+@given(lists(bigints(), max_size=6))
+@example([])
+def test_lcm_nary(xs):
+    mxs = list(map(mpz, xs))
+    r = math.lcm(*xs)
+    assert lcm(*mxs) == r
+    assert lcm(*xs) == r
 
 
 @given(booleans(), bigints(min_value=0), bigints(),
@@ -109,6 +160,7 @@ def test_mpmath_create(man, exp, prec, rnd):
     mman = mpz(man)
     res = mpmath.libmp.from_man_exp(man, exp, prec, rnd)
     assert _mpmath_create(mman, exp, prec, rnd) == res
+    assert mman == man
     assert _mpmath_create(man, exp, prec, rnd) == res
 
 
@@ -125,6 +177,10 @@ def test_interfaces():
     with pytest.raises(TypeError):
         gcdext(2j, 2)
     with pytest.raises(TypeError):
+        lcm(1j)
+    with pytest.raises(TypeError):
+        lcm(1, 1j)
+    with pytest.raises(TypeError):
         isqrt(1j)
     with pytest.raises(TypeError):
         isqrt_rem(1j)
@@ -138,6 +194,26 @@ def test_interfaces():
         fac(-1)
     with pytest.raises(OverflowError):
         fac(2**1000)
+    with pytest.raises(TypeError):
+        comb(123)
+    with pytest.raises(ValueError, match="not defined for negative values"):
+        comb(-1, 2)
+    with pytest.raises(ValueError, match="not defined for negative values"):
+        comb(2, -1)
+    with pytest.raises(OverflowError):
+        comb(2**1000, 1)
+    with pytest.raises(OverflowError):
+        comb(1, 2**1000)
+    with pytest.raises(TypeError):
+        perm(1, 2, 3)
+    with pytest.raises(ValueError, match="not defined for negative values"):
+        perm(-1, 2)
+    with pytest.raises(ValueError, match="not defined for negative values"):
+        perm(2, -1)
+    with pytest.raises(OverflowError):
+        perm(2**1000, 1)
+    with pytest.raises(OverflowError):
+        perm(1, 2**1000)
     with pytest.raises(TypeError):
         _mpmath_create(1j)
     with pytest.raises(TypeError):
@@ -161,3 +237,10 @@ def test_interfaces():
     with pytest.raises(ValueError, match="invalid rounding mode specified"):
         _mpmath_normalize(1, mpz(111), 11, 12, 13, 1j)
     gmp._free_cache()  # just for coverage
+
+
+def test_func_api():
+    for fn in ["comb", "factorial", "gcd", "isqrt", "lcm", "perm"]:
+        f = getattr(math, fn)
+        fz = getattr(gmp, fn)
+        assert inspect.signature(f) == inspect.signature(fz)

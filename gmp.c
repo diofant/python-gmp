@@ -1824,7 +1824,7 @@ gmp_gcdext(PyObject *module, PyObject *const *args,
     Py_XDECREF(x);
     Py_XDECREF(y);
     if (ret == ZZ_MEM) {
-        PyErr_NoMemory(); /* LCOV_EXCL_LINE */
+        return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
     PyObject *tup = PyTuple_Pack(3, g, s, t);
 
@@ -1838,6 +1838,38 @@ end:
     Py_DECREF(t);
     Py_XDECREF(x);
     Py_XDECREF(y);
+    return NULL;
+}
+
+static PyObject *
+gmp_lcm(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
+{
+    gmp_state *state = PyModule_GetState(module);
+    MPZ_Object *res = MPZ_new(state, state->MPZ_Type, 0);
+
+    if (!res || zz_from_i64(1, &res->z)) {
+        return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
+    }
+    for (Py_ssize_t i = 0; i < nargs; i++) {
+        MPZ_Object *arg;
+
+        CHECK_OP_INT(arg, args[i]);
+        if (zz_cmp_i32(&res->z, 0) == ZZ_EQ) {
+            Py_DECREF(arg);
+            continue;
+        }
+        if (zz_lcm(&res->z, &arg->z, &res->z)) {
+            /* LCOV_EXCL_START */
+            Py_DECREF(res);
+            Py_DECREF(arg);
+            return PyErr_NoMemory();
+            /* LCOV_EXCL_STOP */
+        }
+        Py_DECREF(arg);
+    }
+    return (PyObject *)res;
+end:
+    Py_DECREF(res);
     return NULL;
 }
 
@@ -1948,6 +1980,120 @@ MAKE_MPZ_UI_FUN(fac)
 MAKE_MPZ_UI_FUN(fac2)
 MAKE_MPZ_UI_FUN(fib)
 
+static PyObject *
+gmp_comb(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
+{
+    if (nargs != 2) {
+        PyErr_SetString(PyExc_TypeError, "two arguments required");
+        return NULL;
+    }
+
+    gmp_state *state = PyModule_GetState(module);
+    MPZ_Object *x, *y, *res = MPZ_new(state, state->MPZ_Type, 0);
+
+    if (!res) {
+        return NULL; /* LCOV_EXCL_LINE */
+    }
+    CHECK_OP_INT(x, args[0]);
+    CHECK_OP_INT(y, args[1]);
+    if (zz_isneg(&x->z) || zz_isneg(&y->z)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "comb() not defined for negative values");
+        goto err;
+    }
+
+    int64_t n, k;
+
+    if ((zz_to_i64(&x->z, &n) || n > ULONG_MAX)
+        || (zz_to_i64(&y->z, &k) || k > ULONG_MAX))
+    {
+        PyErr_Format(PyExc_OverflowError,
+                     "comb() arguments should not exceed %ld",
+                     ULONG_MAX);
+        goto err;
+    }
+    Py_XDECREF(x);
+    Py_XDECREF(y);
+    if (zz_bin((uint64_t)n, (uint64_t)k, &res->z)) {
+        /* LCOV_EXCL_START */
+        PyErr_NoMemory();
+        goto err;
+        /* LCOV_EXCL_STOP */
+    }
+    return (PyObject *)res;
+err:
+end:
+    Py_DECREF(res);
+    return NULL;
+}
+
+static PyObject *
+gmp_perm(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
+{
+    if (nargs > 2 || nargs < 1) {
+        PyErr_SetString(PyExc_TypeError, "one or two arguments required");
+        return NULL;
+    }
+    if (nargs == 1) {
+        return gmp_fac(module, args[0]);
+    }
+
+    gmp_state *state = PyModule_GetState(module);
+    MPZ_Object *x, *y, *res = MPZ_new(state, state->MPZ_Type, 0);
+
+    if (!res) {
+        return NULL; /* LCOV_EXCL_LINE */
+    }
+    CHECK_OP_INT(x, args[0]);
+    CHECK_OP_INT(y, args[1]);
+    if (zz_isneg(&x->z) || zz_isneg(&y->z)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "perm() not defined for negative values");
+        goto err;
+    }
+
+    int64_t n, k;
+
+    if ((zz_to_i64(&x->z, &n) || n > ULONG_MAX)
+        || (zz_to_i64(&y->z, &k) || k > ULONG_MAX))
+    {
+        PyErr_Format(PyExc_OverflowError,
+                     "perm() arguments should not exceed %ld",
+                     ULONG_MAX);
+        goto err;
+    }
+    Py_XDECREF(x);
+    Py_XDECREF(y);
+    if (k > n) {
+        return (PyObject *)res;
+    }
+
+    MPZ_Object *den = MPZ_new(state, state->MPZ_Type, 0);
+
+    if (!den) {
+        /* LCOV_EXCL_START */
+        PyErr_NoMemory();
+        goto err;
+        /* LCOV_EXCL_STOP */
+    }
+    if (zz_fac((uint64_t)n, &res->z)
+        || zz_fac((uint64_t)(n-k), &den->z)
+        || zz_div(&res->z, &den->z, ZZ_RNDD, &res->z, NULL))
+    {
+        /* LCOV_EXCL_START */
+        Py_DECREF(den);
+        PyErr_NoMemory();
+        goto err;
+        /* LCOV_EXCL_STOP */
+    }
+    Py_DECREF(den);
+    return (PyObject *)res;
+err:
+end:
+    Py_DECREF(res);
+    return NULL;
+}
+
 static zz_rnd
 get_round_mode(PyObject *rndstr)
 {
@@ -1982,6 +2128,100 @@ invalid:
     return rnd;
 }
 
+static zz_err
+zz_mpmath_normalize(zz_bitcnt_t prec, zz_rnd rnd, bool *negative,
+                     zz_t *man, zz_t *exp, zz_bitcnt_t *bc)
+{
+    /* If the mantissa is 0, return the normalized representation. */
+    if (zz_iszero(man)) {
+        *negative = false;
+        *bc = 0;
+        return zz_from_i32(0, exp);
+    }
+    /* if size <= prec and the number is odd return it */
+    if (*bc <= prec && zz_isodd(man)) {
+        return ZZ_OK;
+    }
+    if (*bc > prec) {
+        zz_bitcnt_t shift = *bc - prec;
+
+do_rnd:
+        switch (rnd) {
+            case ZZ_RNDD:
+                rnd = *negative ? ZZ_RNDA : ZZ_RNDZ;
+                goto do_rnd;
+            case ZZ_RNDU:
+                rnd = *negative ? ZZ_RNDZ : ZZ_RNDA;
+                goto do_rnd;
+            case ZZ_RNDZ:
+                zz_quo_2exp(man, shift, man);
+                break;
+            case ZZ_RNDA:
+                zz_neg(man, man);
+                zz_quo_2exp(man, shift, man);
+                zz_abs(man, man);
+                break;
+            case ZZ_RNDN:
+            default:
+                {
+                    bool t = zz_lsbpos(man) + 2 <= shift;
+
+                    if (zz_quo_2exp(man, shift - 1, man)) {
+                        return ZZ_MEM; /* LCOV_EXCL_LINE */
+                    }
+                    t = zz_isodd(man) && (man->digits[0]&2 || t);
+                    if (zz_quo_2exp(man, 1, man)) {
+                        return ZZ_MEM; /* LCOV_EXCL_LINE */
+                    }
+                    if (t && zz_add_i32(man, 1, man)) {
+                        return ZZ_MEM; /* LCOV_EXCL_LINE */
+                    }
+                }
+        }
+
+        zz_t tmp;
+
+        if (zz_init(&tmp) || shift > INT64_MAX
+            || zz_from_i64((int64_t)shift, &tmp)
+            || zz_add(exp, &tmp, exp))
+        {
+            /* LCOV_EXCL_START */
+            zz_clear(&tmp);
+            return ZZ_MEM;
+            /* LCOV_EXCL_STOP */
+        }
+        zz_clear(&tmp);
+        *bc = prec;
+    }
+
+    zz_bitcnt_t zbits = 0;
+
+    /* Strip trailing 0 bits. */
+    if (!zz_iszero(man) && (zbits = zz_lsbpos(man))) {
+        if (zz_quo_2exp(man, zbits, man)) {
+            return ZZ_MEM; /* LCOV_EXCL_LINE */
+        }
+    }
+
+    zz_t tmp;
+
+    if (zz_init(&tmp) || zbits > INT64_MAX
+        || zz_from_i64((int64_t)zbits, &tmp)
+        || zz_add(exp, &tmp, exp))
+    {
+        /* LCOV_EXCL_START */
+        zz_clear(&tmp);
+        return ZZ_MEM;
+        /* LCOV_EXCL_STOP */
+    }
+    zz_clear(&tmp);
+    *bc -= zbits;
+    /* Check if one less than a power of 2 was rounded up. */
+    if (zz_cmp_i32(man, 1) == ZZ_EQ) {
+        *bc = 1;
+    }
+    return ZZ_OK;
+}
 static PyObject *
 gmp__mpmath_normalize(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 {
@@ -2013,8 +2253,8 @@ gmp__mpmath_normalize(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     MPZ_Object *man = (MPZ_Object *)plus(args[1]);
     MPZ_Object *exp = MPZ_from_int(state, state->MPZ_Type, args[2]);
 
-    if (!exp || !man || _zz_mpmath_normalize(prec, rnd, &negative,
-                                             &man->z, &exp->z, &bc))
+    if (!exp || !man || zz_mpmath_normalize(prec, rnd, &negative,
+                                            &man->z, &exp->z, &bc))
     {
         /* LCOV_EXCL_START */
         Py_XDECREF(man);
@@ -2041,14 +2281,25 @@ gmp__mpmath_create(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     if (nargs < 2 || nargs > 4) {
         PyErr_Format(PyExc_TypeError,
                      "_mpmath_create() takes from 2 to 4 arguments");
-end:
         return NULL;
     }
 
     MPZ_Object *man;
     gmp_state *state = PyModule_GetState(module);
 
-    CHECK_OP_INT(man, args[0]);
+    if (MPZ_Check(state, args[0])) {
+        man = (MPZ_Object *)plus(args[0]);
+    }
+    else if (PyLong_Check(args[0])) {
+        man = MPZ_from_int(state, state->MPZ_Type, args[0]);
+        if (!man) {
+            return NULL; /* LCOV_EXCL_LINE */
+        }
+    }
+    else {
+        PyErr_Format(PyExc_TypeError, "_mpmath_create() expects an integer");
+        return NULL;
+    }
     if (!PyLong_Check(args[1])) {
         Py_DECREF(man);
         PyErr_Format(PyExc_TypeError,
@@ -2086,8 +2337,8 @@ end:
 
     MPZ_Object *exp = MPZ_from_int(state, state->MPZ_Type, args[1]);
 
-    if (!exp || _zz_mpmath_normalize(prec, rnd, &negative,
-                                           &man->z, &exp->z, &bc))
+    if (!exp || zz_mpmath_normalize(prec, rnd, &negative,
+                                    &man->z, &exp->z, &bc))
     {
         /* LCOV_EXCL_START */
         Py_DECREF(man);
@@ -2130,6 +2381,9 @@ static PyMethodDef gmp_functions[] = {
     {"gcdext", (PyCFunction)gmp_gcdext, METH_FASTCALL,
      ("gcdext($module, x, y, /)\n--\n\n"
       "Compute extended GCD.")},
+    {"lcm", (PyCFunction)gmp_lcm, METH_FASTCALL,
+     ("lcm($module, /, *integers)\n--\n\n"
+      "Least Common Multiple.")},
     {"isqrt", gmp_isqrt, METH_O,
      ("isqrt($module, n, /)\n--\n\n"
       "Return the integer part of the square root of n.")},
@@ -2145,6 +2399,13 @@ static PyMethodDef gmp_functions[] = {
     {"fib", gmp_fib, METH_O,
      ("fib($module, n, /)\n--\n\n"
       "Return the n-th Fibonacci number.")},
+    {"comb", (PyCFunction)gmp_comb, METH_FASTCALL,
+     ("comb($module, n, k, /)\n--\n\nNumber of ways to choose k"
+      " items from n items without repetition and order.\n\n"
+      "Also called the binomial coefficient.")},
+    {"perm", (PyCFunction)gmp_perm, METH_FASTCALL,
+     ("perm($module, n, k=None, /)\n--\n\nNumber of ways to choose k"
+      " items from n items without repetition and with order.")},
     {"_mpmath_normalize", (PyCFunction)gmp__mpmath_normalize, METH_FASTCALL,
      NULL},
     {"_mpmath_create", (PyCFunction)gmp__mpmath_create, METH_FASTCALL, NULL},
@@ -2243,7 +2504,8 @@ gmp_exec(PyObject *m)
     const char *str = ("import numbers, importlib.metadata as imp\n"
                        "numbers.Integral.register(gmp.mpz)\n"
                        "gmp.fac = gmp.factorial\n"
-                       "gmp.__all__ = ['factorial', 'gcd', 'isqrt', 'mpz']\n"
+                       "gmp.__all__ = ['comb', 'factorial', 'gcd', 'isqrt',\n"
+                       "               'lcm', 'mpz', 'perm']\n"
                        "gmp.__version__ = imp.version('python-gmp')\n");
 
     PyObject *res = PyRun_String(str, Py_file_input, ns, ns);

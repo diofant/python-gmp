@@ -11,10 +11,9 @@ curl -s -O https://ftp.gnu.org/gnu/gmp/gmp-${GMP_VERSION}.tar.xz
 tar -xf gmp-${GMP_VERSION}.tar.xz
 cd gmp-${GMP_VERSION}
 patch -N -Z -p1 < ../scripts/fat_build_fix.diff
-if [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "cygwin" ]
-then
-  patch -N -Z -p0 < ../scripts/dll-importexport.diff
-fi
+patch -N -Z -p0 < ../scripts/dll-importexport.diff
+patch -N -Z -p1 < ../scripts/gcc15.diff
+autoreconf -fi
 
 unset CFLAGS
 

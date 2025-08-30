@@ -47,7 +47,7 @@ Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-tests = ["pytest", "hypothesis", "mpmath>=1.4.0a6"]
+tests = ["pytest", "hypothesis", "mpmath>=1.4.0a7"]
 docs = ["sphinx>=8.2"]
 develop = ["python-gmp[tests,docs]", "pre-commit", "pyperf"]
 
@@ -88,3 +88,4 @@ repair-wheel-command = """delvewheel repair -w {dest_dir} {wheel} \
 
 [tool.cibuildwheel.windows.environment]
 PYTEST_ADDOPTS = "--verbose"
+CFLAGS = "-Wall -Wpedantic -Werror -std=c17 -Wconversion"

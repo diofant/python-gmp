@@ -1,6 +1,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#if defined(__MINGW32__) && defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
 #if defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wnewline-eof" /* XXX: pypy/pypy#5312 */
@@ -21,6 +25,9 @@
 #  pragma GCC diagnostic pop
 #endif
 #if defined(__clang__)
+#  pragma GCC diagnostic pop
+#endif
+#if defined(__MINGW32__) && defined(__GNUC__)
 #  pragma GCC diagnostic pop
 #endif
 

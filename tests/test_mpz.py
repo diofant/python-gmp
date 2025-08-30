@@ -1,4 +1,5 @@
 import cmath
+import inspect
 import locale
 import math
 import operator
@@ -410,6 +411,10 @@ def test_binary_bulk(x, y):
 
 
 @given(bigints(), bigints())
+@example(1, 1<<67)
+@example(1, -(1<<67))
+@example(-2, -1)
+@example(2, -1)
 def test_binary_commutative(x, y):
     mx = mpz(x)
     my = mpz(y)
@@ -1028,3 +1033,12 @@ def test_mpz_collatz(xs):
     with ThreadPoolExecutor(max_workers=7) as tpe:
         futures = [tpe.submit(f, mpz(x)) for x in xs]
         assert all(f.result() == 1 for f in futures)
+
+
+def test_int_api():
+    for meth in dir(int):
+        m = getattr(int, meth)
+        if meth.startswith("_") or not callable(m):
+            continue
+        mz = getattr(mpz, meth)
+        assert inspect.signature(m) == inspect.signature(mz)

@@ -1,6 +1,8 @@
 import gc
 import platform
 import random
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from gmp import fac, mpz
@@ -53,3 +55,22 @@ def test_square_outofmem():
                 break
             i += 1
         resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+
+
+@pytest.mark.skipif(platform.python_implementation() == "PyPy",
+                    reason="XXX: pypy/pypy#5325")
+def test_square_with_threads():
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    def f(n, barrier):
+        barrier.wait()
+        resource.setrlimit(resource.RLIMIT_AS, (VMEM_LIMIT, hard))
+        for i in range(100):
+            n = n*n
+        return n
+    num_threads = 7
+    with ThreadPoolExecutor(max_workers=num_threads) as tpe:
+        futures = []
+        barrier = threading.Barrier(num_threads)
+        for i in range(num_threads):
+            futures.append(tpe.submit(f, mpz(10 + 201*i), barrier))
+    resource.setrlimit(resource.RLIMIT_AS, (soft, hard))

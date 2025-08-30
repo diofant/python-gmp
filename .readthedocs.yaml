@@ -1,4 +1,8 @@
 version: 2
+submodules:
+  include:
+    - libzz
+  recursive: true
 formats:
     - htmlzip
     - pdf

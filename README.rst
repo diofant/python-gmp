@@ -6,8 +6,8 @@ Python extension module, gmp, providing safe bindings to the GNU GMP (version
 
 The gmp can be used as a `gmpy2`_/`python-flint`_ replacement to provide
 integer type (`mpz`_), compatible with Python's `int`_.  It includes few
-functions (`factorial`_, `gcd`_ and `isqrt`_), compatible with the Python
-stdlib's module `math`_.
+functions (`comb`_, `factorial`_, `gcd`_, `isqrt`_, `lcm`_ and `perm`_),
+compatible with the Python stdlib's module `math`_.
 
 This module requires Python 3.9 or later versions and has been tested with
 CPython 3.9 through 3.14, with PyPy 3.11 and with GraalPy 24.2.  Free-threading
@@ -89,4 +89,7 @@ The gmp module handles such errors correctly:
 .. _factorial: https://python-gmp.readthedocs.io/en/latest/#gmp.factorial
 .. _gcd: https://python-gmp.readthedocs.io/en/latest/#gmp.gcd
 .. _isqrt: https://python-gmp.readthedocs.io/en/latest/#gmp.isqrt
+.. _lcm: https://python-gmp.readthedocs.io/en/latest/#gmp.lcm
+.. _comb: https://python-gmp.readthedocs.io/en/latest/#gmp.comb
+.. _perm: https://python-gmp.readthedocs.io/en/latest/#gmp.perm
 .. _math: https://docs.python.org/3/library/math.html#number-theoretic-functions
