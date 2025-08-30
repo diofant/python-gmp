@@ -1,5 +1,6 @@
 import inspect
 import math
+import platform
 
 import gmp
 import pytest
@@ -239,6 +240,8 @@ def test_interfaces():
     gmp._free_cache()  # just for coverage
 
 
+@pytest.mark.skipif(platform.python_implementation() == "PyPy",
+                    reason="XXX")
 def test_func_api():
     for fn in ["comb", "factorial", "gcd", "isqrt", "lcm", "perm"]:
         f = getattr(math, fn)

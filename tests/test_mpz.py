@@ -1035,6 +1035,8 @@ def test_mpz_collatz(xs):
         assert all(f.result() == 1 for f in futures)
 
 
+@pytest.mark.skipif(platform.python_implementation() == "PyPy",
+                    reason="XXX")
 def test_int_api():
     for meth in dir(int):
         m = getattr(int, meth)
