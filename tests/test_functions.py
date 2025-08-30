@@ -1,3 +1,4 @@
+import inspect
 import math
 
 import gmp
@@ -236,3 +237,10 @@ def test_interfaces():
     with pytest.raises(ValueError, match="invalid rounding mode specified"):
         _mpmath_normalize(1, mpz(111), 11, 12, 13, 1j)
     gmp._free_cache()  # just for coverage
+
+
+def test_func_api():
+    for fn in ["comb", "factorial", "gcd", "isqrt", "lcm", "perm"]:
+        f = getattr(math, fn)
+        fz = getattr(gmp, fn)
+        assert inspect.signature(f) == inspect.signature(fz)
