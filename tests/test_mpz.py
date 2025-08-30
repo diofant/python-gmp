@@ -1035,7 +1035,8 @@ def test_mpz_collatz(xs):
         assert all(f.result() == 1 for f in futures)
 
 
-@pytest.mark.skipif(platform.python_implementation() != "CPython",
+@pytest.mark.skipif(platform.python_implementation() != "CPython"
+                    or sys.version_info < (3, 13),
                     reason="no way to specify a signature")
 def test_int_api():
     for meth in dir(int):
