@@ -700,8 +700,8 @@ zz_to_bytes(const zz_t *u, size_t length, bool is_signed, uint8_t **buffer)
     size_t nbits = zz_bitlen(u);
 
     if (nbits > 8*length
-        || (is_signed && nbits
-            && (nbits == 8 * length ? !is_negative : is_negative)))
+        || (is_signed && ((!nbits && is_negative)
+            || (nbits && (nbits == 8 * length ? !is_negative : is_negative)))))
     {
 overflow:
         zz_clear(&tmp);

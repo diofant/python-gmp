@@ -374,18 +374,27 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
         }
         return bytes;
     }
-    Py_DECREF(bytes);
     if (ret == ZZ_BUF) {
         if (zz_isneg(&u->z) && !is_signed) {
             PyErr_SetString(PyExc_OverflowError,
                             "can't convert negative mpz to unsigned");
         }
         else {
+#if (PY_VERSION_HEX < 0x030D08F0 || (PY_VERSION_HEX >= 0x030E0000 \
+                                     && PY_VERSION_HEX < 0x030E00C3))
+            if (!length && zz_cmp_i32(&u->z, -1) == ZZ_EQ) {
+                return bytes;
+            }
+#endif
             PyErr_SetString(PyExc_OverflowError, "int too big to convert");
         }
+        Py_DECREF(bytes);
         return NULL;
     }
-    return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
+    /* LCOV_EXCL_START */
+    Py_DECREF(bytes);
+    return PyErr_NoMemory();
+    /* LCOV_EXCL_STOP */
 }
 
 static MPZ_Object *
