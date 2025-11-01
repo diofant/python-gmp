@@ -50,7 +50,7 @@ jobs:
           lcov --remove coverage.info "*.h" --ignore-errors unused \
                --output-file coverage.info
           cp coverage.info build/coverage-${{ matrix.python-version }}.info
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: coverage-${{ matrix.python-version }}
           path: |
@@ -73,7 +73,7 @@ jobs:
           path: build/
           merge-multiple: true
       - run: genhtml build/coverage*.info --hierarchical --output-directory build/coverage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: coverage
           path: |

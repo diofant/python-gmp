@@ -15,7 +15,7 @@ jobs:
         python-version: "3.x"
     - run: pip install build
     - run: python -m build -s
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       with:
         name: python-gmp-sdist
         path: dist/
