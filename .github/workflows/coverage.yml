@@ -67,7 +67,7 @@ jobs:
           submodules: true
       - run: sudo apt-get update
       - run: sudo apt-get install lcov
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           pattern: coverage-*
           path: build/
