@@ -24,7 +24,7 @@ jobs:
           submodules: true
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          python-version: pypy3.11
       - uses: msys2/setup-msys2@v2.29.0
         with:
           install: >-
