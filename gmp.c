@@ -330,23 +330,15 @@ MPZ_to_int(MPZ_Object *u)
     (void)zz_export(&u->z, *int_layout, size, digits);
     return PyLongWriter_Finish(writer);
 #else
-    size_t len;
+    PyObject *str = MPZ_to_str(u, 16, 0);
 
-    (void)zz_sizeinbase(&u->z, 16, &len);
-
-    int8_t *buf = malloc(len + 1);
-
-    if (zz_to_str(&u->z, 16, buf, &len)) {
-        /* LCOV_EXCL_START */
-        free(buf);
-        return NULL;
-        /* LCOV_EXCL_STOP */
+    if (!str) {
+        return NULL; /* LCOV_EXCL_LINE */
     }
-    buf[len] = '\0';
 
-    PyObject *res = PyLong_FromString((char *)buf, NULL, 16);
+    PyObject *res = PyLong_FromUnicodeObject(str, 16);
 
-    free(buf);
+    Py_DECREF(str);
     return res;
 #endif
 }
