@@ -216,6 +216,7 @@ def test_format_interface():
 @example(-1329227995784915872903807060280344576)
 @example(1<<63)
 def test_from_to_int(x):
+    print(f"{x=:}", flush=True)
     sx = str(x)
     bx = bytes(sx, "ascii")
     bax = bytearray(sx, "ascii")
