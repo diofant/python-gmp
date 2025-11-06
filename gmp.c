@@ -309,12 +309,6 @@ MPZ_from_int(PyObject *obj)
 static PyObject *
 MPZ_to_int(MPZ_Object *u)
 {
-    int64_t value;
-
-    if (zz_to_i64(&u->z, &value) == ZZ_OK) {
-        return PyLong_FromInt64(value);
-    }
-
 #if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON) \
     && !defined(Py_LIMITED_API)
     const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
@@ -347,7 +341,9 @@ MPZ_to_int(MPZ_Object *u)
 
     PyObject *res = PyLong_FromString((char *)buf, NULL, 16);
 
+    printf("debug: hi1\n");
     free(buf);
+    printf("debug: hi2\n");
     return res;
 #endif
 }

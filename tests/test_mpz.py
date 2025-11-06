@@ -209,6 +209,7 @@ def test_format_interface():
 
 @given(bigints())
 @example(0)
+@example(-1)
 @example(123)
 @example(75424656551107706)
 @example(1284673497348563845623546741523784516734143215346712)
