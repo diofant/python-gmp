@@ -1433,33 +1433,39 @@ __round__(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     MPZ_Object *u = (MPZ_Object *)self;
 
     if (!nargs) {
-noop:
         return plus(self);
     }
 
-    MPZ_Object *ndigits = NULL;
+    PyObject *ndigits = PyNumber_Index(args[0]);
 
-    CHECK_OP_INT(ndigits, args[0]);
-
-    if (zz_isneg(&ndigits->z)) {
-        (void)zz_neg(&ndigits->z, &ndigits->z);
+    if (!ndigits) {
+        return NULL;
     }
-    else {
+    if (!PyLong_IsNegative(ndigits)) {
         Py_DECREF(ndigits);
-        goto noop;
+        return plus(self);
     }
 
-    MPZ_Object *ten = MPZ_new();
+    PyObject *tmp = PyNumber_Negative(ndigits);
 
-    if (!ten || zz_from_i32(10, &ten->z)) {
+    if (!tmp) {
         /* LCOV_EXCL_START */
         Py_DECREF(ndigits);
-        Py_XDECREF(ten);
+        return NULL;
+        /* LCOV_EXCL_STOP */
+    }
+    Py_SETREF(ndigits, tmp);
+
+    PyObject *ten = PyLong_FromLong(10);
+
+    if (!ten) {
+        /* LCOV_EXCL_START */
+        Py_DECREF(ndigits);
         return NULL;
         /* LCOV_EXCL_STOP */
     }
 
-    PyObject *p = power((PyObject *)ten, (PyObject *)ndigits, Py_None);
+    PyObject *p = power(ten, ndigits, Py_None);
 
     Py_DECREF(ten);
     Py_DECREF(ndigits);
@@ -1494,8 +1500,6 @@ noop:
     }
     Py_DECREF(r);
     return (PyObject *)res;
-end:
-    return NULL;
 }
 
 static PyObject *
