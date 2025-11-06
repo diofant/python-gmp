@@ -343,6 +343,7 @@ MPZ_to_int(MPZ_Object *u)
         /* LCOV_EXCL_STOP */
     }
     buf[len] = '\0';
+    printf("debug: buf=%s len=%lu\n", (char *)buf, len);
 
     PyObject *res = PyLong_FromString((char *)buf, NULL, 16);
 
