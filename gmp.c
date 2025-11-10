@@ -307,7 +307,7 @@ MPZ_from_int(PyObject *obj)
 static PyObject *
 MPZ_to_int(MPZ_Object *u)
 {
-    int64_t value;
+    zz_slimb_t value;
 
     if (zz_to_sl(&u->z, &value) == ZZ_OK) {
         return PyLong_FromInt64(value);
@@ -749,7 +749,7 @@ hash(PyObject *self)
     Py_hash_t r;
 
     assert(-(uint64_t)INT64_MIN > PyHASH_MODULUS);
-    (void)zz_rem_ul(&u->z, (uint64_t)PyHASH_MODULUS, ZZ_RNDD, (uint64_t *)&r);
+    (void)zz_rem_ul(&u->z, (zz_limb_t)PyHASH_MODULUS, ZZ_RNDD, (zz_limb_t *)&r);
     if (negative) {
         (void)zz_neg(&u->z, &u->z);
         r = -r;
@@ -1114,10 +1114,10 @@ power(PyObject *self, PyObject *other, PyObject *module)
         }
         res = MPZ_new();
 
-        int64_t exp;
+        zz_slimb_t exp;
 
         if (!res || zz_to_sl(&v->z, &exp)
-            || zz_pow(&u->z, (uint64_t)exp, &res->z))
+            || zz_pow(&u->z, (zz_limb_t)exp, &res->z))
         {
             /* LCOV_EXCL_START */
             Py_CLEAR(res);
@@ -1838,7 +1838,7 @@ end:
             goto err;                                                    \
         }                                                                \
                                                                          \
-        int64_t n;                                                       \
+        zz_slimb_t n;                                                    \
                                                                          \
         if (zz_to_sl(&x->z, &n) || n > LONG_MAX) {                       \
             PyErr_Format(PyExc_OverflowError,                            \
@@ -1847,7 +1847,7 @@ end:
             goto err;                                                    \
         }                                                                \
         Py_XDECREF(x);                                                   \
-        if (zz_##name((uint64_t)n, &res->z)) {                           \
+        if (zz_##name((zz_limb_t)n, &res->z)) {                          \
             /* LCOV_EXCL_START */                                        \
             PyErr_NoMemory();                                            \
             goto err;                                                    \
@@ -1885,7 +1885,7 @@ gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
         goto err;
     }
 
-    int64_t n, k;
+    zz_slimb_t n, k;
 
     if ((zz_to_sl(&x->z, &n) || n > ULONG_MAX)
         || (zz_to_sl(&y->z, &k) || k > ULONG_MAX))
@@ -1897,7 +1897,7 @@ gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     }
     Py_XDECREF(x);
     Py_XDECREF(y);
-    if (zz_bin((uint64_t)n, (uint64_t)k, &res->z)) {
+    if (zz_bin((zz_limb_t)n, (zz_limb_t)k, &res->z)) {
         /* LCOV_EXCL_START */
         PyErr_NoMemory();
         goto err;
@@ -1934,7 +1934,7 @@ gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
         goto err;
     }
 
-    int64_t n, k;
+    zz_slimb_t n, k;
 
     if ((zz_to_sl(&x->z, &n) || n > ULONG_MAX)
         || (zz_to_sl(&y->z, &k) || k > ULONG_MAX))
@@ -1958,8 +1958,8 @@ gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
         goto err;
         /* LCOV_EXCL_STOP */
     }
-    if (zz_fac((uint64_t)n, &res->z)
-        || zz_fac((uint64_t)(n-k), &den->z)
+    if (zz_fac((zz_limb_t)n, &res->z)
+        || zz_fac((zz_limb_t)(n-k), &den->z)
         || zz_div(&res->z, &den->z, ZZ_RNDD, &res->z, NULL))
     {
         /* LCOV_EXCL_START */
@@ -2064,7 +2064,7 @@ do_rnd:
         zz_t tmp;
 
         if (zz_init(&tmp) || shift > INT64_MAX
-            || zz_from_sl((int64_t)shift, &tmp)
+            || zz_from_sl((zz_slimb_t)shift, &tmp)
             || zz_add(exp, &tmp, exp))
         {
             /* LCOV_EXCL_START */
@@ -2088,7 +2088,7 @@ do_rnd:
     zz_t tmp;
 
     if (zz_init(&tmp) || zbits > INT64_MAX
-        || zz_from_sl((int64_t)zbits, &tmp)
+        || zz_from_sl((zz_slimb_t)zbits, &tmp)
         || zz_add(exp, &tmp, exp))
     {
         /* LCOV_EXCL_START */
