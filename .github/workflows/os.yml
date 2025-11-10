@@ -12,9 +12,9 @@ jobs:
 #       include:
 #         - os: windows-2022
 #           shell: 'msys2 {0}'
-    defaults:
-      run:
-        shell: ${{ matrix.shell }}
+#   defaults:
+#     run:
+#       shell: ${{ matrix.shell }}
     env:
       PYTEST_ADDOPTS: --verbose --hypothesis-profile=default
       CFLAGS: -Wall -Wpedantic -Werror -std=c17 -Wconversion
