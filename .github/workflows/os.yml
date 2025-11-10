@@ -46,16 +46,17 @@ jobs:
       - run: bash scripts/cibw_before_all.sh
         if: steps.cache-gmp.outputs.cache-hit != 'true'
       - run: python -m pip install --upgrade pip
-      - run: pip --verbose wheel . -Csetup-args=-Dbuildtype=debug
+      - run: pip install --upgrade build
+      - run: python -m build --verbose -Csetup-args=-Dbuildtype=debug .
         env:
           PKG_CONFIG_PATH: ${{ github.workspace }}/.local/lib/pkgconfig
       - run: |
           pip install delvewheel
-          delvewheel repair *.whl
-          mv wheelhouse/*.whl .
+          delvewheel repair dist/*.whl
+          mv wheelhouse/*.whl dist/
         if: ${{ startsWith(matrix.os, 'windows') }}
       - run: |
-          pip install --verbose *.whl
+          pip install --verbose dist/*.whl
           pip install --verbose python-gmp[tests]
       - run: pytest
         env:
