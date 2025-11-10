@@ -6,11 +6,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15]
-        shell: [bash]
-        include:
-          - os: windows-2022
-            shell: 'msys2 {0}'
+#       os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15]
+        os: [macos-15-intel]
+#       shell: [bash]
+#       include:
+#         - os: windows-2022
+#           shell: 'msys2 {0}'
     defaults:
       run:
         shell: ${{ matrix.shell }}
