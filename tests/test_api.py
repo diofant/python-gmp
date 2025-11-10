@@ -51,15 +51,15 @@ class zz_rnd(IntEnum):
 libzz = CDLL("libzz.so")
 zz_setup = libzz.zz_setup
 zz_finish = libzz.zz_finish
-zz_from_i64 = libzz.zz_from_i64
-zz_cmp_i32 = libzz.zz_cmp_i32
+zz_from_sl = libzz.zz_from_sl
+zz_cmp_sl = libzz.zz_cmp_sl
 zz_cmp = libzz.zz_cmp
-zz_add_i32 = libzz.zz_add_i32
+zz_add_sl = libzz.zz_add_sl
 zz_lsbpos = libzz.zz_lsbpos
 zz_export = libzz.zz_export
 zz_mul = libzz.zz_mul
 zz_div = libzz.zz_div
-zz_rem_u64 = libzz.zz_rem_u64
+zz_rem_ul = libzz.zz_rem_ul
 zz_mul_2exp = libzz.zz_mul_2exp
 zz_quo_2exp = libzz.zz_quo_2exp
 zz_pow = libzz.zz_pow
@@ -78,23 +78,23 @@ def libzz_setup_teardown():
     zz_finish()
 
 
-def test_zz_cmp_i32():
-    assert zz_from_i64(13, u) == zz_err.ZZ_OK
-    assert zz_cmp_i32(u, 1) == zz_ord.ZZ_GT
-    assert zz_cmp_i32(u, 100) == zz_ord.ZZ_LT
+def test_zz_cmp_sl():
+    assert zz_from_sl(13, u) == zz_err.ZZ_OK
+    assert zz_cmp_sl(u, 1) == zz_ord.ZZ_GT
+    assert zz_cmp_sl(u, 100) == zz_ord.ZZ_LT
 
 
-def test_zz_add_i32():
-    assert zz_from_i64(0, u) == zz_err.ZZ_OK
-    assert zz_add_i32(u, 2, u) == zz_err.ZZ_OK
-    assert zz_cmp_i32(u, 2) == zz_ord.ZZ_EQ
-    assert zz_from_i64(0, u) == zz_err.ZZ_OK
-    assert zz_add_i32(u, 0, u) == zz_err.ZZ_OK
-    assert zz_cmp_i32(u, 0) == zz_ord.ZZ_EQ
+def test_zz_add_sl():
+    assert zz_from_sl(0, u) == zz_err.ZZ_OK
+    assert zz_add_sl(u, 2, u) == zz_err.ZZ_OK
+    assert zz_cmp_sl(u, 2) == zz_ord.ZZ_EQ
+    assert zz_from_sl(0, u) == zz_err.ZZ_OK
+    assert zz_add_sl(u, 0, u) == zz_err.ZZ_OK
+    assert zz_cmp_sl(u, 0) == zz_ord.ZZ_EQ
 
 
 def test_zz_lsbpos():
-    assert zz_from_i64(0, u) == zz_err.ZZ_OK
+    assert zz_from_sl(0, u) == zz_err.ZZ_OK
     assert zz_lsbpos(u, 0) == 0
 
 
@@ -102,51 +102,51 @@ def test_zz_lsbpos():
                     reason=("NotImplementedError: Passing structs "
                             "by value is not supported on NFI backend"))
 def test_zz_export():
-    assert zz_from_i64(123, u) == zz_err.ZZ_OK
+    assert zz_from_sl(123, u) == zz_err.ZZ_OK
     assert zz_export(u, int_layout, 0, 0) == zz_err.ZZ_VAL
 
 
 def test_zz_to_str():
-    assert zz_from_i64(123, u) == zz_err.ZZ_OK
+    assert zz_from_sl(123, u) == zz_err.ZZ_OK
     p = c_int8()
     s = c_size_t()
     assert zz_to_str(u, 38, byref(p), byref(s)) == zz_err.ZZ_VAL
 
 
 def test_zz_mul():
-    assert zz_from_i64(2, u) == zz_err.ZZ_OK
-    assert zz_from_i64(3, v) == zz_err.ZZ_OK
+    assert zz_from_sl(2, u) == zz_err.ZZ_OK
+    assert zz_from_sl(3, v) == zz_err.ZZ_OK
     assert zz_mul(u, v, u) == zz_err.ZZ_OK
-    assert zz_cmp_i32(u, 6) == zz_ord.ZZ_EQ
+    assert zz_cmp_sl(u, 6) == zz_ord.ZZ_EQ
     assert zz_mul(u, v, v) == zz_err.ZZ_OK
-    assert zz_cmp_i32(v, 18) == zz_ord.ZZ_EQ
+    assert zz_cmp_sl(v, 18) == zz_ord.ZZ_EQ
 
 
 def test_zz_div():
-    assert zz_from_i64(4, u) == zz_err.ZZ_OK
-    assert zz_from_i64(2, v) == zz_err.ZZ_OK
+    assert zz_from_sl(4, u) == zz_err.ZZ_OK
+    assert zz_from_sl(2, v) == zz_err.ZZ_OK
     assert zz_div(u, v, zz_rnd.ZZ_RNDD, v, None) == zz_err.ZZ_OK
-    assert zz_cmp_i32(v, 2) == zz_ord.ZZ_EQ
+    assert zz_cmp_sl(v, 2) == zz_ord.ZZ_EQ
     assert zz_div(u, v, 123, u, None) == zz_err.ZZ_VAL
     assert zz_div(u, v, zz_rnd.ZZ_RNDD, None, None) == zz_err.ZZ_VAL
 
 
-def test_zz_rem_u64():
-    assert zz_from_i64(123, u) == zz_err.ZZ_OK
+def test_zz_rem_ul():
+    assert zz_from_sl(123, u) == zz_err.ZZ_OK
     p = c_uint64(0)
-    assert zz_rem_u64(u, 0, zz_rnd.ZZ_RNDD, byref(p)) == zz_err.ZZ_VAL
-    assert zz_from_i64(111, u) == zz_err.ZZ_OK
-    assert zz_rem_u64(u, 12, zz_rnd.ZZ_RNDD, byref(p)) == zz_err.ZZ_OK
+    assert zz_rem_ul(u, 0, zz_rnd.ZZ_RNDD, byref(p)) == zz_err.ZZ_VAL
+    assert zz_from_sl(111, u) == zz_err.ZZ_OK
+    assert zz_rem_ul(u, 12, zz_rnd.ZZ_RNDD, byref(p)) == zz_err.ZZ_OK
     assert p.value == 3
-    assert zz_from_i64(-111, u) == zz_err.ZZ_OK
-    assert zz_rem_u64(u, 12, zz_rnd.ZZ_RNDD, byref(p)) == zz_err.ZZ_OK
+    assert zz_from_sl(-111, u) == zz_err.ZZ_OK
+    assert zz_rem_ul(u, 12, zz_rnd.ZZ_RNDD, byref(p)) == zz_err.ZZ_OK
     assert p.value == 9
 
 
 def test_zz_quo_2exp():
-    assert zz_from_i64(c_int64(0x7fffffffffffffff), u) == zz_err.ZZ_OK
+    assert zz_from_sl(c_int64(0x7fffffffffffffff), u) == zz_err.ZZ_OK
     assert zz_mul_2exp(u, 1, u) == zz_err.ZZ_OK
-    assert zz_add_i32(u, 1, u) == zz_err.ZZ_OK
+    assert zz_add_sl(u, 1, u) == zz_err.ZZ_OK
     assert zz_mul_2exp(u, 64, u) == zz_err.ZZ_OK
     assert zz_quo_2exp(u, 64, u) == zz_err.ZZ_OK
     a = cast(u, POINTER(zz_t_struct)).contents
@@ -154,34 +154,34 @@ def test_zz_quo_2exp():
     assert a.alloc >= 1
     assert a.size == 1
     assert a.digits[0] == 0xffffffffffffffff
-    assert zz_from_i64(c_int64(0x7fffffffffffffff), v) == zz_err.ZZ_OK
+    assert zz_from_sl(c_int64(0x7fffffffffffffff), v) == zz_err.ZZ_OK
     assert zz_mul_2exp(v, 1, v) == zz_err.ZZ_OK
-    assert zz_add_i32(v, 1, v) == zz_err.ZZ_OK
+    assert zz_add_sl(v, 1, v) == zz_err.ZZ_OK
     assert zz_cmp(u, v) == zz_ord.ZZ_EQ
 
 
 def test_zz_pow():
-    assert zz_from_i64(2, u) == zz_err.ZZ_OK
+    assert zz_from_sl(2, u) == zz_err.ZZ_OK
     assert zz_pow(u, 2, u) == zz_err.ZZ_OK
-    assert zz_cmp_i32(u, 4) == zz_ord.ZZ_EQ
+    assert zz_cmp_sl(u, 4) == zz_ord.ZZ_EQ
 
 
 def test_zz_sqrtrem():
-    assert zz_from_i64(4, u) == zz_err.ZZ_OK
-    assert zz_from_i64(0, v) == zz_err.ZZ_OK
+    assert zz_from_sl(4, u) == zz_err.ZZ_OK
+    assert zz_from_sl(0, v) == zz_err.ZZ_OK
     assert zz_sqrtrem(u, u, v) == zz_err.ZZ_OK
-    assert zz_cmp_i32(u, 2) == zz_ord.ZZ_EQ
-    assert zz_cmp_i32(v, 0) == zz_ord.ZZ_EQ
+    assert zz_cmp_sl(u, 2) == zz_ord.ZZ_EQ
+    assert zz_cmp_sl(v, 0) == zz_ord.ZZ_EQ
 
 def test_zz_powm():
-    assert zz_from_i64(12, u) == zz_err.ZZ_OK
-    assert zz_from_i64(4, v) == zz_err.ZZ_OK
-    assert zz_from_i64(7, w) == zz_err.ZZ_OK
+    assert zz_from_sl(12, u) == zz_err.ZZ_OK
+    assert zz_from_sl(4, v) == zz_err.ZZ_OK
+    assert zz_from_sl(7, w) == zz_err.ZZ_OK
     assert zz_powm(u, v, w, u) == zz_err.ZZ_OK
-    assert zz_cmp_i32(u, 2) == zz_ord.ZZ_EQ
-    assert zz_from_i64(12, u) == zz_err.ZZ_OK
+    assert zz_cmp_sl(u, 2) == zz_ord.ZZ_EQ
+    assert zz_from_sl(12, u) == zz_err.ZZ_OK
     assert zz_powm(u, v, w, v) == zz_err.ZZ_OK
-    assert zz_cmp_i32(v, 2) == zz_ord.ZZ_EQ
-    assert zz_from_i64(4, v) == zz_err.ZZ_OK
+    assert zz_cmp_sl(v, 2) == zz_ord.ZZ_EQ
+    assert zz_from_sl(4, v) == zz_err.ZZ_OK
     assert zz_powm(u, v, w, w) == zz_err.ZZ_OK
-    assert zz_cmp_i32(w, 2) == zz_ord.ZZ_EQ
+    assert zz_cmp_sl(w, 2) == zz_ord.ZZ_EQ
