@@ -18,7 +18,7 @@ jobs:
     env:
       PYTEST_ADDOPTS: --verbose --hypothesis-profile=default
       CFLAGS: -Wall -Wpedantic -Werror -std=c17 -Wconversion
-      MACOSX_DEPLOYMENT_TARGET: 10.15
+#     MACOSX_DEPLOYMENT_TARGET: 10.15
     steps:
       - uses: actions/checkout@v5
         with:
@@ -26,7 +26,7 @@ jobs:
           submodules: true
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          python-version: 3.13
       - uses: msys2/setup-msys2@v2.29.0
         with:
           install: >-
