@@ -57,6 +57,12 @@ jobs:
           mv wheelhouse/*.whl dist/
         if: ${{ startsWith(matrix.os, 'windows') }}
       - run: |
+          lipo -info $(which python)
+          pip install delocate
+          delocate-wheel --require-archs x86_64 -w wheelhouse -v dist/*.whl
+          mv wheelhouse/*.whl dist/
+        if: ${{ startsWith(matrix.os, 'macos') }}
+      - run: |
           pip install --verbose dist/*.whl
           pip install --verbose python-gmp[tests]
       - run: pytest
