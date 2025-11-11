@@ -84,6 +84,11 @@ def test_zz_cmp_sl():
     assert zz_cmp_sl(u, 100) == zz_ord.ZZ_LT
 
 
+def test_zz_cmp():
+    assert zz_from_sl(13, u) == zz_err.ZZ_OK
+    assert zz_cmp(u, u) == zz_ord.ZZ_EQ
+
+
 def test_zz_add_sl():
     assert zz_from_sl(0, u) == zz_err.ZZ_OK
     assert zz_add_sl(u, 2, u) == zz_err.ZZ_OK
