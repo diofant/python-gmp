@@ -18,6 +18,7 @@ jobs:
     env:
       PYTEST_ADDOPTS: --verbose --hypothesis-profile=default
       CFLAGS: -Wall -Wpedantic -Werror -std=c17 -Wconversion
+      MACOSX_DEPLOYMENT_TARGET: 10.15
     steps:
       - uses: actions/checkout@v5
         with:
@@ -38,36 +39,36 @@ jobs:
           msystem: ucrt64
           path-type: inherit
         if: ${{ startsWith(matrix.os, 'windows') }}
-#     - name: Cache GNU GMP builds
-#       id: cache-gmp
-#       uses: actions/cache@v4
-#       with:
-#         path: .local
-#         key: ${{ matrix.os }}-${{ hashFiles('scripts/*') }}
-#     - run: bash scripts/cibw_before_all.sh
-#       if: steps.cache-gmp.outputs.cache-hit != 'true'
-#     - run: python -m pip install --upgrade pip
-#     - run: pip install --upgrade build
-#     - run: python -m build --verbose -Csetup-args=-Dbuildtype=debug .
-#       env:
-#         PKG_CONFIG_PATH: ${{ github.workspace }}/.local/lib/pkgconfig
-#     - run: |
-#         pip install delvewheel
-#         delvewheel repair dist/*.whl
-#         mv wheelhouse/*.whl dist/
-#       if: ${{ startsWith(matrix.os, 'windows') }}
+      - name: Cache GNU GMP builds
+        id: cache-gmp
+        uses: actions/cache@v4
+        with:
+          path: .local
+          key: ${{ matrix.os }}-${{ hashFiles('scripts/*') }}
+      - run: bash scripts/cibw_before_all.sh
+        if: steps.cache-gmp.outputs.cache-hit != 'true'
+      - run: python -m pip install --upgrade pip
+      - run: pip install --upgrade build
+      - run: python -m build --verbose -Csetup-args=-Dbuildtype=debug .
+        env:
+          PKG_CONFIG_PATH: ${{ github.workspace }}/.local/lib/pkgconfig
+      - run: |
+          pip install delvewheel
+          delvewheel repair dist/*.whl
+          mv wheelhouse/*.whl dist/
+        if: ${{ startsWith(matrix.os, 'windows') }}
 #     - run: |
 #         lipo -info $(which python)
 #         pip install delocate
 #         delocate-wheel --require-archs x86_64 -w wheelhouse -v dist/*.whl
 #         mv wheelhouse/*.whl dist/
 #       if: ${{ startsWith(matrix.os, 'macos') }}
-#     - run: |
-#         pip install --verbose dist/*.whl
-#         pip install --verbose python-gmp[tests]
       - run: |
-          pip install --verbose *.whl
+          pip install --verbose dist/*.whl
           pip install --verbose python-gmp[tests]
+#     - run: |
+#         pip install --verbose *.whl
+#         pip install --verbose python-gmp[tests]
       - run: pytest
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/.local/lib
