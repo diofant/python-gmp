@@ -19,7 +19,7 @@ jobs:
     env:
       PYTEST_ADDOPTS: --verbose --hypothesis-profile=default
       CFLAGS: -Wall -Wpedantic -Werror -std=c17 -Wconversion
-#     MACOSX_DEPLOYMENT_TARGET: 10.15
+      MACOSX_DEPLOYMENT_TARGET: 10.15
     steps:
       - uses: actions/checkout@v5
         with:
