@@ -34,9 +34,7 @@ from test_utils import (
 
 @given(bigints(min_value=0))
 def test_isqrt(x):
-    print(f"{x=:}", flush=True)
     mx = mpz(x)
-    print("done", flush=True)
     for fm, f in [(isqrt, math.isqrt), (isqrt_rem, python_isqrtrem)]:
         r = f(x)
         assert fm(mx) == r
