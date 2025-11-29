@@ -17,18 +17,26 @@ do
   patch --strip 1 < $f
 done
 
+CONFIG_ARGS="--enable-shared --disable-static --with-pic --prefix=$PREFIX"
+if [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "cygwin" ]
+then
+  if [ "${RUNNER_ARCH}" = "ARM64" ]
+  then
+    autoreconf -fi
+    CONFIG_ARGS="${CONFIG_ARGS} --disable-assembly"
+  else
+    CONFIG_ARGS="${CONFIG_ARGS} --enable-fat"
+  fi
+else
+  CONFIG_ARGS="${CONFIG_ARGS} --enable-fat"
+fi
+
 # config.guess uses microarchitecture and configfsf.guess doesn't
 # We replace config.guess with configfsf.guess to avoid microarchitecture
 # specific code in common code.
 rm config.guess && mv configfsf.guess config.guess && chmod +x config.guess
 
-./configure --enable-fat \
-            --enable-shared \
-            --disable-static \
-            --with-pic \
-            --disable-alloca \
-            --prefix=$PREFIX \
-            --quiet
+./configure ${CONFIG_ARGS}
 
 make --silent all install
 
