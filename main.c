@@ -2009,7 +2009,13 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
             return NULL;
             /* LCOV_EXCL_STOP */
         }
-        if (tmp->size < u->size) {
+        if (tmp->size < u->size
+#if (PY_VERSION_HEX >= 0x030D08F0 && (PY_VERSION_HEX < 0x030E0000 \
+                                      || PY_VERSION_HEX >= 0x030E00C3))
+            || (u->size == 1 && u->digits[0] == 1 && !length)
+#endif
+           )
+        {
             goto overflow;
         }
         mpn_zero(tmp->digits, tmp->size);
