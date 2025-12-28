@@ -2,12 +2,24 @@
 
 set -e -x
 
+PREFIX=${PREFIX:-"$(pwd)/.local"}
+CFLAGS=
+CURL_OPTS="--fail --location --retry 4 --connect-timeout 32"
+
+download () {
+  sleep_ivl=16
+  until curl ${CURL_OPTS} --remote-name $1
+  do
+    sleep ${sleep_ivl}
+    sleep_ivl=$((${sleep_ivl}*2))
+  done
+}
+
 GMP_VERSION=6.3.0
+GMP_DIR=gmp-${GMP_VERSION}
+GMP_URL=https://ftp.gnu.org/gnu/gmp/${GMP_DIR}.tar.xz
 
-PREFIX="$(pwd)/.local/"
-
-# -- build GMP --
-curl -s -O https://ftp.gnu.org/gnu/gmp/gmp-${GMP_VERSION}.tar.xz
+download ${GMP_URL}
 tar -xf gmp-${GMP_VERSION}.tar.xz
 cd gmp-${GMP_VERSION}
 patch -N -Z -p1 < ../scripts/fat_build_fix.diff
