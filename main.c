@@ -2028,6 +2028,12 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
     {
 overflow:
         Py_XDECREF(tmp);
+#if (PY_VERSION_HEX < 0x030D08F0 || (PY_VERSION_HEX >= 0x030E0000 \
+                                     && PY_VERSION_HEX < 0x030E00C3))
+        if (is_signed && !length && is_negative && !u->size) {
+            return PyBytes_FromStringAndSize(NULL, 0);
+        }
+#endif
         PyErr_SetString(PyExc_OverflowError, "int too big to convert");
         return NULL;
     }
