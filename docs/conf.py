@@ -55,7 +55,7 @@ latex_documents = [("index", "python-gmp.tex", "python-gmp Documentation",
 # Python code that is treated like it were put in a testsetup directive for
 # every file that is tested, and for every group.
 doctest_global_setup = """
-from fractions import Decimal
+from decimal import Decimal
 
 from gmp import mpq
 """
