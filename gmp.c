@@ -2511,7 +2511,7 @@ do_rnd:
                     if (zz_quo_2exp(man, shift - 1, man)) {
                         return ZZ_MEM; /* LCOV_EXCL_LINE */
                     }
-                    t = zz_isodd(man) && (man->digits[0]&2 || t);
+                    t = zz_isodd(man) && (zz_lsbpos(man) == 1 || t);
                     if (zz_quo_2exp(man, 1, man)) {
                         return ZZ_MEM; /* LCOV_EXCL_LINE */
                     }
