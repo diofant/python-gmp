@@ -1193,8 +1193,7 @@ zz_truediv(const zz_t *u, const zz_t *v, double *res)
     }
 
     int shift = (int)(vbits - ubits);
-    int n = shift, whole = n / bits_per_digit;
-    zz_t a, b;
+    zz_t a, b, c;
 
     if (zz_init(&a) || zz_init(&b) || zz_abs(u, &a) || zz_abs(v, &b)) {
         /* LCOV_EXCL_START */
@@ -1204,60 +1203,41 @@ tmp_clear:
         return ZZ_MEM;
         /* LCOV_EXCL_STOP */
     }
-    if (shift < 0) {
-        const zz_t *t = u;
-
-        u = v;
-        v = t;
-        n = -n;
-        whole = -whole;
-    }
     /*                       -shift - 1             -shift
       find shift satisfying 2           <= |a/b| < 2       */
-    n %= bits_per_digit;
-    for (zz_size_t i = v->size; i--;) {
-        zz_digit_t du, dv = v->digits[i];
-
-        if (i >= whole) {
-            if (i - whole < u->size) {
-                du = u->digits[i - whole] << n;
-            }
-            else {
-                du = 0;
-            }
-            if (n && i > whole) {
-                du |= u->digits[i - whole - 1] >> (bits_per_digit - n);
-            }
+    if (zz_init(&c) || zz_pos(&b, &c)) {
+        /* LCOV_EXCL_START */
+tmp_clear2:
+        zz_clear(&c);
+        goto tmp_clear;
+        /* LCOV_EXCL_STOP */
+    }
+    if (shift <= 0) {
+       if (shift && zz_mul_2exp(&b, (zz_bitcnt_t)-shift, &c)) {
+           goto tmp_clear2; /* LCOV_EXCL_LINE */
+       }
+       if (zz_cmp(&a, &c) != ZZ_LT) {
+           shift--;
+       }
+    }
+    else {
+        if (zz_mul_2exp(&a, (zz_bitcnt_t)shift, &c)) {
+           goto tmp_clear2; /* LCOV_EXCL_LINE */
         }
-        else {
-            du = 0;
-        }
-        if (du < dv) {
-            if (shift < 0) {
-                shift--;
-            }
-            break;
-        }
-        if (du > dv) {
-            if (shift >= 0) {
-                shift--;
-            }
-            break;
+        if (zz_cmp(&c, &b) != ZZ_LT) {
+            shift--;
         }
     }
+    zz_clear(&c);
     shift += DBL_MANT_DIG;
-    if (shift > 0 && zz_mul_2exp(&a, (uint64_t)shift, &a)) {
+    if (shift > 0 && zz_mul_2exp(&a, (zz_bitcnt_t)shift, &a)) {
         goto tmp_clear; /* LCOV_EXCL_LINE */
     }
-    if (shift < 0 && zz_mul_2exp(&b, (uint64_t)-shift, &b)) {
+    if (shift < 0 && zz_mul_2exp(&b, (zz_bitcnt_t)-shift, &b)) {
         goto tmp_clear; /* LCOV_EXCL_LINE */
     }
     if (zz_divnear(&a, &b, &a, NULL)) {
-        /* LCOV_EXCL_START */
-        zz_clear(&a);
-        zz_clear(&b);
-        return ZZ_MEM;
-        /* LCOV_EXCL_STOP */
+        goto tmp_clear; /* LCOV_EXCL_LINE */
     }
     zz_clear(&b);
     (void)zz_get(&a, res);
