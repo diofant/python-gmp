@@ -36,7 +36,7 @@ autodoc_default_options = {"members": True}
 
 # General information about the project.
 project = gmp.__package__
-copyright = "2024-2025, Sergey B Kirpichev"
+copyright = "2024-2026, Sergey B Kirpichev"
 gmp_version = packaging.version.parse(gmp.__version__)
 
 # The version info for the project you're documenting, acts as

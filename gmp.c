@@ -66,9 +66,7 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
     size_t len;
     bool negative = zz_isneg(&u->z), cast_abs = false;
 
-    if ((base < INT8_MIN || base > INT8_MAX)
-        || zz_sizeinbase(&u->z, (int8_t)base, &len))
-    {
+    if (zz_sizeinbase(&u->z, base, &len)) {
         PyErr_SetString(PyExc_ValueError,
                         "mpz base must be >= 2 and <= 36");
         return NULL;
@@ -82,13 +80,13 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
     }
     len++;
 
-    int8_t *buf = malloc(len), *p = buf;
+    char *buf = malloc(len), *p = buf;
 
     if (!buf) {
         return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
     if (options & OPT_TAG) {
-        strcpy((char *)p, MPZ_TAG);
+        strcpy(p, MPZ_TAG);
         p += strlen(MPZ_TAG);
     }
     if (options & OPT_PREFIX) {
@@ -117,7 +115,7 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
         (void)zz_abs(&u->z, &u->z);
     }
 
-    zz_err ret = zz_to_str(&u->z, (int8_t)base, p, &len);
+    zz_err ret = zz_to_str(&u->z, base, p, &len);
 
     if (cast_abs) {
         (void)zz_neg(&u->z, &u->z);
@@ -134,7 +132,7 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
     }
     *(p++) = '\0';
 
-    PyObject *res = PyUnicode_FromString((char *)buf);
+    PyObject *res = PyUnicode_FromString(buf);
 
     free(buf);
     return res;
@@ -144,12 +142,12 @@ static MPZ_Object *
 MPZ_from_str(PyObject *obj, int base)
 {
     Py_ssize_t len;
-    int8_t *str = (int8_t *)PyUnicode_AsUTF8AndSize(obj, &len);
+    const char *str = PyUnicode_AsUTF8AndSize(obj, &len);
 
     if (!str) {
         return NULL; /* LCOV_EXCL_LINE */
     }
-    if (base < 0 || base > INT8_MAX) {
+    if (base < 0) {
         goto bad_base;
     }
 
@@ -211,14 +209,14 @@ skip_negation:
         base = 10;
     }
 
-    int8_t *end = str + len - 1;
+    const char *end = str + len - 1;
 
     while (len > 0 && isspace(*end)) {
         end--;
         len--;
     }
 
-    zz_err ret = zz_from_str(str, (size_t)len, (int8_t)base, &res->z);
+    zz_err ret = zz_from_str(str, (size_t)len, base, &res->z);
 
     if (ret == ZZ_MEM) {
         /* LCOV_EXCL_START */
@@ -333,7 +331,7 @@ MPZ_to_int(MPZ_Object *u)
     (void)zz_sizeinbase(&u->z, 16, &len);
     len += zz_isneg(&u->z);
 
-    int8_t *buf = malloc(len + 1);
+    char *buf = malloc(len + 1);
 
     if (zz_to_str(&u->z, 16, buf, &len)) {
         /* LCOV_EXCL_START */
@@ -343,7 +341,7 @@ MPZ_to_int(MPZ_Object *u)
     }
     buf[len] = '\0';
 
-    PyObject *res = PyLong_FromString((char *)buf, NULL, 16);
+    PyObject *res = PyLong_FromString(buf, NULL, 16);
 
     free(buf);
     return res;
@@ -372,7 +370,7 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
         return NULL; /* LCOV_EXCL_LINE */
     }
 
-    uint8_t *buffer = (uint8_t *)PyBytes_AS_STRING(bytes);
+    unsigned char *buffer = (unsigned char *)PyBytes_AS_STRING(bytes);
     zz_err ret = zz_to_bytes(&u->z, (size_t)length, is_signed, &buffer);
 
     if (ret == ZZ_OK) {
@@ -408,7 +406,7 @@ static MPZ_Object *
 MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
 {
     PyObject *bytes = PyObject_Bytes(obj);
-    uint8_t *buffer;
+    unsigned char *buffer;
     Py_ssize_t length;
 
     if (bytes == NULL) {
@@ -421,7 +419,7 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
         is_little = 0;
     }
     if (is_little) {
-        uint8_t *tmp = malloc((size_t)length);
+        unsigned char *tmp = malloc((size_t)length);
 
         if (!tmp) {
             /* LCOV_EXCL_START */
@@ -1095,7 +1093,7 @@ err:
         /* LCOV_EXCL_STOP */
     }
 
-    zz_ord unexpect = v->negative ? ZZ_LT : ZZ_GT;
+    zz_ord unexpect = zz_isneg(v) ? ZZ_LT : ZZ_GT;
     zz_t halfQ;
 
     if (zz_init(&halfQ) || zz_quo_2exp(v, 1, &halfQ)) {
@@ -1108,9 +1106,7 @@ err:
     zz_ord cmp = zz_cmp(r, &halfQ);
 
     zz_clear(&halfQ);
-    if (cmp == ZZ_EQ && v->digits[0]%2 == 0 && q->size
-        && q->digits[0]%2 != 0)
-    {
+    if (cmp == ZZ_EQ && !zz_isodd(v) && !zz_iszero(q) && zz_isodd(q)) {
         cmp = unexpect;
     }
     if (cmp == unexpect && (zz_add_sl(q, 1, q) || zz_sub(r, v, r))) {
@@ -1122,11 +1118,11 @@ err:
 static zz_err
 zz_truediv(const zz_t *u, const zz_t *v, double *res)
 {
-    if (!v->size) {
+    if (zz_iszero(v)) {
         return ZZ_VAL;
     }
-    if (!u->size) {
-        *res = v->negative ? -0.0 : 0.0;
+    if (zz_iszero(u)) {
+        *res = zz_isneg(v) ? -0.0 : 0.0;
         return ZZ_OK;
     }
 
@@ -1137,7 +1133,7 @@ zz_truediv(const zz_t *u, const zz_t *v, double *res)
         return ZZ_BUF;
     }
     if (ubits < vbits && vbits - ubits > -DBL_MIN_EXP + DBL_MANT_DIG + 1) {
-        *res = u->negative != v->negative ? -0.0 : 0.0;
+        *res = zz_isneg(u) != zz_isneg(v) ? -0.0 : 0.0;
         return ZZ_OK;
     }
 
@@ -1212,7 +1208,7 @@ tmp_clear:
     (void)zz_to_double(&a, res);
     zz_clear(&a);
     *res = ldexp(*res, -shift);
-    if (u->negative != v->negative) {
+    if (zz_isneg(u) != zz_isneg(v)) {
         *res = -*res;
     }
     if (isinf(*res)) {
@@ -1424,10 +1420,10 @@ done:                                                                \
 static inline zz_err
 zz_and_sl(const zz_t *u, zz_slimb_t v, zz_t *w)
 {
-    if (!u->size || !v) {
+    if (zz_iszero(u) || !v) {
         return zz_from_sl(0, w);
     }
-    assert(!u->negative && v > 0);
+    assert(!zz_isneg(u) && v > 0);
     return zz_from_sl((zz_slimb_t)(u->digits[0] & (zz_limb_t)v), w);
 }
 #define zz_sl_and(x, y, r) zz_and_sl((y), (x), (r))
@@ -1442,10 +1438,13 @@ zz_lshift(const zz_t *u, const zz_t *v, zz_t *w)
     if (zz_isneg(v)) {
         return ZZ_VAL;
     }
-    if (v->size > 1) {
+
+    zz_slimb_t shift;
+
+    if (zz_to_sl(v, &shift)) {
         return ZZ_BUF;
     }
-    return zz_mul_2exp(u, v->size ? v->digits[0] : 0, w);
+    return zz_mul_2exp(u, (zz_bitcnt_t)shift, w);
 }
 
 static inline zz_err
@@ -1454,10 +1453,13 @@ zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
     if (zz_isneg(v)) {
         return ZZ_VAL;
     }
-    if (v->size > 1) {
+
+    zz_slimb_t shift;
+
+    if (zz_to_sl(v, &shift)) {
         return zz_from_sl(zz_isneg(u) ? -1 : 0, w);
     }
-    return zz_quo_2exp(u, v->size ? v->digits[0] : 0, w);
+    return zz_quo_2exp(u, (zz_bitcnt_t)shift, w);
 }
 
 BINOP_INT(lshift)

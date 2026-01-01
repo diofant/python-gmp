@@ -724,11 +724,11 @@ def test_power_errors():
         if platform.system() != "Darwin":
             with pytest.raises(MemoryError):
                 pow(mpz(1<<64), (1<<63))
-    with pytest.raises(MemoryError):
+    with pytest.raises(OverflowError):
         mpz(1) << ((1 << 64) - 1)
     if platform.system() != "Darwin":
         with pytest.raises(MemoryError):
-            mpz(1) << (1 << 63)
+            mpz(1) << ((1 << 63) - 1)
 
 
 @given(bigints(), integers(max_value=12345))

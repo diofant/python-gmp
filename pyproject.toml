@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "mesonpy"
-requires = ["meson-python", "setuptools_scm[toml]>=6.0"]
+requires = ["meson-python", "setuptools_scm[toml]>=9"]
 
 [project]
 name = "python-gmp"
@@ -44,10 +44,8 @@ Homepage = "https://github.com/diofant/python-gmp"
 "Bug Tracker" = "https://github.com/diofant/python-gmp/issues"
 Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 
-[tool.setuptools_scm]
-
 [project.optional-dependencies]
-tests = ["pytest", "hypothesis", "mpmath>=1.4.0a7"]
+tests = ["pytest", "hypothesis", "mpmath"]
 ci = ["python-gmp[tests]", "pytest-xdist"]
 docs = ["sphinx>=8.2"]
 develop = ["python-gmp[tests,docs]", "pre-commit", "pyperf"]
