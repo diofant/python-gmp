@@ -366,8 +366,13 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
         return NULL; /* LCOV_EXCL_LINE */
     }
 
+<<<<<<< HEAD
     uint8_t *buffer = (uint8_t *)PyBytes_AS_STRING(bytes);
     zz_err ret = zz_to_bytes(&u->z, (size_t)length, is_signed, &buffer);
+=======
+    unsigned char *buffer = (unsigned char *)PyBytes_AsString(bytes);
+    zz_err ret = zz_get_bytes(&u->z, (size_t)length, is_signed, &buffer);
+>>>>>>> adcc1bd (Use Limited API functions)
 
     if (ret == ZZ_OK) {
         if (is_little && length) {
@@ -534,10 +539,10 @@ str:
         const char *string;
 
         if (PyByteArray_Check(arg)) {
-            string = PyByteArray_AS_STRING(arg);
+            string = PyByteArray_AsString(arg);
         }
         else {
-            string = PyBytes_AS_STRING(arg);
+            string = PyBytes_AsString(arg);
         }
 
         PyObject *str = PyUnicode_FromString(string);
@@ -566,7 +571,7 @@ static PyObject *
 new(PyTypeObject *type, PyObject *args, PyObject *keywds)
 {
     static char *kwlist[] = {"", "base", NULL};
-    Py_ssize_t argc = PyTuple_GET_SIZE(args);
+    Py_ssize_t argc = PyTuple_Size(args);
     PyObject *arg, *base = Py_None;
 
     if (type != &MPZ_Type) {
@@ -597,7 +602,7 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
         return (PyObject *)MPZ_new(0);
     }
     if (argc == 1 && !keywds) {
-        arg = PyTuple_GET_ITEM(args, 0);
+        arg = PyTuple_GetItem(args, 0);
         return new_impl(type, arg, Py_None);
     }
     if (!PyArg_ParseTupleAndKeywords(args, keywds, "O|O",
@@ -1043,8 +1048,8 @@ nb_divmod(PyObject *self, PyObject *other)
     }
     Py_DECREF(u);
     Py_DECREF(v);
-    PyTuple_SET_ITEM(res, 0, (PyObject *)q);
-    PyTuple_SET_ITEM(res, 1, (PyObject *)r);
+    (void)PyTuple_SetItem(res, 0, (PyObject *)q);
+    (void)PyTuple_SetItem(res, 1, (PyObject *)r);
     return res;
     /* LCOV_EXCL_START */
 end:
@@ -1587,7 +1592,7 @@ to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
         PyObject *arg = args[argidx[1]];
 
         if (PyUnicode_Check(arg)) {
-            const char *byteorder = PyUnicode_AsUTF8(arg);
+            const char *byteorder = PyUnicode_AsUTF8AndSize(arg, NULL);
 
             if (!byteorder) {
                 return NULL; /* LCOV_EXCL_LINE */
@@ -1646,7 +1651,7 @@ from_bytes(PyTypeObject *Py_UNUSED(type), PyObject *const *args,
         PyObject *arg = args[argidx[1]];
 
         if (PyUnicode_Check(arg)) {
-            const char *byteorder = PyUnicode_AsUTF8(arg);
+            const char *byteorder = PyUnicode_AsUTF8AndSize(arg, NULL);
 
             if (!byteorder) {
                 return NULL; /* LCOV_EXCL_LINE */
@@ -2265,9 +2270,10 @@ invalid:
         return (zz_rnd)-1;
     }
 
-    Py_UCS4 rndchr = PyUnicode_READ_CHAR(rndstr, 0);
+    Py_UCS4 rndchr = PyUnicode_ReadChar(rndstr, 0);
     zz_rnd rnd = ZZ_RNDN;
 
+    assert(rndchr != -1);
     switch (rndchr) {
         case (Py_UCS4)'f':
             rnd = ZZ_RNDD;
@@ -2511,6 +2517,7 @@ gmp_exec(PyObject *m)
     if (gmp_info == NULL) {
         return -1; /* LCOV_EXCL_LINE */
     }
+<<<<<<< HEAD
     PyStructSequence_SET_ITEM(gmp_info, 0,
                               PyLong_FromLong(info.bits_per_limb));
     PyStructSequence_SET_ITEM(gmp_info, 1,
@@ -2524,6 +2531,12 @@ gmp_exec(PyObject *m)
                                                    info.version[0],
                                                    info.version[1],
                                                    info.version[2]));
+=======
+    PyStructSequence_SetItem(mpz_info, 0, PyLong_FromLong(bits_per_digit));
+    PyStructSequence_SetItem(mpz_info, 1, PyLong_FromLong(layout->digit_size));
+    PyStructSequence_SetItem(mpz_info, 2,
+                             PyLong_FromUInt64(zz_get_bitcnt_max()));
+>>>>>>> adcc1bd (Use Limited API functions)
     if (PyErr_Occurred()) {
         /* LCOV_EXCL_START */
         Py_DECREF(gmp_info);

@@ -17,7 +17,7 @@ gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
     Py_ssize_t nkws = 0;
 
     if (kwnames) {
-        nkws = PyTuple_GET_SIZE(kwnames);
+        nkws = PyTuple_Size(kwnames);
     }
     if (nkws > fnargs->maxpos) {
         PyErr_Format(PyExc_TypeError,
@@ -33,7 +33,8 @@ gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
         return -1;
     }
     for (Py_ssize_t i = 0; i < nkws; i++) {
-        const char *kwname = PyUnicode_AsUTF8(PyTuple_GET_ITEM(kwnames, i));
+        const char *kwname = PyUnicode_AsUTF8AndSize(PyTuple_GetItem(kwnames,
+                                                                     i), NULL);
         Py_ssize_t j = 0;
 
         for (; j < fnargs->maxargs; j++) {
@@ -65,11 +66,12 @@ gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
 PyObject *
 gmp_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
 {
+    assert(PyUnicode_Check(unicode));
     if (PyUnicode_IS_ASCII(unicode)) {
         return Py_NewRef(unicode);
     }
 
-    Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
+    Py_ssize_t len = PyUnicode_GetLength(unicode);
     PyObject *result = PyUnicode_New(len, 127);
 
     if (result == NULL) {

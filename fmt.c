@@ -487,6 +487,7 @@ _PyUnicode_InsertThousandsGrouping(_PyUnicodeWriter *writer,
     assert(0 <= d_pos);
     assert(0 <= n_digits);
     assert(grouping != NULL);
+    assert(PyUnicode_Check(thousands_sep));
 
     Py_ssize_t count = 0;
     Py_ssize_t n_zeros;
@@ -504,7 +505,7 @@ _PyUnicode_InsertThousandsGrouping(_PyUnicodeWriter *writer,
        returns 0. */
     GroupGenerator groupgen;
     GroupGenerator_init(&groupgen, grouping);
-    const Py_ssize_t thousands_sep_len = PyUnicode_GET_LENGTH(thousands_sep);
+    const Py_ssize_t thousands_sep_len = PyUnicode_GetLength(thousands_sep);
 
     /* if digits are not grouped, thousands separator
        should be an empty string */
@@ -513,8 +514,8 @@ _PyUnicode_InsertThousandsGrouping(_PyUnicodeWriter *writer,
     digits_pos = d_pos + n_digits;
     if (writer) {
         buffer_pos = writer->pos + n_buffer;
-        assert(buffer_pos <= PyUnicode_GET_LENGTH(writer->buffer));
-        assert(digits_pos <= PyUnicode_GET_LENGTH(digits));
+        assert(buffer_pos <= PyUnicode_GetLength(writer->buffer));
+        assert(digits_pos <= PyUnicode_GetLength(digits));
     }
     else {
         buffer_pos = n_buffer;
@@ -581,7 +582,7 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
     spec->n_digits = n_end - n_start - n_frac - n_remainder - (has_decimal?1:0);
     spec->n_lpadding = 0;
     spec->n_prefix = n_prefix;
-    spec->n_decimal = has_decimal ? PyUnicode_GET_LENGTH(locale->decimal_point) : 0;
+    spec->n_decimal = has_decimal ? PyUnicode_GetLength(locale->decimal_point) : 0;
     spec->n_remainder = n_remainder;
     spec->n_frac = n_frac;
     spec->n_spadding = 0;
@@ -1027,6 +1028,7 @@ format_long_internal(MPZ_Object *value, const InternalFormatSpec *format)
         }
         /* Do the hard part, converting to a string in a given base */
         tmp = MPZ_to_str(value, base, OPT_PREFIX);
+        assert(PyUnicode_Check(tmp));
         if (tmp == NULL) {
             goto done; /* LCOV_EXCL_LINE */
         }
@@ -1036,11 +1038,11 @@ format_long_internal(MPZ_Object *value, const InternalFormatSpec *format)
             n_prefix = leading_chars_to_skip;
         }
         inumeric_chars = 0;
-        n_digits = PyUnicode_GET_LENGTH(tmp);
+        n_digits = PyUnicode_GetLength(tmp);
         prefix = inumeric_chars;
         /* Is a sign character present in the output?  If so, remember it
            and skip it */
-        if (PyUnicode_READ_CHAR(tmp, inumeric_chars) == '-') {
+        if (PyUnicode_ReadChar(tmp, inumeric_chars) == '-') {
             sign_char = '-';
             ++prefix;
             ++leading_chars_to_skip;
@@ -1093,7 +1095,7 @@ extern PyObject * to_float(PyObject *self);
 PyObject *
 __format__(PyObject *self, PyObject *format_spec)
 {
-    Py_ssize_t end = PyUnicode_GET_LENGTH(format_spec);
+    Py_ssize_t end = PyUnicode_GetLength(format_spec);
 
     if (!end) {
        return PyObject_Str(self);
