@@ -2567,9 +2567,19 @@ gmp_exec(PyObject *m)
                        "gmp.fac = gmp.factorial\n"
                        "gmp.__all__ = ['factorial', 'gcd', 'isqrt', 'mpz']\n"
                        "gmp.__version__ = imp.version('python-gmp')\n");
+<<<<<<< HEAD
 
     PyObject *res = PyRun_String(str, Py_file_input, ns, ns);
+=======
+    PyObject *codeobj = Py_CompileString(str, "<file>", Py_file_input);
+    PyObject *res;
+>>>>>>> 1acdd24 (Use Py_CompileString and PyEval_EvalCode)
 
+    if (!codeobj) {
+        goto fail1; /* LCOV_EXCL_LINE */
+    }
+    res = PyEval_EvalCode(codeobj, ns, NULL);
+    Py_DECREF(codeobj);
     Py_DECREF(ns);
     if (!res) {
         return -1; /* LCOV_EXCL_LINE */
