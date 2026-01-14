@@ -436,7 +436,7 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
         if (is_little) {
             free(buffer);
         }
-        Py_XDECREF(res);
+        Py_XDECREF((PyObject *)res);
         return (MPZ_Object *)PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
@@ -661,7 +661,7 @@ str(PyObject *self)
 #define CHECK_OP(u, a)          \
     if (MPZ_Check(a)) {         \
         u = (MPZ_Object *)a;    \
-        Py_INCREF(u);           \
+        Py_INCREF(a);           \
     }                           \
     else if (PyLong_Check(a)) { \
         u = MPZ_from_int(a);    \
@@ -793,7 +793,26 @@ to_bool(PyObject *self)
     return !zz_iszero(&((MPZ_Object *)self)->z);
 }
 
+<<<<<<< HEAD
 #define BINOP_INT(suff)                                         \
+=======
+#define CHECK_OPv2(u, a)        \
+    if (MPZ_Check(a)) {         \
+        u = (MPZ_Object *)a;    \
+        Py_INCREF(a);           \
+    }                           \
+    else if (PyLong_Check(a)) { \
+        ;                       \
+    }                           \
+    else if (Number_Check(a)) { \
+        goto numbers;           \
+    }                           \
+    else {                      \
+        goto fallback;          \
+    }
+
+#define BINOP(suff, slot)                                       \
+>>>>>>> b6e969a (Add missing type casts for Py_XDECREF (for Limited API))
     static PyObject *                                           \
     nb_##suff(PyObject *self, PyObject *other)                  \
     {                                                           \
@@ -822,10 +841,11 @@ to_bool(PyObject *self)
             /* LCOV_EXCL_STOP */                                \
         }                                                       \
     end:                                                        \
-        Py_XDECREF(u);                                          \
-        Py_XDECREF(v);                                          \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
         return (PyObject *)res;                                 \
     fallback:                                                   \
+<<<<<<< HEAD
     numbers:                                                    \
         Py_XDECREF(u);                                          \
         Py_XDECREF(v);                                          \
@@ -901,6 +921,42 @@ to_bool(PyObject *self)
         Py_DECREF(uf);                                   \
         Py_DECREF(vf);                                   \
         return res;                                      \
+=======
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
+        Py_RETURN_NOTIMPLEMENTED;                               \
+    numbers:                                                    \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
+                                                                \
+        PyObject *uf, *vf, *rf;                                 \
+                                                                \
+        if (Number_Check(self)) {                               \
+            uf = self;                                          \
+            Py_INCREF(uf);                                      \
+        }                                                       \
+        else {                                                  \
+            uf = to_float(self);                                \
+            if (!uf) {                                          \
+                return NULL;                                    \
+            }                                                   \
+        }                                                       \
+        if (Number_Check(other)) {                              \
+            vf = other;                                         \
+            Py_INCREF(vf);                                      \
+        }                                                       \
+        else {                                                  \
+            vf = to_float(other);                               \
+            if (!vf) {                                          \
+                Py_DECREF(uf);                                  \
+                return NULL;                                    \
+            }                                                   \
+        }                                                       \
+        rf = slot(uf, vf);                                      \
+        Py_DECREF(uf);                                          \
+        Py_DECREF(vf);                                          \
+        return rf;                                              \
+>>>>>>> b6e969a (Add missing type casts for Py_XDECREF (for Limited API))
     }
 
 BINOP(add, PyNumber_Add)
@@ -939,8 +995,8 @@ nb_divmod(PyObject *self, PyObject *other)
 
     if (!q || !r) {
         /* LCOV_EXCL_START */
-        Py_XDECREF(q);
-        Py_XDECREF(r);
+        Py_XDECREF((PyObject *)q);
+        Py_XDECREF((PyObject *)r);
         return NULL;
         /* LCOV_EXCL_STOP */
     }
@@ -966,15 +1022,15 @@ nb_divmod(PyObject *self, PyObject *other)
     /* LCOV_EXCL_START */
 end:
     Py_DECREF(res);
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     return NULL;
     /* LCOV_EXCL_STOP */
 fallback:
 numbers:
     Py_DECREF(res);
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     Py_RETURN_NOTIMPLEMENTED;
 }
 
@@ -1006,16 +1062,16 @@ nb_truediv(PyObject *self, PyObject *other)
         PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
 end:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     return res;
 fallback:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     Py_RETURN_NOTIMPLEMENTED;
 numbers:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
 
     PyObject *uf, *vf;
 
@@ -1081,7 +1137,7 @@ BINOP_INT(xor)
 #define CHECK_OP_INT(u, a)      \
     if (MPZ_Check(a)) {         \
         u = (MPZ_Object *)a;    \
-        Py_INCREF(u);           \
+        Py_INCREF(a);           \
     }                           \
     else {                      \
         u = MPZ_from_int(a);    \
@@ -1090,6 +1146,175 @@ BINOP_INT(xor)
         }                       \
     }                           \
 
+<<<<<<< HEAD
+=======
+#define CHECK_OP_INTv2(u, a)    \
+    if (MPZ_Check(a)) {         \
+        u = (MPZ_Object *)a;    \
+        Py_INCREF(u);           \
+    }                           \
+    else if (PyLong_Check(a)) { \
+        ;                       \
+    }                           \
+    else {                      \
+        goto end;               \
+    }                           \
+
+#define BINOP_INT(suff)                                         \
+    static PyObject *                                           \
+    nb_##suff(PyObject *self, PyObject *other)                  \
+    {                                                           \
+        MPZ_Object *u = NULL, *v = NULL, *res = NULL;           \
+                                                                \
+        CHECK_OP_INT(u, self);                                  \
+        CHECK_OP_INT(v, other);                                 \
+                                                                \
+        res = MPZ_new();                                        \
+        zz_err ret = ZZ_OK;                                     \
+                                                                \
+        if (!res || (ret = zz_##suff(&u->z, &v->z, &res->z))) { \
+            /* LCOV_EXCL_START */                               \
+            Py_CLEAR(res);                                      \
+            if (ret == ZZ_VAL) {                                \
+                PyErr_SetString(PyExc_ValueError,               \
+                                "negative shift count");        \
+            }                                                   \
+            else if (ret == ZZ_BUF) {                           \
+                PyErr_SetString(PyExc_OverflowError,            \
+                                "too many digits in integer");  \
+            }                                                   \
+            else {                                              \
+                PyErr_NoMemory();                               \
+            }                                                   \
+            /* LCOV_EXCL_STOP */                                \
+        }                                                       \
+    end:                                                        \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
+        return (PyObject *)res;                                 \
+    }
+
+#define BINOP_INTv2(suff)                                            \
+    static PyObject *                                                \
+    nb_##suff(PyObject *self, PyObject *other)                       \
+    {                                                                \
+        MPZ_Object *u = NULL, *v = NULL, *res = NULL;                \
+                                                                     \
+        CHECK_OP_INTv2(u, self);                                     \
+        CHECK_OP_INTv2(v, other);                                    \
+                                                                     \
+        res = MPZ_new();                                             \
+        if (!res) {                                                  \
+            goto end;                                                \
+        }                                                            \
+                                                                     \
+        zz_err ret = ZZ_OK;                                          \
+                                                                     \
+        if (!u) {                                                    \
+            int error = PyLong_IsNegative(self) || zz_isneg(&v->z);  \
+                                                                     \
+            if (!error) {                                            \
+                int64_t temp = PyLong_AsSdigit_t(self, &error);      \
+                                                                     \
+                if (!error) {                                        \
+                    ret = zz_i64_##suff(temp, &v->z, &res->z);       \
+                    goto done;                                       \
+                }                                                    \
+            }                                                        \
+            u = MPZ_from_int(self);                                  \
+            if (!u) {                                                \
+                goto end;                                            \
+            }                                                        \
+        }                                                            \
+        if (!v) {                                                    \
+            int error = zz_isneg(&u->z) || PyLong_IsNegative(other); \
+                                                                     \
+            if (!error) {                                            \
+                int64_t temp = PyLong_AsSdigit_t(other, &error);     \
+                                                                     \
+                if (!error) {                                        \
+                    ret = zz_##suff##_i64(&u->z, temp, &res->z);     \
+                    goto done;                                       \
+                }                                                    \
+            }                                                        \
+            v = MPZ_from_int(other);                                 \
+            if (!v) {                                                \
+                goto end;                                            \
+            }                                                        \
+        }                                                            \
+        ret = zz_##suff(&u->z, &v->z, &res->z);                      \
+done:                                                                \
+        if (ret) {                                                   \
+            /* LCOV_EXCL_START */                                    \
+            Py_CLEAR(res);                                           \
+            if (ret == ZZ_VAL) {                                     \
+                PyErr_SetString(PyExc_ValueError,                    \
+                                "negative shift count");             \
+            }                                                        \
+            else if (ret == ZZ_BUF) {                                \
+                PyErr_SetString(PyExc_OverflowError,                 \
+                                "too many digits in integer");       \
+            }                                                        \
+            else {                                                   \
+                PyErr_NoMemory();                                    \
+            }                                                        \
+            /* LCOV_EXCL_STOP */                                     \
+        }                                                            \
+    end:                                                             \
+        Py_XDECREF((PyObject *)u);                                   \
+        Py_XDECREF((PyObject *)v);                                   \
+        return (PyObject *)res;                                      \
+    }
+
+static inline zz_err
+zz_and_i64(const zz_t *u, int64_t v, zz_t *w)
+{
+    if (zz_iszero(u) || !v) {
+        return zz_set(0, w);
+    }
+    assert(!zz_isneg(u) && v > 0);
+    return zz_set((int64_t)(u->digits[0] & (zz_digit_t)v), w);
+}
+#define zz_i64_and(x, y, r) zz_and_i64((y), (x), (r))
+
+BINOP_INTv2(and)
+BINOP_INT(or)
+BINOP_INT(xor)
+
+static inline zz_err
+zz_lshift(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    if (zz_isneg(v)) {
+        return ZZ_VAL;
+    }
+
+    int64_t shift;
+
+    if (zz_get(v, &shift)) {
+        return ZZ_BUF;
+    }
+    return zz_mul_2exp(u, (zz_bitcnt_t)shift, w);
+}
+
+static inline zz_err
+zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    if (zz_isneg(v)) {
+        return ZZ_VAL;
+    }
+
+    int64_t shift;
+
+    if (zz_get(v, &shift)) {
+        return zz_set(zz_isneg(u) ? -1 : 0, w);
+    }
+    return zz_quo_2exp(u, (zz_bitcnt_t)shift, w);
+}
+
+BINOP_INT(lshift)
+BINOP_INT(rshift)
+
+>>>>>>> b6e969a (Add missing type casts for Py_XDECREF (for Limited API))
 static PyObject *
 power(PyObject *self, PyObject *other, PyObject *module)
 {
@@ -1158,16 +1383,16 @@ power(PyObject *self, PyObject *other, PyObject *module)
         Py_DECREF(w);
     }
 end:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     return (PyObject *)res;
 fallback:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     Py_RETURN_NOTIMPLEMENTED;
 numbers:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
 
     PyObject *uf, *vf;
 
@@ -1709,9 +1934,9 @@ gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
 
     if (!g || !s || !t) {
         /* LCOV_EXCL_START */
-        Py_XDECREF(g);
-        Py_XDECREF(s);
-        Py_XDECREF(t);
+        Py_XDECREF((PyObject *)g);
+        Py_XDECREF((PyObject *)s);
+        Py_XDECREF((PyObject *)t);
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
@@ -1720,8 +1945,8 @@ gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
 
     zz_err ret = zz_gcdext(&x->z, &y->z, &g->z, &s->z, &t->z);
 
-    Py_XDECREF(x);
-    Py_XDECREF(y);
+    Py_XDECREF((PyObject *)x);
+    Py_XDECREF((PyObject *)y);
     if (ret == ZZ_MEM) {
         PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
@@ -1735,8 +1960,8 @@ end:
     Py_DECREF(g);
     Py_DECREF(s);
     Py_DECREF(t);
-    Py_XDECREF(x);
-    Py_XDECREF(y);
+    Py_XDECREF((PyObject *)x);
+    Py_XDECREF((PyObject *)y);
     return NULL;
 }
 
@@ -1776,8 +2001,8 @@ gmp_isqrt_rem(PyObject *Py_UNUSED(module), PyObject *arg)
 
     if (!root || !rem) {
         /* LCOV_EXCL_START */
-        Py_XDECREF(root);
-        Py_XDECREF(rem);
+        Py_XDECREF((PyObject *)root);
+        Py_XDECREF((PyObject *)rem);
         return NULL;
         /* LCOV_EXCL_STOP */
     }
@@ -1840,9 +2065,153 @@ end:
         return NULL;                                                     \
     }
 
+<<<<<<< HEAD
 MAKE_MPZ_UI_FUN(fac)
 MAKE_MPZ_UI_FUN(fac2)
 MAKE_MPZ_UI_FUN(fib)
+=======
+    int64_t n;
+
+    if (zz_get(&x->z, &n) || n > LONG_MAX) {
+        PyErr_Format(PyExc_OverflowError,
+                     "fac() argument should not exceed %ld",
+                     LONG_MAX);
+        goto err;
+    }
+    Py_XDECREF((PyObject *)x);
+    if (zz_fac((zz_digit_t)n, &res->z)) {
+        /* LCOV_EXCL_START */
+        PyErr_NoMemory();
+        goto err;
+        /* LCOV_EXCL_STOP */
+    }
+    return (PyObject *)res;
+err:
+end:
+    Py_DECREF(res);
+    return NULL;
+}
+
+static PyObject *
+gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
+{
+    if (nargs != 2) {
+        PyErr_SetString(PyExc_TypeError, "two arguments required");
+        return NULL;
+    }
+
+    MPZ_Object *x, *y, *res = MPZ_new();
+
+    if (!res) {
+        return NULL; /* LCOV_EXCL_LINE */
+    }
+    CHECK_OP_INT(x, args[0]);
+    CHECK_OP_INT(y, args[1]);
+    if (zz_isneg(&x->z) || zz_isneg(&y->z)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "comb() not defined for negative values");
+        goto err;
+    }
+
+    int64_t n, k;
+
+    if ((zz_get(&x->z, &n) || n > ULONG_MAX)
+        || (zz_get(&y->z, &k) || k > ULONG_MAX))
+    {
+        PyErr_Format(PyExc_OverflowError,
+                     "comb() arguments should not exceed %ld",
+                     ULONG_MAX);
+        goto err;
+    }
+    Py_XDECREF((PyObject *)x);
+    Py_XDECREF((PyObject *)y);
+    if (zz_bin((zz_digit_t)n, (zz_digit_t)k, &res->z)) {
+        /* LCOV_EXCL_START */
+        PyErr_NoMemory();
+        goto err;
+        /* LCOV_EXCL_STOP */
+    }
+    return (PyObject *)res;
+err:
+end:
+    Py_DECREF(res);
+    return NULL;
+}
+
+static PyObject *
+gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
+{
+    if (nargs > 2 || nargs < 1) {
+        PyErr_SetString(PyExc_TypeError, "one or two arguments required");
+        return NULL;
+    }
+    if (nargs == 1) {
+        return gmp_fac(self, args[0]);
+    }
+
+    MPZ_Object *x, *y, *res = MPZ_new();
+
+    if (!res) {
+        return NULL; /* LCOV_EXCL_LINE */
+    }
+    CHECK_OP_INT(x, args[0]);
+    CHECK_OP_INT(y, args[1]);
+    if (zz_isneg(&x->z) || zz_isneg(&y->z)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "perm() not defined for negative values");
+        goto err;
+    }
+
+    int64_t n, k;
+
+    if ((zz_get(&x->z, &n) || n > ULONG_MAX)
+        || (zz_get(&y->z, &k) || k > ULONG_MAX))
+    {
+        PyErr_Format(PyExc_OverflowError,
+                     "perm() arguments should not exceed %ld",
+                     ULONG_MAX);
+        goto err;
+    }
+    Py_XDECREF((PyObject *)x);
+    Py_XDECREF((PyObject *)y);
+    if (k > n) {
+        return (PyObject *)res;
+    }
+
+    MPZ_Object *den = MPZ_new();
+
+    if (!den) {
+        /* LCOV_EXCL_START */
+        PyErr_NoMemory();
+        goto err;
+        /* LCOV_EXCL_STOP */
+    }
+    if (zz_fac((zz_digit_t)n, &res->z)
+        || zz_fac((zz_digit_t)(n-k), &den->z)
+        || zz_div(&res->z, &den->z, &res->z, NULL))
+    {
+        /* LCOV_EXCL_START */
+        Py_DECREF(den);
+        PyErr_NoMemory();
+        goto err;
+        /* LCOV_EXCL_STOP */
+    }
+    Py_DECREF(den);
+    return (PyObject *)res;
+err:
+end:
+    Py_DECREF(res);
+    return NULL;
+}
+
+typedef enum {
+    ZZ_RNDD = 0,
+    ZZ_RNDN = 1,
+    ZZ_RNDU = 2,
+    ZZ_RNDZ = 3,
+    ZZ_RNDA = 4,
+} zz_rnd;
+>>>>>>> b6e969a (Add missing type casts for Py_XDECREF (for Limited API))
 
 static zz_rnd
 get_round_mode(PyObject *rndstr)
@@ -1912,8 +2281,8 @@ gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
                                              &man->z, &exp->z, &bc))
     {
         /* LCOV_EXCL_START */
-        Py_XDECREF(man);
-        Py_XDECREF(exp);
+        Py_XDECREF((PyObject *)man);
+        Py_XDECREF((PyObject *)exp);
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
@@ -1996,7 +2365,7 @@ gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     {
         /* LCOV_EXCL_START */
         Py_DECREF(man);
-        Py_XDECREF(exp);
+        Py_XDECREF((PyObject *)exp);
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
