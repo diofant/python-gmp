@@ -5,23 +5,18 @@
 #if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
 
 static void
-unknown_presentation_type(Py_UCS4 presentation_type,
-                          const char* type_name)
+unknown_presentation_type(Py_UCS4 presentation_type, PyObject* type_name)
 {
     /* %c might be out-of-range, hence the two cases. */
     if (presentation_type > 32 && presentation_type < 128) {
         PyErr_Format(PyExc_ValueError,
-                     "Unknown format code '%c' "
-                     "for object of type '%.200s'",
-                     (char)presentation_type,
-                     type_name);
+                     "Unknown format code '%c' for object of type '%U'",
+                     (char)presentation_type, type_name);
     }
     else {
         PyErr_Format(PyExc_ValueError,
-                     "Unknown format code '\\x%x' "
-                     "for object of type '%.200s'",
-                     (unsigned int)presentation_type,
-                     type_name);
+                     "Unknown format code '\\x%x' for object of type '%U'",
+                     (unsigned int)presentation_type, type_name);
     }
 }
 
@@ -301,7 +296,7 @@ parse_internal_render_format_spec(PyObject *obj,
             PyErr_Format(PyExc_ValueError,
                          ("Invalid format specifier '%U' for object "
                           "of type '%.200s'"), actual_format_spec,
-                         Py_TYPE(obj)->tp_name);
+                         PyType_GetName(Py_TYPE(obj)));
             Py_DECREF(actual_format_spec);
         }
         return 0;
@@ -1141,7 +1136,7 @@ __format__(PyObject *self, PyObject *format_spec)
         return res;
     }
     default:
-        unknown_presentation_type(format.type, Py_TYPE(self)->tp_name);
+        unknown_presentation_type(format.type, PyType_GetName(Py_TYPE(self)));
         return NULL;
     }
 }

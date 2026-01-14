@@ -446,6 +446,8 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
     return res;
 }
 
+typedef PyObject * (*Py_nb_int_func)(PyObject *);
+
 static PyObject *
 new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
 {
@@ -460,27 +462,35 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
         }
         if (PyNumber_Check(arg)) {
             PyObject *integer = NULL;
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+            Py_nb_int_func nb_int = PyType_GetSlot(Py_TYPE(arg), Py_nb_int);
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif
 
-            if (Py_TYPE(arg)->tp_as_number->nb_int) {
-                integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
+            if (nb_int) {
+                integer = nb_int(arg);
                 if (!integer) {
                     return NULL;
                 }
                 if (!PyLong_Check(integer)) {
                     PyErr_Format(PyExc_TypeError,
-                                 "__int__ returned non-int (type %.200s)",
-                                 Py_TYPE(integer)->tp_name);
+                                 "__int__ returned non-int (type %U)",
+                                 PyType_GetName(Py_TYPE(integer)));
                     Py_XDECREF(integer);
                     return NULL;
                 }
                 if (!PyLong_CheckExact(integer)
                     && PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
-                                        "__int__ returned non-int (type %.200s).  "
+                                        "__int__ returned non-int (type %U).  "
                                         "The ability to return an instance of a "
                                         "strict subclass of int "
                                         "is deprecated, and may be removed "
                                         "in a future version of Python.",
-                                        Py_TYPE(integer)->tp_name))
+                                        PyType_GetName(Py_TYPE(integer))))
                 {
                     Py_XDECREF(integer);
                     return NULL;
@@ -566,7 +576,7 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
             return NULL; /* LCOV_EXCL_LINE */
         }
 
-        MPZ_Object *newobj = (MPZ_Object *)type->tp_alloc(type, 0);
+        MPZ_Object *newobj = (MPZ_Object *)PyType_GenericNew(type, NULL, NULL);
 
         if (!newobj) {
             /* LCOV_EXCL_START */
@@ -598,11 +608,12 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     return new_impl(type, arg, base);
 }
 
+typedef void (*Py_tp_free_func)(void *);
+
 static void
 dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
-    PyTypeObject *type = Py_TYPE(self);
 
     if (global.gmp_cache_size < CACHE_SIZE
         && (u->z).alloc <= MAX_CACHE_MPZ_LIMBS
@@ -612,7 +623,21 @@ dealloc(PyObject *self)
     }
     else {
         zz_clear(&u->z);
-        type->tp_free(self);
+        if (MPZ_CheckExact(self)) {
+            PyObject_Free(self);
+        }
+        else {
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+            Py_tp_free_func tp_free = PyType_GetSlot(Py_TYPE(self), Py_tp_free);
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif
+
+            tp_free(self);
+        }
     }
 }
 
@@ -1316,7 +1341,12 @@ zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
 BINOP_INT(lshift)
 BINOP_INT(rshift)
 
+<<<<<<< HEAD
 >>>>>>> b6e969a (Add missing type casts for Py_XDECREF (for Limited API))
+=======
+typedef PyObject * (*Py_nb_power_func)(PyObject *, PyObject *, PyObject *);
+
+>>>>>>> 9b4d1c5 (Don't access directly slots (for Limited API))
 static PyObject *
 power(PyObject *self, PyObject *other, PyObject *module)
 {
@@ -1341,7 +1371,18 @@ power(PyObject *self, PyObject *other, PyObject *module)
                 Py_DECREF(uf);
                 return NULL;
             }
-            resf = PyFloat_Type.tp_as_number->nb_power(uf, vf, Py_None);
+
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+            Py_nb_power_func nb_power = PyType_GetSlot(&PyFloat_Type,
+                                                       Py_nb_power);
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif
+
+            resf = nb_power(uf, vf, Py_None);
             Py_DECREF(uf);
             Py_DECREF(vf);
             return resf;
@@ -2390,10 +2431,9 @@ gmp__free_cache(PyObject *Py_UNUSED(module), PyObject *Py_UNUSED(args))
     for (size_t i = 0; i < global.gmp_cache_size; i++) {
         MPZ_Object *u = global.gmp_cache[i];
         PyObject *self = (PyObject *)u;
-        PyTypeObject *type = Py_TYPE(self);
 
         zz_clear(&u->z);
-        type->tp_free(self);
+        PyObject_Free(self);
     }
     global.gmp_cache_size = 0;
     Py_RETURN_NONE;
