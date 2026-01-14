@@ -28,6 +28,12 @@ _Thread_local gmp_global global = {
     .gmp_cache_size = 0,
 };
 
+<<<<<<< HEAD
+=======
+uint8_t bits_per_digit;
+Py_hash_t pyhash_modulus;
+
+>>>>>>> f350596 (Don't use PyHASH_MODULUS macro)
 static MPZ_Object *
 MPZ_new(int64_t size)
 {
@@ -777,17 +783,27 @@ hash(PyObject *self)
 
     bool negative = zz_isneg(&u->z);
 
+<<<<<<< HEAD
     if (negative) {
         (void)zz_abs(&u->z, &u->z);
     }
+=======
+    assert((int64_t)INT64_MAX > pyhash_modulus);
+    (void)zz_div(&u->z, (int64_t)pyhash_modulus, NULL, &w);
+>>>>>>> f350596 (Don't use PyHASH_MODULUS macro)
 
     Py_hash_t r;
 
+<<<<<<< HEAD
     assert(-(uint64_t)INT64_MIN > PyHASH_MODULUS);
     (void)zz_rem_u64(&u->z, (uint64_t)PyHASH_MODULUS, (uint64_t *)&r);
     if (negative) {
         (void)zz_neg(&u->z, &u->z);
         r = -r;
+=======
+    if (zz_isneg(&u->z) && r) {
+        r = -(pyhash_modulus - r);
+>>>>>>> f350596 (Don't use PyHASH_MODULUS macro)
     }
     if (r == -1) {
         r = -2;
@@ -2580,11 +2596,36 @@ gmp_exec(PyObject *m)
     }
     res = PyEval_EvalCode(codeobj, ns, NULL);
     Py_DECREF(codeobj);
-    Py_DECREF(ns);
     if (!res) {
         return -1; /* LCOV_EXCL_LINE */
     }
     Py_DECREF(res);
+
+    PyObject *sys_mod = PyImport_ImportModuleLevel("sys", NULL, NULL, NULL, 0);
+
+    if (!sys_mod || PyDict_SetItemString(ns, "sys", sys_mod) < 0) {
+        /* LCOV_EXCL_START */
+        Py_DECREF(ns);
+        goto fail1;
+        /* LCOV_EXCL_STOP */
+    }
+    codeobj = Py_CompileString("sys.hash_info.modulus", "<string>",
+                               Py_eval_input);
+    if (!codeobj || !(res = PyEval_EvalCode(codeobj, ns, NULL))) {
+        /* LCOV_EXCL_START */
+        Py_XDECREF(codeobj);
+        Py_DECREF(ns);
+        goto fail1;
+        /* LCOV_EXCL_STOP */
+    }
+    Py_DECREF(codeobj);
+    Py_DECREF(sys_mod);
+    Py_DECREF(ns);
+    pyhash_modulus = (Py_hash_t)PyLong_AsSsize_t(res);
+    Py_DECREF(res);
+    if (pyhash_modulus == -1) {
+        goto fail1; /* LCOV_EXCL_LINE */
+    }
     return 0;
 }
 
