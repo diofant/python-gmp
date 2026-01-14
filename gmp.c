@@ -470,7 +470,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                     PyErr_Format(PyExc_TypeError,
                                  "__int__ returned non-int (type %.200s)",
                                  Py_TYPE(integer)->tp_name);
-                    Py_DECREF(integer);
+                    Py_XDECREF(integer);
                     return NULL;
                 }
                 if (!PyLong_CheckExact(integer)
@@ -482,7 +482,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                                         "in a future version of Python.",
                                         Py_TYPE(integer)->tp_name))
                 {
-                    Py_DECREF(integer);
+                    Py_XDECREF(integer);
                     return NULL;
                 }
             }
@@ -493,8 +493,10 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                 }
             }
             if (integer) {
-                Py_SETREF(integer, (PyObject *)MPZ_from_int(integer));
-                return integer;
+                PyObject *mpz = (PyObject *)MPZ_from_int(integer);
+
+                Py_DECREF(integer);
+                return (PyObject *)mpz;
             }
         }
         goto str;
