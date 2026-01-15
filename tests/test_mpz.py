@@ -1032,3 +1032,26 @@ def test_mpz_collatz(xs):
     with ThreadPoolExecutor(max_workers=7) as tpe:
         futures = [tpe.submit(f, mpz(x)) for x in xs]
         assert all(f.result() == 1 for f in futures)
+<<<<<<< HEAD
+=======
+
+
+# See pypy/pypy#5368 and oracle/graalpython#593
+@pytest.mark.skipif(platform.python_implementation() != "CPython",
+                    reason="no way to specify a signature")
+def test_int_api():
+    for meth in dir(int):
+        m = getattr(int, meth)
+        if meth.startswith("_") or not callable(m):
+            continue
+        mz = getattr(mpz, meth)
+        try:
+            m_sig = inspect.signature(m)
+        except ValueError:
+            # Signatures for some METH_NOARGS builtins were
+            # unavailable til python/cpython#107794.
+            if sys.version_info < (3, 13):
+                continue
+        mz_sig = inspect.signature(mz)
+        assert m_sig == mz_sig
+>>>>>>> 2444e9f (Enable test_int_api() for CPython < 3.13)
