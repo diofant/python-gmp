@@ -1860,30 +1860,6 @@ digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
     return MPZ_to_str((MPZ_Object *)self, base, 0);
 }
 
-PyDoc_STRVAR(
-    to_bytes__doc__,
-    "to_bytes($self, /, length=1, byteorder=\'big\', *, signed=False)\n--\n\n\
-Return an array of bytes representing self.\n\n\
-The integer is represented using length bytes.  An OverflowError is\n\
-raised if self is not representable with the given number of bytes.\n\n\
-The byteorder argument determines the byte order used to represent self.\n\
-Accepted values are \'big\' and \'little\', when the most significant\n\
-byte is at the beginning or at the end of the byte array, respectively.\n\n\
-The signed argument determines whether two\'s complement is used to\n\
-represent self.  If signed is False and a negative integer is given,\n\
-an OverflowError is raised.");
-PyDoc_STRVAR(
-    from_bytes__doc__,
-    "from_bytes($type, /, bytes, byteorder=\'big\', *, signed=False)\n--\n\n\
-Return the integer represented by the given array of bytes.\n\n\
-The argument bytes must either be a bytes-like object or an iterable\n\
-producing bytes.\n\n\
-The byteorder argument determines the byte order used to represent the\n\
-integer.  Accepted values are \'big\' and \'little\', when the most\n\
-significant byte is at the beginning or at the end of the byte array,\n\
-respectively.\n\n\
-The signed argument indicates whether two’s complement is used.");
-
 extern PyObject * __format__(PyObject *self, PyObject *format_spec);
 
 /* Explicit signatures for METH_NOARGS methods are redundant
@@ -1899,9 +1875,27 @@ static PyMethodDef methods[] = {
      ("bit_count($self, /)\n--\n\nNumber of ones in the binary "
       "representation of the absolute value of self.")},
     {"to_bytes", (PyCFunction)to_bytes, METH_FASTCALL | METH_KEYWORDS,
-     to_bytes__doc__},
+     "to_bytes($self, /, length=1, byteorder=\'big\', *, signed=False)\n--\n\n\
+Return an array of bytes representing self.\n\n\
+The integer is represented using length bytes.  An OverflowError is\n\
+raised if self is not representable with the given number of bytes.\n\n\
+The byteorder argument determines the byte order used to represent self.\n\
+Accepted values are \'big\' and \'little\', when the most significant\n\
+byte is at the beginning or at the end of the byte array, respectively.\n\n\
+The signed argument determines whether two\'s complement is used to\n\
+represent self.  If signed is False and a negative integer is given,\n\
+an OverflowError is raised."},
     {"from_bytes", (PyCFunction)from_bytes,
-     METH_FASTCALL | METH_KEYWORDS | METH_CLASS, from_bytes__doc__},
+     METH_FASTCALL | METH_KEYWORDS | METH_CLASS,
+     "from_bytes($type, /, bytes, byteorder=\'big\', *, signed=False)\n--\n\n\
+Return the integer represented by the given array of bytes.\n\n\
+The argument bytes must either be a bytes-like object or an iterable\n\
+producing bytes.\n\n\
+The byteorder argument determines the byte order used to represent the\n\
+integer.  Accepted values are \'big\' and \'little\', when the most\n\
+significant byte is at the beginning or at the end of the byte array,\n\
+respectively.\n\n\
+The signed argument indicates whether two’s complement is used."},
     {"as_integer_ratio", as_integer_ratio, METH_NOARGS,
      ("as_integer_ratio($self, /)\n--\n\nReturn a pair of integers, "
       "whose ratio is equal to self.\n\n"
