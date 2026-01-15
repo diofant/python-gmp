@@ -1886,24 +1886,32 @@ The signed argument indicates whether two’s complement is used.");
 
 extern PyObject * __format__(PyObject *self, PyObject *format_spec);
 
+/* Explicit signatures for METH_NOARGS methods are redundant
+   since CPython 3.13. */
+
 static PyMethodDef methods[] = {
     {"conjugate", (PyCFunction)plus, METH_NOARGS,
-     "Returns self."},
+     "conjugate($self, /)\n--\n\nReturns self."},
     {"bit_length", bit_length, METH_NOARGS,
-     "Number of bits necessary to represent self in binary."},
+     ("bit_length($self, /)\n--\n\nNumber of bits necessary "
+      "to represent self in binary.")},
     {"bit_count", bit_count, METH_NOARGS,
-     ("Number of ones in the binary representation of the "
-      "absolute value of self.")},
+     ("bit_count($self, /)\n--\n\nNumber of ones in the binary "
+      "representation of the absolute value of self.")},
     {"to_bytes", (PyCFunction)to_bytes, METH_FASTCALL | METH_KEYWORDS,
      to_bytes__doc__},
     {"from_bytes", (PyCFunction)from_bytes,
      METH_FASTCALL | METH_KEYWORDS | METH_CLASS, from_bytes__doc__},
     {"as_integer_ratio", as_integer_ratio, METH_NOARGS,
-     ("Return a pair of integers, whose ratio is equal to self.\n\n"
+     ("as_integer_ratio($self, /)\n--\n\nReturn a pair of integers, "
+      "whose ratio is equal to self.\n\n"
       "The ratio is in lowest terms and has a positive denominator.")},
-    {"__trunc__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
-    {"__floor__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
-    {"__ceil__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
+    {"__trunc__", (PyCFunction)plus, METH_NOARGS,
+     "__trunc__($self, /)\n--\n\nReturns self."},
+    {"__floor__", (PyCFunction)plus, METH_NOARGS,
+     "__floor__($self, /)\n--\n\nReturns self."},
+    {"__ceil__", (PyCFunction)plus, METH_NOARGS,
+     "__ceil__($self, /)\n--\n\nReturns self."},
     {"__round__", (PyCFunction)__round__, METH_FASTCALL,
      ("__round__($self, ndigits=0, /)\n--\n\n"
       "Round self to to the closest multiple of 10**-ndigits\n\n"
@@ -1916,8 +1924,9 @@ static PyMethodDef methods[] = {
      ("__format__($self, format_spec, /)\n--\n\n"
       "Convert self to a string according to format_spec.")},
     {"__sizeof__", __sizeof__, METH_NOARGS,
-     "Returns size of self in memory, in bytes."},
-    {"is_integer", is_integer, METH_NOARGS, "Returns True."},
+     "__sizeof__($self, /)\n--\n\nReturns size of self in memory, in bytes."},
+    {"is_integer", is_integer, METH_NOARGS,
+     "is_integer($self, /)\n--\n\nReturns True."},
     {"digits", (PyCFunction)digits, METH_FASTCALL | METH_KEYWORDS,
      ("digits($self, base=10)\n--\n\n"
       "Return string representing self in the given base.\n\n"
