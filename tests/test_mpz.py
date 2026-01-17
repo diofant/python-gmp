@@ -116,6 +116,8 @@ def test_format_bulk(x, fmt):
 
 def test_format_interface():
     mx = mpz(123)
+    with pytest.raises(TypeError, match="int"):
+        mx.__format__(321)
     with pytest.raises(ValueError, match="Unknown format code"):
         format(mx, "q")
     if platform.python_implementation() != "PyPy":  # XXX: pypy/pypy#5311

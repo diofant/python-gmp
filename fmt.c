@@ -1095,6 +1095,13 @@ extern PyObject * to_float(PyObject *self);
 PyObject *
 __format__(PyObject *self, PyObject *format_spec)
 {
+    if (!PyUnicode_Check(format_spec)) {
+        PyErr_Format(PyExc_TypeError,
+                     "__format__() argument must be str, not %U",
+                     PyType_GetName(Py_TYPE(format_spec)));
+        return NULL;
+    }
+
     Py_ssize_t end = PyUnicode_GetLength(format_spec);
 
     if (!end) {
