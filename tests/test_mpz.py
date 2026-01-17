@@ -808,9 +808,7 @@ def test_getters(x):
 @given(bigints())
 def test_methods(x):
     mx = mpz(x)
-    methods = ["conjugate", "bit_length", "as_integer_ratio"]
-    if sys.version_info >= (3, 10):
-        methods.append("bit_count")
+    methods = ["conjugate", "bit_length", "as_integer_ratio", "bit_count"]
     if sys.version_info >= (3, 12):
         methods.append("is_integer")
     for name in methods:
