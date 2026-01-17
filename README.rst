@@ -10,8 +10,8 @@ integer type (`mpz`_), compatible with Python's `int`_.  It includes few
 functions (`comb`_, `factorial`_, `gcd`_, `isqrt`_, `lcm`_ and `perm`_),
 compatible with the Python stdlib's module `math`_.
 
-This module requires Python 3.9 or later versions and has been tested with
-CPython 3.9 through 3.14, with PyPy3.11 7.3.20 and with GraalPy 25.0.
+This module requires Python 3.11 or later versions and has been tested with
+CPython 3.11 through 3.14, with PyPy3.11 7.3.20 and with GraalPy 25.0.
 Free-threading builds of the CPython are supported.
 
 Releases are available in the Python Package Index (PyPI) at

@@ -20,8 +20,6 @@ classifiers = ["Development Status :: 4 - Beta",
                "Programming Language :: C",
                "Programming Language :: Python :: 3",
                "Programming Language :: Python :: 3 :: Only",
-               "Programming Language :: Python :: 3.9",
-               "Programming Language :: Python :: 3.10",
                "Programming Language :: Python :: 3.11",
                "Programming Language :: Python :: 3.12",
                "Programming Language :: Python :: 3.13",
@@ -36,7 +34,7 @@ classifiers = ["Development Status :: 4 - Beta",
                "Operating System :: MacOS",
                "Topic :: Scientific/Engineering :: Mathematics",
                "Topic :: Software Development :: Libraries :: Python Modules"]
-requires-python = ">= 3.9"
+requires-python = ">= 3.11"
 
 [project.urls]
 Homepage = "https://github.com/diofant/python-gmp"
