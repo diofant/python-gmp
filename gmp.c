@@ -7,11 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if !defined(PYPY_VERSION)
-#  define MAX_CACHE_SIZE 100
-#else
-#  define MAX_CACHE_SIZE 0
-#endif
+#define MAX_CACHE_SIZE 100
 #define MAX_CACHED_NDIGITS 16
 
 typedef struct {
@@ -34,7 +30,6 @@ MPZ_new(void)
     if (global.gmp_cache_size) {
         res = global.gmp_cache[--global.gmp_cache_size];
         (void)zz_set(0, &res->z);
-        Py_XINCREF((PyObject *)res);
     }
     else {
         res = PyObject_New(MPZ_Object, &MPZ_Type);
@@ -683,6 +678,17 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     return new_impl(type, arg, base);
 }
 
+static void
+finalize(PyObject *self)
+{
+    if (global.gmp_cache_size < MAX_CACHE_SIZE
+        && (((MPZ_Object *)self)->z).alloc <= MAX_CACHED_NDIGITS
+        && MPZ_CheckExact(self))
+    {
+        Py_INCREF(self);
+    }
+}
+
 typedef void (*Py_tp_free_func)(void *);
 
 static void
@@ -690,10 +696,7 @@ dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
 
-    if (global.gmp_cache_size < MAX_CACHE_SIZE
-        && (u->z).alloc <= MAX_CACHED_NDIGITS
-        && MPZ_CheckExact(self))
-    {
+    if (PyObject_CallFinalizerFromDealloc(self)) {
         global.gmp_cache[global.gmp_cache_size++] = u;
     }
     else {
@@ -2098,6 +2101,7 @@ PyTypeObject MPZ_Type = {
     .tp_basicsize = sizeof(MPZ_Object),
     .tp_new = new,
     .tp_dealloc = dealloc,
+    .tp_finalize = finalize,
     .tp_repr = repr,
     .tp_str = str,
     .tp_richcompare = richcompare,
