@@ -112,3 +112,43 @@ gmp_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
     }
     return result;
 }
+
+#if PY_VERSION_HEX < 0x030D00A0
+static PyObject *
+PyType_GetModuleName(PyTypeObject *type)
+{
+    return PyObject_GetAttrString((PyObject *)type, "__module__");
+}
+
+PyObject *
+_PyType_GetFullyQualifiedName(PyTypeObject *type)
+{
+    PyObject *qualname = PyType_GetQualName(type);
+    if (qualname == NULL) {
+        return NULL; /* LCOV_EXCL_LINE */
+    }
+
+    PyObject *module = PyType_GetModuleName(type);
+    if (module == NULL) {
+        /* LCOV_EXCL_START */
+        Py_DECREF(qualname);
+        return NULL;
+        /* LCOV_EXCL_STOP */
+    }
+
+    PyObject *result;
+
+    if (PyUnicode_Check(module)
+        && !PyUnicode_EqualToUTF8(module, "builtins")
+        && !PyUnicode_EqualToUTF8(module, "__main__"))
+    {
+        result = PyUnicode_FromFormat("%U.%U", module, qualname);
+    }
+    else {
+        result = Py_NewRef(qualname);
+    }
+    Py_XDECREF(module);
+    Py_XDECREF(qualname);
+    return result;
+}
+#endif

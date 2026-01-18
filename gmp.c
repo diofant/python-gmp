@@ -559,7 +559,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                 if (!PyLong_Check(integer)) {
                     PyErr_Format(PyExc_TypeError,
                                  "__int__ returned non-int (type %U)",
-                                 PyType_GetName(Py_TYPE(integer)));
+                                 PyType_GetFullyQualifiedName(Py_TYPE(integer)));
                     Py_XDECREF(integer);
                     return NULL;
                 }
@@ -570,7 +570,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                                         "strict subclass of int "
                                         "is deprecated, and may be removed "
                                         "in a future version of Python.",
-                                        PyType_GetName(Py_TYPE(integer))))
+                                        PyType_GetFullyQualifiedName(Py_TYPE(integer))))
                 {
                     Py_XDECREF(integer);
                     return NULL;

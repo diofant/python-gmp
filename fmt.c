@@ -296,7 +296,7 @@ parse_internal_render_format_spec(PyObject *obj,
             PyErr_Format(PyExc_ValueError,
                          ("Invalid format specifier '%U' for object "
                           "of type '%.200s'"), actual_format_spec,
-                         PyType_GetName(Py_TYPE(obj)));
+                         PyType_GetFullyQualifiedName(Py_TYPE(obj)));
             Py_DECREF(actual_format_spec);
         }
         return 0;
@@ -1098,7 +1098,7 @@ __format__(PyObject *self, PyObject *format_spec)
     if (!PyUnicode_Check(format_spec)) {
         PyErr_Format(PyExc_TypeError,
                      "__format__() argument must be str, not %U",
-                     PyType_GetName(Py_TYPE(format_spec)));
+                     PyType_GetFullyQualifiedName(Py_TYPE(format_spec)));
         return NULL;
     }
 
@@ -1145,7 +1145,7 @@ __format__(PyObject *self, PyObject *format_spec)
         return res;
     }
     default:
-        unknown_presentation_type(format.type, PyType_GetName(Py_TYPE(self)));
+        unknown_presentation_type(format.type, PyType_GetFullyQualifiedName(Py_TYPE(self)));
         return NULL;
     }
 }
