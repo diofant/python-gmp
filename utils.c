@@ -17,7 +17,7 @@ gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
     Py_ssize_t nkws = 0;
 
     if (kwnames) {
-        nkws = PyTuple_GET_SIZE(kwnames);
+        nkws = PyTuple_Size(kwnames);
     }
     if (nkws > fnargs->maxpos) {
         PyErr_Format(PyExc_TypeError,
@@ -33,7 +33,8 @@ gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
         return -1;
     }
     for (Py_ssize_t i = 0; i < nkws; i++) {
-        const char *kwname = PyUnicode_AsUTF8(PyTuple_GET_ITEM(kwnames, i));
+        const char *kwname = PyUnicode_AsUTF8AndSize(PyTuple_GetItem(kwnames,
+                                                                     i), NULL);
         Py_ssize_t j = 0;
 
         for (; j < fnargs->maxargs; j++) {
@@ -65,11 +66,12 @@ gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
 PyObject *
 gmp_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
 {
+    assert(PyUnicode_Check(unicode));
     if (PyUnicode_IS_ASCII(unicode)) {
         return Py_NewRef(unicode);
     }
 
-    Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
+    Py_ssize_t len = PyUnicode_GetLength(unicode);
     PyObject *result = PyUnicode_New(len, 127);
 
     if (result == NULL) {
@@ -110,3 +112,43 @@ gmp_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
     }
     return result;
 }
+
+#if PY_VERSION_HEX < 0x030D00A0
+static PyObject *
+PyType_GetModuleName(PyTypeObject *type)
+{
+    return PyObject_GetAttrString((PyObject *)type, "__module__");
+}
+
+PyObject *
+_PyType_GetFullyQualifiedName(PyTypeObject *type)
+{
+    PyObject *qualname = PyType_GetQualName(type);
+    if (qualname == NULL) {
+        return NULL; /* LCOV_EXCL_LINE */
+    }
+
+    PyObject *module = PyType_GetModuleName(type);
+    if (module == NULL) {
+        /* LCOV_EXCL_START */
+        Py_DECREF(qualname);
+        return NULL;
+        /* LCOV_EXCL_STOP */
+    }
+
+    PyObject *result;
+
+    if (PyUnicode_Check(module)
+        && !PyUnicode_EqualToUTF8(module, "builtins")
+        && !PyUnicode_EqualToUTF8(module, "__main__"))
+    {
+        result = PyUnicode_FromFormat("%U.%U", module, qualname);
+    }
+    else {
+        result = Py_NewRef(qualname);
+    }
+    Py_XDECREF(module);
+    Py_XDECREF(qualname);
+    return result;
+}
+#endif

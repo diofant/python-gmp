@@ -1,5 +1,4 @@
 #include "mpz.h"
-#include "utils.h"
 
 #include <ctype.h>
 #include <float.h>
@@ -25,6 +24,7 @@ _Thread_local gmp_global global = {
 };
 
 uint8_t bits_per_digit;
+Py_hash_t pyhash_modulus;
 
 static MPZ_Object *
 MPZ_new(void)
@@ -418,7 +418,7 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
         return NULL; /* LCOV_EXCL_LINE */
     }
 
-    unsigned char *buffer = (unsigned char *)PyBytes_AS_STRING(bytes);
+    unsigned char *buffer = (unsigned char *)PyBytes_AsString(bytes);
     zz_err ret = zz_get_bytes(&u->z, (size_t)length, is_signed, &buffer);
 
     if (ret == ZZ_OK) {
@@ -516,7 +516,7 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
         if (is_little) {
             free(buffer);
         }
-        Py_XDECREF(res);
+        Py_XDECREF((PyObject *)res);
         return (MPZ_Object *)PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
@@ -525,6 +525,8 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
     }
     return res;
 }
+
+typedef PyObject * (*Py_nb_int_func)(PyObject *);
 
 static PyObject *
 new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
@@ -540,29 +542,37 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
         }
         if (PyNumber_Check(arg)) {
             PyObject *integer = NULL;
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+            Py_nb_int_func nb_int = PyType_GetSlot(Py_TYPE(arg), Py_nb_int);
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif
 
-            if (Py_TYPE(arg)->tp_as_number->nb_int) {
-                integer = Py_TYPE(arg)->tp_as_number->nb_int(arg);
+            if (nb_int) {
+                integer = nb_int(arg);
                 if (!integer) {
                     return NULL;
                 }
                 if (!PyLong_Check(integer)) {
                     PyErr_Format(PyExc_TypeError,
-                                 "__int__ returned non-int (type %.200s)",
-                                 Py_TYPE(integer)->tp_name);
-                    Py_DECREF(integer);
+                                 "__int__ returned non-int (type %U)",
+                                 PyType_GetFullyQualifiedName(Py_TYPE(integer)));
+                    Py_XDECREF(integer);
                     return NULL;
                 }
                 if (!PyLong_CheckExact(integer)
                     && PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
-                                        "__int__ returned non-int (type %.200s).  "
+                                        "__int__ returned non-int (type %U).  "
                                         "The ability to return an instance of a "
                                         "strict subclass of int "
                                         "is deprecated, and may be removed "
                                         "in a future version of Python.",
-                                        Py_TYPE(integer)->tp_name))
+                                        PyType_GetFullyQualifiedName(Py_TYPE(integer))))
                 {
-                    Py_DECREF(integer);
+                    Py_XDECREF(integer);
                     return NULL;
                 }
             }
@@ -573,8 +583,10 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
                 }
             }
             if (integer) {
-                Py_SETREF(integer, (PyObject *)MPZ_from_int(integer));
-                return integer;
+                PyObject *mpz = (PyObject *)MPZ_from_int(integer);
+
+                Py_DECREF(integer);
+                return (PyObject *)mpz;
             }
         }
         goto str;
@@ -602,10 +614,10 @@ str:
         const char *string;
 
         if (PyByteArray_Check(arg)) {
-            string = PyByteArray_AS_STRING(arg);
+            string = PyByteArray_AsString(arg);
         }
         else {
-            string = PyBytes_AS_STRING(arg);
+            string = PyBytes_AsString(arg);
         }
 
         PyObject *str = PyUnicode_FromString(string);
@@ -634,7 +646,7 @@ static PyObject *
 new(PyTypeObject *type, PyObject *args, PyObject *keywds)
 {
     static char *kwlist[] = {"", "base", NULL};
-    Py_ssize_t argc = PyTuple_GET_SIZE(args);
+    Py_ssize_t argc = PyTuple_Size(args);
     PyObject *arg, *base = Py_None;
 
     if (type != &MPZ_Type) {
@@ -644,7 +656,7 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
             return NULL; /* LCOV_EXCL_LINE */
         }
 
-        MPZ_Object *newobj = (MPZ_Object *)type->tp_alloc(type, 0);
+        MPZ_Object *newobj = (MPZ_Object *)PyType_GenericNew(type, NULL, NULL);
 
         if (!newobj) {
             /* LCOV_EXCL_START */
@@ -665,7 +677,7 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
         return (PyObject *)MPZ_new();
     }
     if (argc == 1 && !keywds) {
-        arg = PyTuple_GET_ITEM(args, 0);
+        arg = PyTuple_GetItem(args, 0);
         return new_impl(type, arg, Py_None);
     }
     if (!PyArg_ParseTupleAndKeywords(args, keywds, "O|O",
@@ -676,11 +688,12 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     return new_impl(type, arg, base);
 }
 
+typedef void (*Py_tp_free_func)(void *);
+
 static void
 dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
-    PyTypeObject *type = Py_TYPE(self);
 
     if (global.gmp_cache_size < CACHE_SIZE
         && (u->z).alloc <= MAX_CACHE_MPZ_DIGITS
@@ -690,7 +703,21 @@ dealloc(PyObject *self)
     }
     else {
         zz_clear(&u->z);
-        type->tp_free(self);
+        if (MPZ_CheckExact(self)) {
+            PyObject_Free(self);
+        }
+        else {
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+            Py_tp_free_func tp_free = PyType_GetSlot(Py_TYPE(self), Py_tp_free);
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif
+
+            tp_free(self);
+        }
     }
 }
 
@@ -741,7 +768,7 @@ str(PyObject *self)
 #define CHECK_OP(u, a)          \
     if (MPZ_Check(a)) {         \
         u = (MPZ_Object *)a;    \
-        Py_INCREF(u);           \
+        Py_INCREF(a);           \
     }                           \
     else if (PyLong_Check(a)) { \
         u = MPZ_from_int(a);    \
@@ -862,13 +889,13 @@ hash(PyObject *self)
     zz_digit_t digits[1];
     zz_t w = {false, 1, 1, digits};
 
-    assert((int64_t)INT64_MAX > PyHASH_MODULUS);
-    (void)zz_div(&u->z, (int64_t)PyHASH_MODULUS, NULL, &w);
+    assert((int64_t)INT64_MAX > pyhash_modulus);
+    (void)zz_div(&u->z, (int64_t)pyhash_modulus, NULL, &w);
 
     Py_hash_t r = w.size ? (Py_hash_t)w.digits[0] : 0;
 
     if (zz_isneg(&u->z) && r) {
-        r = -((Py_hash_t)PyHASH_MODULUS - r);
+        r = -(pyhash_modulus - r);
     }
     if (r == -1) {
         r = -2;
@@ -909,7 +936,7 @@ to_bool(PyObject *self)
 #define CHECK_OPv2(u, a)        \
     if (MPZ_Check(a)) {         \
         u = (MPZ_Object *)a;    \
-        Py_INCREF(u);           \
+        Py_INCREF(a);           \
     }                           \
     else if (PyLong_Check(a)) { \
         ;                       \
@@ -978,16 +1005,16 @@ done:                                                           \
             PyErr_NoMemory();                                   \
         }                                                       \
     end:                                                        \
-        Py_XDECREF(u);                                          \
-        Py_XDECREF(v);                                          \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
         return (PyObject *)res;                                 \
     fallback:                                                   \
-        Py_XDECREF(u);                                          \
-        Py_XDECREF(v);                                          \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
         Py_RETURN_NOTIMPLEMENTED;                               \
     numbers:                                                    \
-        Py_XDECREF(u);                                          \
-        Py_XDECREF(v);                                          \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
                                                                 \
         PyObject *uf, *vf, *rf;                                 \
                                                                 \
@@ -1045,8 +1072,8 @@ nb_divmod(PyObject *self, PyObject *other)
 
     if (!q || !r) {
         /* LCOV_EXCL_START */
-        Py_XDECREF(q);
-        Py_XDECREF(r);
+        Py_XDECREF((PyObject *)q);
+        Py_XDECREF((PyObject *)r);
         return NULL;
         /* LCOV_EXCL_STOP */
     }
@@ -1066,21 +1093,21 @@ nb_divmod(PyObject *self, PyObject *other)
     }
     Py_DECREF(u);
     Py_DECREF(v);
-    PyTuple_SET_ITEM(res, 0, (PyObject *)q);
-    PyTuple_SET_ITEM(res, 1, (PyObject *)r);
+    (void)PyTuple_SetItem(res, 0, (PyObject *)q);
+    (void)PyTuple_SetItem(res, 1, (PyObject *)r);
     return res;
     /* LCOV_EXCL_START */
 end:
     Py_DECREF(res);
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     return NULL;
     /* LCOV_EXCL_STOP */
 fallback:
 numbers:
     Py_DECREF(res);
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     Py_RETURN_NOTIMPLEMENTED;
 }
 
@@ -1278,16 +1305,16 @@ nb_truediv(PyObject *self, PyObject *other)
         PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
 end:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     return res;
 fallback:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     Py_RETURN_NOTIMPLEMENTED;
 numbers:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
 
     PyObject *uf, *vf;
 
@@ -1323,7 +1350,7 @@ numbers:
 #define CHECK_OP_INT(u, a)      \
     if (MPZ_Check(a)) {         \
         u = (MPZ_Object *)a;    \
-        Py_INCREF(u);           \
+        Py_INCREF(a);           \
     }                           \
     else {                      \
         u = MPZ_from_int(a);    \
@@ -1373,8 +1400,8 @@ numbers:
             /* LCOV_EXCL_STOP */                                \
         }                                                       \
     end:                                                        \
-        Py_XDECREF(u);                                          \
-        Py_XDECREF(v);                                          \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
         return (PyObject *)res;                                 \
     }
 
@@ -1445,8 +1472,8 @@ done:                                                                \
             /* LCOV_EXCL_STOP */                                     \
         }                                                            \
     end:                                                             \
-        Py_XDECREF(u);                                               \
-        Py_XDECREF(v);                                               \
+        Py_XDECREF((PyObject *)u);                                   \
+        Py_XDECREF((PyObject *)v);                                   \
         return (PyObject *)res;                                      \
     }
 
@@ -1498,6 +1525,8 @@ zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
 BINOP_INT(lshift)
 BINOP_INT(rshift)
 
+typedef PyObject * (*Py_nb_power_func)(PyObject *, PyObject *, PyObject *);
+
 static PyObject *
 power(PyObject *self, PyObject *other, PyObject *module)
 {
@@ -1522,7 +1551,18 @@ power(PyObject *self, PyObject *other, PyObject *module)
                 Py_DECREF(uf);
                 return NULL;
             }
-            resf = PyFloat_Type.tp_as_number->nb_power(uf, vf, Py_None);
+
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+            Py_nb_power_func nb_power = PyType_GetSlot(&PyFloat_Type,
+                                                       Py_nb_power);
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif
+
+            resf = nb_power(uf, vf, Py_None);
             Py_DECREF(uf);
             Py_DECREF(vf);
             return resf;
@@ -1566,16 +1606,16 @@ power(PyObject *self, PyObject *other, PyObject *module)
         Py_DECREF(w);
     }
 end:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     return (PyObject *)res;
 fallback:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
     Py_RETURN_NOTIMPLEMENTED;
 numbers:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
+    Py_XDECREF((PyObject *)u);
+    Py_XDECREF((PyObject *)v);
 
     PyObject *uf, *vf;
 
@@ -1727,7 +1767,7 @@ to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
         PyObject *arg = args[argidx[1]];
 
         if (PyUnicode_Check(arg)) {
-            const char *byteorder = PyUnicode_AsUTF8(arg);
+            const char *byteorder = PyUnicode_AsUTF8AndSize(arg, NULL);
 
             if (!byteorder) {
                 return NULL; /* LCOV_EXCL_LINE */
@@ -1786,7 +1826,7 @@ from_bytes(PyTypeObject *Py_UNUSED(type), PyObject *const *args,
         PyObject *arg = args[argidx[1]];
 
         if (PyUnicode_Check(arg)) {
-            const char *byteorder = PyUnicode_AsUTF8(arg);
+            const char *byteorder = PyUnicode_AsUTF8AndSize(arg, NULL);
 
             if (!byteorder) {
                 return NULL; /* LCOV_EXCL_LINE */
@@ -1978,9 +2018,22 @@ digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
     return MPZ_to_str((MPZ_Object *)self, base, 0);
 }
 
-PyDoc_STRVAR(
-    to_bytes__doc__,
-    "to_bytes($self, /, length=1, byteorder=\'big\', *, signed=False)\n--\n\n\
+extern PyObject * __format__(PyObject *self, PyObject *format_spec);
+
+/* Explicit signatures for METH_NOARGS methods are redundant
+   since CPython 3.13. */
+
+static PyMethodDef methods[] = {
+    {"conjugate", (PyCFunction)plus, METH_NOARGS,
+     "conjugate($self, /)\n--\n\nReturns self."},
+    {"bit_length", bit_length, METH_NOARGS,
+     ("bit_length($self, /)\n--\n\nNumber of bits necessary "
+      "to represent self in binary.")},
+    {"bit_count", bit_count, METH_NOARGS,
+     ("bit_count($self, /)\n--\n\nNumber of ones in the binary "
+      "representation of the absolute value of self.")},
+    {"to_bytes", (PyCFunction)to_bytes, METH_FASTCALL | METH_KEYWORDS,
+     "to_bytes($self, /, length=1, byteorder=\'big\', *, signed=False)\n--\n\n\
 Return an array of bytes representing self.\n\n\
 The integer is represented using length bytes.  An OverflowError is\n\
 raised if self is not representable with the given number of bytes.\n\n\
@@ -1989,10 +2042,10 @@ Accepted values are \'big\' and \'little\', when the most significant\n\
 byte is at the beginning or at the end of the byte array, respectively.\n\n\
 The signed argument determines whether two\'s complement is used to\n\
 represent self.  If signed is False and a negative integer is given,\n\
-an OverflowError is raised.");
-PyDoc_STRVAR(
-    from_bytes__doc__,
-    "from_bytes($type, /, bytes, byteorder=\'big\', *, signed=False)\n--\n\n\
+an OverflowError is raised."},
+    {"from_bytes", (PyCFunction)from_bytes,
+     METH_FASTCALL | METH_KEYWORDS | METH_CLASS,
+     "from_bytes($type, /, bytes, byteorder=\'big\', *, signed=False)\n--\n\n\
 Return the integer represented by the given array of bytes.\n\n\
 The argument bytes must either be a bytes-like object or an iterable\n\
 producing bytes.\n\n\
@@ -2000,28 +2053,17 @@ The byteorder argument determines the byte order used to represent the\n\
 integer.  Accepted values are \'big\' and \'little\', when the most\n\
 significant byte is at the beginning or at the end of the byte array,\n\
 respectively.\n\n\
-The signed argument indicates whether two’s complement is used.");
-
-extern PyObject * __format__(PyObject *self, PyObject *format_spec);
-
-static PyMethodDef methods[] = {
-    {"conjugate", (PyCFunction)plus, METH_NOARGS,
-     "Returns self."},
-    {"bit_length", bit_length, METH_NOARGS,
-     "Number of bits necessary to represent self in binary."},
-    {"bit_count", bit_count, METH_NOARGS,
-     ("Number of ones in the binary representation of the "
-      "absolute value of self.")},
-    {"to_bytes", (PyCFunction)to_bytes, METH_FASTCALL | METH_KEYWORDS,
-     to_bytes__doc__},
-    {"from_bytes", (PyCFunction)from_bytes,
-     METH_FASTCALL | METH_KEYWORDS | METH_CLASS, from_bytes__doc__},
+The signed argument indicates whether two’s complement is used."},
     {"as_integer_ratio", as_integer_ratio, METH_NOARGS,
-     ("Return a pair of integers, whose ratio is equal to self.\n\n"
+     ("as_integer_ratio($self, /)\n--\n\nReturn a pair of integers, "
+      "whose ratio is equal to self.\n\n"
       "The ratio is in lowest terms and has a positive denominator.")},
-    {"__trunc__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
-    {"__floor__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
-    {"__ceil__", (PyCFunction)plus, METH_NOARGS, "Returns self."},
+    {"__trunc__", (PyCFunction)plus, METH_NOARGS,
+     "__trunc__($self, /)\n--\n\nReturns self."},
+    {"__floor__", (PyCFunction)plus, METH_NOARGS,
+     "__floor__($self, /)\n--\n\nReturns self."},
+    {"__ceil__", (PyCFunction)plus, METH_NOARGS,
+     "__ceil__($self, /)\n--\n\nReturns self."},
     {"__round__", (PyCFunction)__round__, METH_FASTCALL,
      ("__round__($self, ndigits=0, /)\n--\n\n"
       "Round self to to the closest multiple of 10**-ndigits\n\n"
@@ -2034,8 +2076,9 @@ static PyMethodDef methods[] = {
      ("__format__($self, format_spec, /)\n--\n\n"
       "Convert self to a string according to format_spec.")},
     {"__sizeof__", __sizeof__, METH_NOARGS,
-     "Returns size of self in memory, in bytes."},
-    {"is_integer", is_integer, METH_NOARGS, "Returns True."},
+     "__sizeof__($self, /)\n--\n\nReturns size of self in memory, in bytes."},
+    {"is_integer", is_integer, METH_NOARGS,
+     "is_integer($self, /)\n--\n\nReturns True."},
     {"digits", (PyCFunction)digits, METH_FASTCALL | METH_KEYWORDS,
      ("digits($self, base=10)\n--\n\n"
       "Return string representing self in the given base.\n\n"
@@ -2116,9 +2159,9 @@ gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
 
     if (!g || !s || !t) {
         /* LCOV_EXCL_START */
-        Py_XDECREF(g);
-        Py_XDECREF(s);
-        Py_XDECREF(t);
+        Py_XDECREF((PyObject *)g);
+        Py_XDECREF((PyObject *)s);
+        Py_XDECREF((PyObject *)t);
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
@@ -2127,8 +2170,8 @@ gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
 
     zz_err ret = zz_gcdext(&x->z, &y->z, &g->z, &s->z, &t->z);
 
-    Py_XDECREF(x);
-    Py_XDECREF(y);
+    Py_XDECREF((PyObject *)x);
+    Py_XDECREF((PyObject *)y);
     if (ret == ZZ_MEM) {
         return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
@@ -2142,8 +2185,8 @@ end:
     Py_DECREF(g);
     Py_DECREF(s);
     Py_DECREF(t);
-    Py_XDECREF(x);
-    Py_XDECREF(y);
+    Py_XDECREF((PyObject *)x);
+    Py_XDECREF((PyObject *)y);
     return NULL;
 }
 
@@ -2214,8 +2257,8 @@ gmp_isqrt_rem(PyObject *Py_UNUSED(module), PyObject *arg)
 
     if (!root || !rem) {
         /* LCOV_EXCL_START */
-        Py_XDECREF(root);
-        Py_XDECREF(rem);
+        Py_XDECREF((PyObject *)root);
+        Py_XDECREF((PyObject *)rem);
         return NULL;
         /* LCOV_EXCL_STOP */
     }
@@ -2263,7 +2306,7 @@ gmp_fac(PyObject *Py_UNUSED(module), PyObject *arg)
                      LONG_MAX);
         goto err;
     }
-    Py_XDECREF(x);
+    Py_XDECREF((PyObject *)x);
     if (zz_fac((zz_digit_t)n, &res->z)) {
         /* LCOV_EXCL_START */
         PyErr_NoMemory();
@@ -2308,8 +2351,8 @@ gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
                      ULONG_MAX);
         goto err;
     }
-    Py_XDECREF(x);
-    Py_XDECREF(y);
+    Py_XDECREF((PyObject *)x);
+    Py_XDECREF((PyObject *)y);
     if (zz_bin((zz_digit_t)n, (zz_digit_t)k, &res->z)) {
         /* LCOV_EXCL_START */
         PyErr_NoMemory();
@@ -2357,8 +2400,8 @@ gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
                      ULONG_MAX);
         goto err;
     }
-    Py_XDECREF(x);
-    Py_XDECREF(y);
+    Py_XDECREF((PyObject *)x);
+    Py_XDECREF((PyObject *)y);
     if (k > n) {
         return (PyObject *)res;
     }
@@ -2406,9 +2449,10 @@ invalid:
         return (zz_rnd)-1;
     }
 
-    Py_UCS4 rndchr = PyUnicode_READ_CHAR(rndstr, 0);
+    Py_UCS4 rndchr = PyUnicode_ReadChar(rndstr, 0);
     zz_rnd rnd = ZZ_RNDN;
 
+    assert(rndchr != -1);
     switch (rndchr) {
         case (Py_UCS4)'f':
             rnd = ZZ_RNDD;
@@ -2559,8 +2603,8 @@ gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
                                             &man->z, &exp->z, &bc))
     {
         /* LCOV_EXCL_START */
-        Py_XDECREF(man);
-        Py_XDECREF(exp);
+        Py_XDECREF((PyObject *)man);
+        Py_XDECREF((PyObject *)exp);
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
@@ -2643,7 +2687,7 @@ gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     {
         /* LCOV_EXCL_START */
         Py_DECREF(man);
-        Py_XDECREF(exp);
+        Py_XDECREF((PyObject *)exp);
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
@@ -2666,10 +2710,9 @@ gmp__free_cache(PyObject *Py_UNUSED(module), PyObject *Py_UNUSED(args))
     for (size_t i = 0; i < global.gmp_cache_size; i++) {
         MPZ_Object *u = global.gmp_cache[i];
         PyObject *self = (PyObject *)u;
-        PyTypeObject *type = Py_TYPE(self);
 
         zz_clear(&u->z);
-        type->tp_free(self);
+        PyObject_Free(self);
     }
     global.gmp_cache_size = 0;
     Py_RETURN_NONE;
@@ -2746,12 +2789,10 @@ gmp_exec(PyObject *m)
     if (mpz_info == NULL) {
         return -1; /* LCOV_EXCL_LINE */
     }
-    PyStructSequence_SET_ITEM(mpz_info, 0,
-                              PyLong_FromLong(bits_per_digit));
-    PyStructSequence_SET_ITEM(mpz_info, 1,
-                              PyLong_FromLong(layout->digit_size));
-    PyStructSequence_SET_ITEM(mpz_info, 2,
-                              PyLong_FromUInt64(zz_get_bitcnt_max()));
+    PyStructSequence_SetItem(mpz_info, 0, PyLong_FromLong(bits_per_digit));
+    PyStructSequence_SetItem(mpz_info, 1, PyLong_FromLong(layout->digit_size));
+    PyStructSequence_SetItem(mpz_info, 2,
+                             PyLong_FromUInt64(zz_get_bitcnt_max()));
     if (PyErr_Occurred()) {
         /* LCOV_EXCL_START */
 fail1:
@@ -2785,13 +2826,44 @@ fail1:
                        "gmp.__all__ = ['comb', 'factorial', 'gcd', 'isqrt',\n"
                        "               'lcm', 'mpz', 'perm']\n"
                        "gmp.__version__ = imp.version('python-gmp')\n");
-    PyObject *res = PyRun_String(str, Py_file_input, ns, ns);
+    PyObject *codeobj = Py_CompileString(str, "<file>", Py_file_input);
+    PyObject *res;
 
-    Py_DECREF(ns);
+    if (!codeobj) {
+        goto fail1; /* LCOV_EXCL_LINE */
+    }
+    res = PyEval_EvalCode(codeobj, ns, NULL);
+    Py_DECREF(codeobj);
     if (!res) {
         goto fail1; /* LCOV_EXCL_LINE */
     }
     Py_DECREF(res);
+
+    PyObject *sys_mod = PyImport_ImportModuleLevel("sys", NULL, NULL, NULL, 0);
+
+    if (!sys_mod || PyDict_SetItemString(ns, "sys", sys_mod) < 0) {
+        /* LCOV_EXCL_START */
+        Py_DECREF(ns);
+        goto fail1;
+        /* LCOV_EXCL_STOP */
+    }
+    codeobj = Py_CompileString("sys.hash_info.modulus", "<string>",
+                               Py_eval_input);
+    if (!codeobj || !(res = PyEval_EvalCode(codeobj, ns, NULL))) {
+        /* LCOV_EXCL_START */
+        Py_XDECREF(codeobj);
+        Py_DECREF(ns);
+        goto fail1;
+        /* LCOV_EXCL_STOP */
+    }
+    Py_DECREF(codeobj);
+    Py_DECREF(sys_mod);
+    Py_DECREF(ns);
+    pyhash_modulus = (Py_hash_t)PyLong_AsSsize_t(res);
+    Py_DECREF(res);
+    if (pyhash_modulus == -1) {
+        goto fail1; /* LCOV_EXCL_LINE */
+    }
     return 0;
 }
 
