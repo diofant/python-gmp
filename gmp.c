@@ -8,14 +8,14 @@
 #include <string.h>
 
 #if !defined(PYPY_VERSION)
-#  define CACHE_SIZE (99)
+#  define MAX_CACHE_SIZE 100
 #else
-#  define CACHE_SIZE (0)
+#  define MAX_CACHE_SIZE 0
 #endif
-#define MAX_CACHE_MPZ_DIGITS (64)
+#define MAX_CACHED_NDIGITS 16
 
 typedef struct {
-    MPZ_Object *gmp_cache[CACHE_SIZE + 1];
+    MPZ_Object *gmp_cache[MAX_CACHE_SIZE + 1];
     size_t gmp_cache_size;
 } gmp_global;
 
@@ -32,13 +32,8 @@ MPZ_new(void)
     MPZ_Object *res;
 
     if (global.gmp_cache_size) {
-        res = global.gmp_cache[--(global.gmp_cache_size)];
-        if (zz_set(0, &res->z)) {
-            /* LCOV_EXCL_START */
-            global.gmp_cache[(global.gmp_cache_size)++] = res;
-            return (MPZ_Object *)PyErr_NoMemory();
-            /* LCOV_EXCL_STOP */
-        }
+        res = global.gmp_cache[--global.gmp_cache_size];
+        (void)zz_set(0, &res->z);
         Py_XINCREF((PyObject *)res);
     }
     else {
@@ -695,11 +690,11 @@ dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
 
-    if (global.gmp_cache_size < CACHE_SIZE
-        && (u->z).alloc <= MAX_CACHE_MPZ_DIGITS
+    if (global.gmp_cache_size < MAX_CACHE_SIZE
+        && (u->z).alloc <= MAX_CACHED_NDIGITS
         && MPZ_CheckExact(self))
     {
-        global.gmp_cache[(global.gmp_cache_size)++] = u;
+        global.gmp_cache[global.gmp_cache_size++] = u;
     }
     else {
         zz_clear(&u->z);
@@ -2707,14 +2702,13 @@ gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 static PyObject *
 gmp__free_cache(PyObject *Py_UNUSED(module), PyObject *Py_UNUSED(args))
 {
-    for (size_t i = 0; i < global.gmp_cache_size; i++) {
-        MPZ_Object *u = global.gmp_cache[i];
+    while (global.gmp_cache_size) {
+        MPZ_Object *u = global.gmp_cache[--global.gmp_cache_size];
         PyObject *self = (PyObject *)u;
 
         zz_clear(&u->z);
         PyObject_Free(self);
     }
-    global.gmp_cache_size = 0;
     Py_RETURN_NONE;
 }
 
