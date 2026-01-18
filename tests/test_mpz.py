@@ -1,3 +1,4 @@
+import decimal
 import inspect
 import locale
 import math
@@ -121,6 +122,8 @@ def test_format_bulk(x, fmt):
 
 def test_format_interface():
     mx = mpz(123)
+    with pytest.raises(TypeError, match="int"):
+        mx.__format__(321)
     with pytest.raises(ValueError, match="Unknown format code"):
         format(mx, "q")
     if platform.python_implementation() != "PyPy":  # XXX: pypy/pypy#5311
@@ -296,6 +299,8 @@ def test_mpz_interface():
             mpz(with_int(int2(123)))
     with pytest.raises(TypeError):
         mpz(with_int(1j))
+    with pytest.raises(TypeError):
+        mpz(with_int(decimal.Decimal(123)))
 
     assert mpz(with_index(123)) == 123
     with pytest.raises(RuntimeError):
@@ -1069,8 +1074,8 @@ def test_mpz_collatz(xs):
         assert all(f.result() == 1 for f in futures)
 
 
-@pytest.mark.skipif(platform.python_implementation() != "CPython"
-                    or sys.version_info < (3, 13),
+# See pypy/pypy#5368 and oracle/graalpython#593
+@pytest.mark.skipif(platform.python_implementation() != "CPython",
                     reason="no way to specify a signature")
 def test_int_api():
     for meth in dir(int):
@@ -1078,4 +1083,12 @@ def test_int_api():
         if meth.startswith("_") or not callable(m):
             continue
         mz = getattr(mpz, meth)
-        assert inspect.signature(m) == inspect.signature(mz)
+        try:
+            m_sig = inspect.signature(m)
+        except ValueError:
+            # Signatures for some METH_NOARGS builtins were
+            # unavailable til python/cpython#107794.
+            if sys.version_info < (3, 13):
+                continue
+        mz_sig = inspect.signature(mz)
+        assert m_sig == mz_sig

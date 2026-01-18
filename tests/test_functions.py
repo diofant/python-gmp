@@ -1,7 +1,6 @@
 import inspect
 import math
 import platform
-import sys
 
 import gmp
 import pytest
@@ -235,8 +234,8 @@ def test_interfaces():
     gmp._free_cache()  # just for coverage
 
 
-@pytest.mark.skipif(platform.python_implementation() != "CPython"
-                    or sys.version_info < (3, 11),
+# See pypy/pypy#5368 and oracle/graalpython#593
+@pytest.mark.skipif(platform.python_implementation() != "CPython",
                     reason="no way to specify a signature")
 def test_func_api():
     for fn in ["comb", "factorial", "gcd", "isqrt", "lcm", "perm"]:
