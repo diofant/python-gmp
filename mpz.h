@@ -1,6 +1,7 @@
 #ifndef MPZ_H
 #define MPZ_H
 
+<<<<<<< HEAD
 #if defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wnewline-eof" /* XXX: pypy/pypy#5312 */
@@ -25,6 +26,10 @@
 #endif
 
 #include "zz.h"
+=======
+#include "utils.h"
+#include "zz/zz.h"
+>>>>>>> 723a834 (Keep Python.h include in utils.h)
 
 typedef struct {
     PyObject_HEAD

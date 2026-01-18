@@ -1,5 +1,4 @@
 #include "mpz.h"
-#include "utils.h"
 
 #include <ctype.h>
 #include <float.h>
