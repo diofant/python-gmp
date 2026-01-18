@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 import cmath
+=======
+import decimal
+import inspect
+>>>>>>> 942df50 (Use PyType_GetFullyQualifiedName to print types in errors)
 import locale
 import math
 import operator
@@ -285,6 +290,8 @@ def test_mpz_interface():
             mpz(with_int(int2(123)))
     with pytest.raises(TypeError):
         mpz(with_int(1j))
+    with pytest.raises(TypeError):
+        mpz(with_int(decimal.Decimal(123)))
 
     assert mpz(with_index(123)) == 123
     with pytest.raises(RuntimeError):
