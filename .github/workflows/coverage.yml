@@ -2,9 +2,10 @@ name: Run coverage tests
 on: [workflow_dispatch, workflow_call]
 jobs:
   coverage:
+    timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     env:
-      PYTEST_ADDOPTS: --verbose -n 2
+      PYTEST_ADDOPTS: --verbose
       CFLAGS: -Wall -Wpedantic -Werror -std=c17 -Wconversion
     strategy:
       matrix:
