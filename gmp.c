@@ -2739,9 +2739,13 @@ static PyMethodDef gmp_functions[] = {
      ("perm($module, n, k=None, /)\n--\n\nNumber of ways to choose k"
       " items from n items without repetition and with order.")},
     {"_mpmath_normalize", (PyCFunction)gmp__mpmath_normalize, METH_FASTCALL,
-     NULL},
-    {"_mpmath_create", (PyCFunction)gmp__mpmath_create, METH_FASTCALL, NULL},
-    {"_free_cache", gmp__free_cache, METH_NOARGS, "Free mpz's cache."},
+     ("_mpmath_normalize($module, sign, man, exp, bc, prec, rnd, /)\n--\n\n"
+      "Helper function for mpmath.")},
+    {"_mpmath_create", (PyCFunction)gmp__mpmath_create, METH_FASTCALL,
+     ("_mpmath_create($module, man, exp, prec=0, rnd='d', /)\n--\n\n"
+      "Helper function for mpmath.")},
+    {"_free_cache", gmp__free_cache, METH_NOARGS,
+     "_free_cache($module)\n--\n\nFree mpz's cache."},
     {NULL} /* sentinel */
 };
 
