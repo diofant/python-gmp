@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "mesonpy"
-requires = ["meson-python", "setuptools_scm[toml]>=9"]
+requires = ["meson-python"]
 
 [project]
 name = "python-gmp"
