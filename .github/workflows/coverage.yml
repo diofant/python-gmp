@@ -5,7 +5,6 @@ jobs:
     timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     env:
-      PYTEST_ADDOPTS: --verbose
       CFLAGS: -Wall -Wpedantic -Werror -std=c17 -Wconversion
     strategy:
       matrix:
