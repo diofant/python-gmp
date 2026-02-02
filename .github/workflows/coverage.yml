@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-24.04]
-        python-version: [pypy3.11, "graalpy-25.0", "3.x"]
+        python-version: [pypy3.11-nightly, "graalpy-25.0", "3.x"]
     steps:
       - uses: actions/checkout@v6
         with:
