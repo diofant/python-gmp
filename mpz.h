@@ -10,9 +10,11 @@ typedef struct {
     zz_t z;
 } MPZ_Object;
 
-extern PyTypeObject MPZ_Type;
+#define MPZ_CheckExact(st, u) Py_IS_TYPE((u), (st)->MPZ_Type)
+#define MPZ_Check(st, u) PyObject_TypeCheck((u), (st)->MPZ_Type)
 
-#define MPZ_CheckExact(u) Py_IS_TYPE((u), &MPZ_Type)
-#define MPZ_Check(u) PyObject_TypeCheck((u), &MPZ_Type)
+typedef struct {
+    PyTypeObject *MPZ_Type;
+} gmp_state;
 
 #endif /* MPZ_H */
