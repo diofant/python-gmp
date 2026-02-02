@@ -1,5 +1,5 @@
 project('gmp', 'c',
-        version: run_command('python', '-m', 'setuptools_scm',
+        version: run_command('python', 'scripts/gitversion.py',
                              check: true).stdout().strip(),
         default_options: ['c_std=c17'])
 py = import('python').find_installation(pure: false)
