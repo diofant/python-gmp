@@ -1,23 +1,22 @@
-import os
-import platform
-from datetime import timedelta
+def pytest_configure(config):
+    if "no:hypothesispytest" not in config.getoption("-p"):
+        import platform
 
-import gmp
-from hypothesis import settings
+        from hypothesis import settings
 
-default = settings.get_profile("default")
-settings.register_profile("default",
-                          settings(default,
-                                   deadline=timedelta(seconds=300)))
-ci = settings.get_profile("ci")
-if platform.python_implementation() != "GraalVM":
-    ci = settings(ci, max_examples=10000)
-else:
-    ci = settings(ci, max_examples=1000)
-settings.register_profile("ci", ci)
+        default = settings.get_profile("default")
+        settings.register_profile("default", settings(default, deadline=700))
+        ci = settings.get_profile("ci")
+        if platform.python_implementation() != "GraalVM":
+            ci = settings(ci, max_examples=10000)
+        else:
+            ci = settings(ci, max_examples=1000)
+        settings.register_profile("ci", ci)
 
 
 def pytest_report_header(config):
+    import gmp
+
     print(f"""
   Using the ZZ library v{gmp._zz_version}
 
@@ -28,4 +27,6 @@ def pytest_report_header(config):
 
 
 def pytest_sessionstart(session):
+    import os
+
     os.environ["MPMATH_NOGMPY"] = "Y"
