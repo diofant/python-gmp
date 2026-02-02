@@ -8,6 +8,7 @@ import platform
 import sys
 import warnings
 from concurrent.futures import ThreadPoolExecutor
+from subprocess import run
 
 import pytest
 from gmp import mpz
@@ -1092,3 +1093,10 @@ def test_int_api():
                 continue
         mz_sig = inspect.signature(mz)
         assert m_sig == mz_sig
+
+
+def test_mpz_clear():
+    # for coverage (test module cleanup)
+    res = run([sys.executable, "-c",
+               "import gmp; a = gmp.mpz(1); del a; gmp._free_cache()"])
+    assert res.returncode == 0

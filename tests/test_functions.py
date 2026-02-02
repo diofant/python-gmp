@@ -231,7 +231,6 @@ def test_interfaces():
         _mpmath_normalize(1, mpz(111), 1j, 12, 13, "c")
     with pytest.raises(ValueError, match="invalid rounding mode specified"):
         _mpmath_normalize(1, mpz(111), 11, 12, 13, 1j)
-    gmp._free_cache()  # just for coverage
 
 
 # See pypy/pypy#5368 and oracle/graalpython#593
