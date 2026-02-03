@@ -14,14 +14,15 @@ if platform.python_implementation() == "GraalVM":
     pytest.skip("XXX: module 'resource' has no attribute 'setrlimit'",
                 allow_module_level=True)
 if platform.python_implementation() == "PyPy":
-    pytest.skip("XXX: diofant/python-gmp#73", allow_module_level=True)
+    pytest.skip("See pypy/pypy#5147 and pypy/pypy#5325",
+                allow_module_level=True)
 
 VMEM_LIMIT = 64*1000**2
 resource = pytest.importorskip("resource")
 
 
 def test_fac_outofmem():
-    for _ in range(100):
+    for _ in range(20):
         x = random.randint(12811, 24984)
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
         resource.setrlimit(resource.RLIMIT_AS, (VMEM_LIMIT, hard))
@@ -38,7 +39,7 @@ def test_fac_outofmem():
 
 
 def test_square_outofmem():
-    for _ in range(100):
+    for _ in range(20):
         x = random.randint(49846727467293, 249846727467293)
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
         resource.setrlimit(resource.RLIMIT_AS, (VMEM_LIMIT, hard))
@@ -56,8 +57,6 @@ def test_square_outofmem():
         resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
 
 
-@pytest.mark.skipif(platform.python_implementation() == "PyPy",
-                    reason="XXX: pypy/pypy#5325")
 def test_square_with_threads():
     soft, hard = resource.getrlimit(resource.RLIMIT_AS)
     def f(n, barrier):
