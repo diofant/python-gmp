@@ -861,7 +861,7 @@ end:
 fallback:
     Py_RETURN_NOTIMPLEMENTED;
 numbers:
-    self = to_float(self);
+    self = MPZ_to_int((MPZ_Object *)self);
     if (!self) {
         return NULL; /* LCOV_EXCL_LINE */
     }
