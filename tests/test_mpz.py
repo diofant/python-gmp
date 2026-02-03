@@ -362,6 +362,7 @@ def test_repr(x):
 
 
 @given(bigints(), floats())
+@example(9007199254740993, 9007199254740992.0)
 def test_richcompare_mixed(x, y):
     mx = mpz(x)
     for op in [operator.eq, operator.ne, operator.lt, operator.le,
@@ -376,10 +377,6 @@ def test_richcompare_errors():
         mx > 1j
     with pytest.raises(TypeError):
         mx > object()
-    with pytest.raises(OverflowError):
-        mpz(10**1000) < 1.1
-    with pytest.raises(OverflowError):
-        mpz(10**1000) > 1.1
 
 
 def test_hash_caching():
