@@ -109,7 +109,7 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
         assert(saved_char);
     }
 
-    zz_err ret = zz_get_str(&u->z, base, p, &len);
+    zz_err ret = zz_get_str(&u->z, base, p);
 
     if (saved_char) {
         *p = saved_char;
@@ -120,11 +120,11 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
-    p += len;
+    p += strlen(p);
     if (options & OPT_TAG) {
         *(p++) = ')';
+        *p = '\0';
     }
-    *(p++) = '\0';
 
     PyObject *res = PyUnicode_FromString(buf);
 
@@ -135,8 +135,7 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
 static MPZ_Object *
 MPZ_from_str(PyObject *obj, int base)
 {
-    Py_ssize_t len;
-    const char *str = PyUnicode_AsUTF8AndSize(obj, &len);
+    const char *str = PyUnicode_AsUTF8(obj);
 
     if (!str) {
         return NULL; /* LCOV_EXCL_LINE */
@@ -150,20 +149,17 @@ MPZ_from_str(PyObject *obj, int base)
     if (!res) {
         return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-    while (len && isspace(*str)) {
+    while (isspace(*str)) {
         str++;
-        len--;
     }
 
     bool cast_negative = (str[0] == '-');
 
     str += cast_negative;
-    len -= cast_negative;
-    if (len && str[0] == '+') {
+    if (str[0] == '+') {
         str++;
-        len--;
     }
-    if (str[0] == '0' && len >= 2) {
+    if (str[0] == '0') {
         if (base == 0) {
             if (tolower(str[1]) == 'b') {
                 base = 2;
@@ -174,7 +170,7 @@ MPZ_from_str(PyObject *obj, int base)
             else if (tolower(str[1]) == 'x') {
                 base = 16;
             }
-            else {
+            else if (!isspace(str[1]) && str[1] != '\0') {
                 goto err;
             }
         }
@@ -183,10 +179,8 @@ MPZ_from_str(PyObject *obj, int base)
             || (tolower(str[1]) == 'x' && base == 16))
         {
             str += 2;
-            len -= 2;
-            if (len && str[0] == '_') {
+            if (str[0] == '_') {
                 str++;
-                len--;
             }
         }
         else {
@@ -196,21 +190,13 @@ MPZ_from_str(PyObject *obj, int base)
     else {
 skip_negation:
         str -= cast_negative;
-        len += cast_negative;
         cast_negative = false;
     }
     if (base == 0) {
         base = 10;
     }
 
-    const char *end = str + len - 1;
-
-    while (len > 0 && isspace(*end)) {
-        end--;
-        len--;
-    }
-
-    zz_err ret = zz_set_str(str, (size_t)len, base, &res->z);
+    zz_err ret = zz_set_str(str, base, &res->z);
 
     if (ret == ZZ_MEM) {
         /* LCOV_EXCL_START */
@@ -327,13 +313,12 @@ MPZ_to_int(MPZ_Object *u)
 
     char *buf = malloc(len + 1);
 
-    if (zz_get_str(&u->z, 16, buf, &len)) {
+    if (zz_get_str(&u->z, 16, buf)) {
         /* LCOV_EXCL_START */
         free(buf);
         return NULL;
         /* LCOV_EXCL_STOP */
     }
-    buf[len] = '\0';
 
     PyObject *res = PyLong_FromString(buf, NULL, 16);
 
