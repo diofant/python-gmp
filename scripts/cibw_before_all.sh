@@ -53,7 +53,7 @@ make --silent all install
 
 cd ..
 
-ZZ_VERSION=0.8.0b0
+ZZ_VERSION=0.8.0b1
 ZZ_DIR=zz-${ZZ_VERSION}
 ZZ_URL=https://github.com/diofant/zz/releases/download/v${ZZ_VERSION}/${ZZ_DIR}.tar.gz
 
