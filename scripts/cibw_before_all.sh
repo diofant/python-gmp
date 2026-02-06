@@ -27,10 +27,10 @@ tar xf gmp-6.3.0-20250919151842.tar.zst
 #cd ${GMP_DIR}
 cd gmp-6.3.0-20250919151842/
 
-for f in ../scripts/*.diff
-do
-  patch --strip 1 < $f
-done
+#for f in ../scripts/*.diff
+#do
+#  patch --strip 1 < $f
+#done
 
 CONFIG_ARGS="--enable-shared --disable-static --with-pic --disable-alloca --prefix=$PREFIX"
 if [ "$OSTYPE" = "cygwin" ]
