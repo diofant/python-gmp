@@ -2,7 +2,8 @@ Python-GMP
 ==========
 
 Python extension module, providing bindings to the GNU GMP via the `ZZ library
-<https://github.com/diofant/zz>`_.  This module shouldn't crash the interpreter.
+<https://github.com/diofant/zz>`_ (version 0.8.0 or later required).  This
+module shouldn't crash the interpreter.
 
 The gmp can be used as a `gmpy2`_/`python-flint`_ replacement to provide
 integer type (`mpz`_), compatible with Python's `int`_.  It also includes
