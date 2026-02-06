@@ -19,9 +19,13 @@ GMP_VERSION=6.3.0
 GMP_DIR=gmp-${GMP_VERSION}
 GMP_URL=https://ftp.gnu.org/gnu/gmp/${GMP_DIR}.tar.xz
 
+GMP_URL=https://gmplib.org/download/snapshot/gmp-next/gmp-6.3.0-20250919151842.tar.zst
+
 download ${GMP_URL}
-tar --extract --file ${GMP_DIR}.tar.xz
-cd ${GMP_DIR}
+#tar --extract --file ${GMP_DIR}.tar.xz
+tar xf gmp-6.3.0-20250919151842.tar.zst
+#cd ${GMP_DIR}
+cd gmp-6.3.0-20250919151842/
 
 for f in ../scripts/*.diff
 do
@@ -33,7 +37,7 @@ if [ "$OSTYPE" = "cygwin" ]
 then
   if [ "${RUNNER_ARCH}" = "ARM64" ]
   then
-    autoreconf -fi
+#   autoreconf -fi
     CONFIG_ARGS="${CONFIG_ARGS} --disable-assembly"
   else
     CONFIG_ARGS="${CONFIG_ARGS} --enable-fat"
