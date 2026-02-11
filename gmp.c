@@ -140,60 +140,11 @@ MPZ_from_str(PyObject *obj, int base)
     if (!str) {
         return NULL; /* LCOV_EXCL_LINE */
     }
-    if (base < 0) {
-        goto bad_base;
-    }
 
     MPZ_Object *res = MPZ_new();
 
     if (!res) {
         return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
-    }
-    while (isspace(*str)) {
-        str++;
-    }
-
-    bool cast_negative = (str[0] == '-');
-
-    str += cast_negative;
-    if (str[0] == '+') {
-        str++;
-    }
-    if (str[0] == '0') {
-        if (base == 0) {
-            if (tolower(str[1]) == 'b') {
-                base = 2;
-            }
-            else if (tolower(str[1]) == 'o') {
-                base = 8;
-            }
-            else if (tolower(str[1]) == 'x') {
-                base = 16;
-            }
-            else if (!isspace(str[1]) && str[1] != '\0') {
-                goto err;
-            }
-        }
-        if ((tolower(str[1]) == 'b' && base == 2)
-            || (tolower(str[1]) == 'o' && base == 8)
-            || (tolower(str[1]) == 'x' && base == 16))
-        {
-            str += 2;
-            if (str[0] == '_') {
-                str++;
-            }
-        }
-        else {
-            goto skip_negation;
-        }
-    }
-    else {
-skip_negation:
-        str -= cast_negative;
-        cast_negative = false;
-    }
-    if (base == 0) {
-        base = 10;
     }
 
     zz_err ret = zz_set_str(str, base, &res->z);
@@ -206,21 +157,16 @@ skip_negation:
     }
     else if (ret == ZZ_VAL) {
         Py_DECREF(res);
-        if (2 <= base && base <= 36) {
-err:
+        if (!base || (2 <= base && base <= 36)) {
             PyErr_Format(PyExc_ValueError,
                          "invalid literal for mpz() with base %d: %.200R",
                          base, obj);
         }
         else {
-bad_base:
             PyErr_SetString(PyExc_ValueError,
                             "mpz base must be >= 2 and <= 36, or 0");
         }
         return NULL;
-    }
-    if (cast_negative) {
-        (void)zz_neg(&res->z, &res->z);
     }
     return res;
 }
