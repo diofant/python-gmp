@@ -980,6 +980,12 @@ def test_round_interface():
         x.__round__(1, 2)
     with pytest.raises(TypeError):
         x.__round__(1j)
+    with pytest.raises(OverflowError):
+        x.__round__((-1<<64) + 1)
+    with pytest.raises(OverflowError):
+        x.__round__((-1<<62))
+    with pytest.raises(OverflowError):
+        x.__round__(-1<<127)
 
 
 @pytest.mark.skipif(platform.python_implementation() == "PyPy",
