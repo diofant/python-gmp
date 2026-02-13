@@ -12,7 +12,7 @@ build:
       pre_create_environment:
         - |
           PREFIX=$(pwd)/.local
-          ZZ_VERSION=0.8.0
+          ZZ_VERSION=0.9.0a2
           ZZ_DIR=zz-${ZZ_VERSION}
           GITHUB_URL=https://github.com/diofant/zz/releases/download/
           ZZ_URL=${GITHUB_URL}v${ZZ_VERSION}/${ZZ_DIR}.tar.gz
