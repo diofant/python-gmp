@@ -818,8 +818,10 @@ hash(PyObject *self)
     assert((int64_t)INT64_MAX > pyhash_modulus);
     (void)zz_div(&u->z, (int64_t)pyhash_modulus, NULL, &w);
 
-    Py_hash_t r = w.size ? (Py_hash_t)w.digits[0] : 0;
+    Py_hash_t r;
 
+    assert(sizeof(Py_hash_t) == 8);
+    (void)zz_get(&w, (int64_t *)&r);
     if (zz_isneg(&u->z) && r) {
         r = -(pyhash_modulus - r);
     }
