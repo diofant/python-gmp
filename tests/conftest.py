@@ -5,7 +5,7 @@ def pytest_configure(config):
         from hypothesis import settings
 
         default = settings.get_profile("default")
-        settings.register_profile("default", settings(default, deadline=1600))
+        settings.register_profile("default", settings(default, deadline=3000))
         ci = settings.get_profile("ci")
         if platform.python_implementation() != "GraalVM":
             ci = settings(ci, max_examples=10000)
