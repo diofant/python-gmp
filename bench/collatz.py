@@ -8,6 +8,8 @@ if os.getenv("T") == "gmpy2.mpz":
     from gmpy2 import mpz
 elif os.getenv("T") == "flint.fmpz":
     from flint import fmpz as mpz
+elif os.getenv("T") == "int":
+    mpz = int
 else:
     from gmp import mpz
 
