@@ -721,17 +721,17 @@ def test_power_errors():
     if platform.python_implementation() == "GraalVM":
         return  # issue oracle/graalpython#551
     if BITCNT_MAX < (1<<64) - 1:
-        with pytest.raises(MemoryError):
+        with pytest.raises(OverflowError):
             pow(mpz(1<<64), (1<<31) - 1)
-        with pytest.raises(MemoryError):
+        with pytest.raises(OverflowError):
             pow(mpz(1<<64), (1<<31))
         with pytest.raises(OverflowError):
             mpz(1) << ((1 << 63) - 1)
     else:
-        with pytest.raises(MemoryError):
+        with pytest.raises(OverflowError):
             pow(mpz(1<<64), (1<<63) - 1)
         if platform.system() != "Darwin":
-            with pytest.raises(MemoryError):
+            with pytest.raises(OverflowError):
                 pow(mpz(1<<64), (1<<63))
         with pytest.raises(OverflowError):
             mpz(1) << ((1 << 64) - 1)

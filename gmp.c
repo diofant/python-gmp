@@ -1495,17 +1495,29 @@ power(PyObject *self, PyObject *other, PyObject *module)
             Py_DECREF(vf);
             return resf;
         }
-        res = MPZ_new();
 
         int64_t exp;
 
-        if (!res || zz_get(&v->z, &exp)
-            || zz_pow(&u->z, (zz_digit_t)exp, &res->z))
-        {
-            /* LCOV_EXCL_START */
-            Py_CLEAR(res);
-            PyErr_SetNone(PyExc_MemoryError);
-            /* LCOV_EXCL_STOP */
+        if (zz_get(&v->z, &exp)) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "too many digits in integer");
+        }
+        else {
+            res = MPZ_new();
+            if (res) {
+                zz_err ret = zz_pow(&u->z, (uint64_t)exp, &res->z);
+
+                if (ret) {
+                    Py_CLEAR(res);
+                    if (ret == ZZ_MEM) {
+                        PyErr_SetNone(PyExc_MemoryError); /* LCOV_EXCL_LINE */
+                    }
+                    else {
+                        PyErr_SetString(PyExc_OverflowError,
+                                        "too many digits in integer");
+                    }
+                }
+            }
         }
         Py_DECREF(u);
         Py_DECREF(v);
