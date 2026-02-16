@@ -56,7 +56,7 @@ int OPT_PREFIX = 0x2;
 PyObject *
 MPZ_to_str(MPZ_Object *u, int base, int options)
 {
-    size_t len;
+    size_t len = 0;
     bool negative = zz_isneg(&u->z);
 
     if (zz_sizeinbase(&u->z, base, &len)) {
@@ -144,7 +144,7 @@ MPZ_from_str(PyObject *obj, int base)
     MPZ_Object *res = MPZ_new();
 
     if (!res) {
-        return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
+        return NULL; /* LCOV_EXCL_LINE */
     }
 
     zz_err ret = zz_set_str(str, base, &res->z);
@@ -153,6 +153,13 @@ MPZ_from_str(PyObject *obj, int base)
         /* LCOV_EXCL_START */
         Py_DECREF(res);
         return (MPZ_Object *)PyErr_NoMemory();
+        /* LCOV_EXCL_STOP */
+    }
+    else if (ret == ZZ_BUF) {
+        /* LCOV_EXCL_START */
+        PyErr_SetString(PyExc_OverflowError,
+                        "too many digits in integer");
+        return NULL;
         /* LCOV_EXCL_STOP */
     }
     else if (ret == ZZ_VAL) {
@@ -185,10 +192,22 @@ MPZ_from_int(PyObject *obj)
     }
     if (long_export.digits) {
         res = MPZ_new();
-        if (!res || zz_import((size_t)long_export.ndigits,
-                              long_export.digits, *int_layout, &res->z))
-        {
-            return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
+        if (!res) {
+            return NULL; /* LCOV_EXCL_LINE */
+        }
+
+        zz_err ret = zz_import((size_t)long_export.ndigits,
+                               long_export.digits, *int_layout, &res->z);
+
+        if (ret) {
+            /* LCOV_EXCL_START */
+            if (ret == ZZ_MEM) {
+                return (MPZ_Object *)PyErr_NoMemory();
+            }
+            PyErr_SetString(PyExc_OverflowError,
+                            "too many digits in integer");
+            return NULL;
+            /* LCOV_EXCL_STOP */
         }
         if (long_export.negative) {
             (void)zz_neg(&res->z, &res->z);
@@ -262,7 +281,7 @@ MPZ_to_int(MPZ_Object *u)
     if (zz_get_str(&u->z, 16, buf)) {
         /* LCOV_EXCL_START */
         free(buf);
-        return NULL;
+        return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
 
@@ -329,7 +348,7 @@ zz_get_bytes(const zz_t *u, size_t length, bool is_signed,
 
     size_t gap = length - (nbits + bits_per_digit/8 - 1)/(bits_per_digit/8);
 
-    zz_export(u, bytes_layout, length - gap, *buffer + gap);
+    (void)zz_export(u, bytes_layout, length - gap, *buffer + gap);
     memset(*buffer, is_negative ? 0xFF : 0, gap);
     zz_clear(&tmp);
     return ZZ_OK;
@@ -383,13 +402,18 @@ zz_set_bytes(const unsigned char *buffer, size_t length, bool is_signed,
     if (!length) {
         return zz_set(0, u);
     }
-    if (zz_import(length, buffer, bytes_layout, u)) {
-        return ZZ_MEM; /* LCOV_EXCL_LINE */
+
+    zz_err ret = zz_import(length, buffer, bytes_layout, u);
+
+    if (ret) {
+        return ret; /* LCOV_EXCL_LINE */
     }
     (void)zz_abs(u, u);
     if (is_signed && zz_bitlen(u) == 8*(size_t)length) {
         zz_t tmp;
 
+        /* we assume, that bytes were created by zz_get_bytes(),
+           else there could be overflow in zz_mul_2exp() */
         if (zz_init(&tmp) || zz_set(1, &tmp)
             || zz_mul_2exp(&tmp, 8*length, &tmp)
             || zz_sub(&tmp, u, u) || zz_neg(u, u))
@@ -436,18 +460,32 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
 
     MPZ_Object *res = MPZ_new();
 
-    if (!res || zz_set_bytes(buffer, (size_t)length, is_signed, &res->z)) {
+    if (!res) {
         /* LCOV_EXCL_START */
         Py_DECREF(bytes);
         if (is_little) {
             free(buffer);
         }
-        Py_XDECREF((PyObject *)res);
-        return (MPZ_Object *)PyErr_NoMemory();
+        return NULL;
         /* LCOV_EXCL_STOP */
     }
+
+    zz_err ret = zz_set_bytes(buffer, (size_t)length, is_signed, &res->z);
+
+    Py_DECREF(bytes);
     if (is_little) {
         free(buffer);
+    }
+    if (ret) {
+        /* LCOV_EXCL_START */
+        Py_DECREF((PyObject *)res);
+        if (ret == ZZ_MEM) {
+            return (MPZ_Object *)PyErr_NoMemory();
+        }
+        PyErr_SetString(PyExc_OverflowError,
+                        "too many digits in integer");
+        return NULL;
+        /* LCOV_EXCL_STOP */
     }
     return res;
 }
@@ -831,23 +869,36 @@ hash(PyObject *self)
     return u->hash_cache = r;
 }
 
-#define UNOP(suff, func)                           \
-    static PyObject *                              \
-    func(PyObject *self)                           \
-    {                                              \
-        MPZ_Object *u = (MPZ_Object *)self;        \
-        MPZ_Object *res = MPZ_new();               \
-                                                   \
-        if (res && zz_##suff(&u->z, &res->z)) {    \
-            PyErr_NoMemory(); /* LCOV_EXCL_LINE */ \
-        }                                          \
-        return (PyObject *)res;                    \
+#define UNOP(suff, func)                                       \
+    static PyObject *                                          \
+    func(PyObject *self)                                       \
+    {                                                          \
+        MPZ_Object *u = (MPZ_Object *)self;                    \
+        MPZ_Object *res = MPZ_new();                           \
+                                                               \
+        if (!res) {                                            \
+            return NULL;                                       \
+        }                                                      \
+                                                               \
+        zz_err ret = zz_##suff(&u->z, &res->z);                \
+                                                               \
+        if (ret) {                                             \
+            Py_CLEAR(res);                                     \
+            if (ret == ZZ_BUF) {                               \
+                PyErr_SetString(PyExc_OverflowError,           \
+                                "too many digits in integer"); \
+            }                                                  \
+            else {                                             \
+                PyErr_NoMemory();                              \
+            }                                                  \
+        }                                                      \
+        return (PyObject *)res;                                \
     }
 
 UNOP(pos, plus)
 UNOP(neg, nb_negative)
 UNOP(abs, nb_absolute)
-UNOP(invert, nb_invert)
+UNOP(invert, nb_invert) /* may overflow */
 
 PyObject *
 to_int(PyObject *self)
@@ -920,17 +971,19 @@ to_bool(PyObject *self)
         }                                                       \
         ret = zz_##suff(&u->z, &v->z, &res->z);                 \
 done:                                                           \
-        if (ret == ZZ_OK) {                                     \
-            goto end;                                           \
-        }                                                       \
-        if (ret == ZZ_VAL) {                                    \
+        if (ret) {                                              \
             Py_CLEAR(res);                                      \
-            PyErr_SetString(PyExc_ZeroDivisionError,            \
-                            "division by zero");                \
-        }                                                       \
-        else {                                                  \
-            Py_CLEAR(res);                                      \
-            PyErr_NoMemory();                                   \
+            if (ret == ZZ_VAL) {                                \
+                PyErr_SetString(PyExc_ZeroDivisionError,        \
+                                "division by zero");            \
+            }                                                   \
+            else if (ret == ZZ_BUF) {                           \
+                PyErr_SetString(PyExc_OverflowError,            \
+                                "too many digits in integer");  \
+            }                                                   \
+            else {                                              \
+                PyErr_NoMemory();                               \
+            }                                                   \
         }                                                       \
     end:                                                        \
         Py_XDECREF((PyObject *)u);                              \
@@ -980,6 +1033,7 @@ BINOP(mul, PyNumber_Multiply)
 #define zz_quo_(u, v, w) zz_div((u), (v), (w), NULL)
 #define zz_rem_(u, v, w) zz_div((u), (v), NULL, (w))
 
+/* can't overflow */
 BINOP(quo_, PyNumber_FloorDivide)
 BINOP(rem_, PyNumber_Remainder)
 
@@ -1097,6 +1151,8 @@ err:
     if (cmp == ZZ_EQ && !zz_isodd(v) && !zz_iszero(q) && zz_isodd(q)) {
         cmp = unexpect;
     }
+    /* No overflow is possible, since q can't have maximal value
+       below (that means v==1) and r have same sign as v (with |r| < |v|) */
     if (cmp == unexpect && (zz_add(q, 1, q) || zz_sub(r, v, r))) {
         goto err; /* LCOV_EXCL_LINE */
     }
@@ -1179,6 +1235,8 @@ tmp_clear:
         }
     }
     shift += DBL_MANT_DIG;
+    /* No overflow is possible in shifts, since shift value
+       much smaller here than zz_get_bitcnt_max() */
     if (shift > 0 && zz_mul_2exp(&a, (uint64_t)shift, &a)) {
         goto tmp_clear; /* LCOV_EXCL_LINE */
     }
@@ -1311,7 +1369,7 @@ numbers:
         res = MPZ_new();                                        \
         zz_err ret = ZZ_OK;                                     \
                                                                 \
-        if (!res || (ret = zz_##suff(&u->z, &v->z, &res->z))) { \
+        if (res && (ret = zz_##suff(&u->z, &v->z, &res->z))) {  \
             /* LCOV_EXCL_START */                               \
             Py_CLEAR(res);                                      \
             if (ret == ZZ_VAL) {                                \
@@ -1918,7 +1976,7 @@ __sizeof__(PyObject *self, PyObject *Py_UNUSED(ignored))
     MPZ_Object *u = (MPZ_Object *)self;
 
     return PyLong_FromSize_t(sizeof(MPZ_Object)
-                             + (unsigned int)(u->z).alloc*sizeof(zz_digit_t));
+                             + (size_t)(u->z).alloc*sizeof(zz_digit_t));
 }
 
 static PyObject *
@@ -2153,10 +2211,18 @@ gmp_lcm(PyObject *Py_UNUSED(module), PyObject *const *args, Py_ssize_t nargs)
             Py_DECREF(arg);
             continue;
         }
-        if (zz_lcm(&res->z, &arg->z, &res->z)) {
+
+        zz_err ret = zz_lcm(&res->z, &arg->z, &res->z);
+
+        if (ret) {
             /* LCOV_EXCL_START */
             Py_DECREF(res);
             Py_DECREF(arg);
+            if (ret == ZZ_BUF) {
+                PyErr_SetString(PyExc_OverflowError,
+                                "too many digits in integer");
+                return NULL;
+            }
             return PyErr_NoMemory();
             /* LCOV_EXCL_STOP */
         }
@@ -2188,7 +2254,7 @@ gmp_isqrt(PyObject *Py_UNUSED(module), PyObject *arg)
         PyErr_SetString(PyExc_ValueError,
                         "isqrt() argument must be nonnegative");
     }
-    if (ret == ZZ_MEM) {
+    else {
         PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
 end:
@@ -2217,11 +2283,11 @@ gmp_isqrt_rem(PyObject *Py_UNUSED(module), PyObject *arg)
     if (ret == ZZ_OK) {
         tup = PyTuple_Pack(2, root, rem);
     }
-    if (ret == ZZ_VAL) {
+    else if (ret == ZZ_VAL) {
         PyErr_SetString(PyExc_ValueError,
                         "isqrt() argument must be nonnegative");
     }
-    if (ret == ZZ_MEM) {
+    else {
         PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
 end:
@@ -2512,6 +2578,7 @@ do_rnd:
     }
     return ZZ_OK;
 }
+
 static PyObject *
 gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
