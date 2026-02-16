@@ -1831,58 +1831,67 @@ noop:
     }
 
     MPZ_Object *ndigits = NULL;
-    zz_t exp, ten, p;
 
-    CHECK_OP_INT(ndigits, args[0]);
-
-    if (zz_isneg(&ndigits->z)) {
-        if (zz_init(&exp) || zz_pos(&ndigits->z, &exp)) {
-            /* LCOV_EXCL_START */
-            zz_clear(&exp);
-            Py_DECREF(ndigits);
-            return PyErr_NoMemory();
-            /* LCOV_EXCL_STOP */
-        }
+    if (MPZ_Check(args[0])) {
+        ndigits = (MPZ_Object *)plus(args[0]);
     }
     else {
+        ndigits = MPZ_from_int(args[0]);
+    }
+    if (!ndigits) {
+        return NULL;
+    }
+    if (!zz_isneg(&ndigits->z)) {
         Py_DECREF(ndigits);
         goto noop;
     }
+
+    zz_t divisor;
+    int64_t exp;
+
+    (void)zz_neg(&ndigits->z, &ndigits->z);
+    if (zz_init(&divisor) || zz_set(10, &divisor)) {
+        /* LCOV_EXCL_START */
+        zz_clear(&divisor);
+        return PyErr_NoMemory();
+        /* LCOV_EXCL_STOP */
+    }
+    if (zz_get(&ndigits->z, &exp)) {
+        zz_clear(&divisor);
+        goto overflow;
+    }
+
+    zz_err ret = zz_pow(&divisor, (uint64_t)exp, &divisor);
+
+    if (ret) {
+        zz_clear(&divisor);
+        Py_DECREF(ndigits);
+        if (ret == ZZ_MEM) {
+            return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
+        }
+overflow:
+        PyErr_SetString(PyExc_OverflowError,
+                        "too many digits in integer");
+        return NULL;
+    }
     Py_DECREF(ndigits);
-    if (zz_init(&ten) || zz_set(10, &ten) || exp.size != 1) {
-        /* LCOV_EXCL_START */
-        zz_clear(&exp);
-        zz_clear(&ten);
-        return PyErr_NoMemory();
-        /* LCOV_EXCL_STOP */
-    }
-    if (zz_init(&p) || zz_pow(&ten, exp.digits[0], &p)) {
-        /* LCOV_EXCL_START */
-        zz_clear(&exp);
-        zz_clear(&ten);
-        zz_clear(&p);
-        return PyErr_NoMemory();
-        /* LCOV_EXCL_STOP */
-    }
-    zz_clear(&exp);
-    zz_clear(&ten);
 
     MPZ_Object *res = MPZ_new();
 
     if (!res) {
         /* LCOV_EXCL_START */
-        zz_clear(&p);
+        zz_clear(&divisor);
         return NULL;
         /* LCOV_EXCL_STOP */
     }
-    if (zz_divnear(&u->z, &p, NULL, &res->z)) {
+    if (zz_divnear(&u->z, &divisor, NULL, &res->z)) {
         /* LCOV_EXCL_START */
-        zz_clear(&p);
+        zz_clear(&divisor);
         Py_DECREF(res);
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
-    zz_clear(&p);
+    zz_clear(&divisor);
     if (zz_sub(&u->z, &res->z, &res->z)) {
         /* LCOV_EXCL_START */
         Py_DECREF(res);
@@ -1890,8 +1899,6 @@ noop:
         /* LCOV_EXCL_STOP */
     }
     return (PyObject *)res;
-end:
-    return NULL;
 }
 
 static PyObject *
