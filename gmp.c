@@ -2474,14 +2474,12 @@ do_rnd:
         }
 
         zz_t tmp;
+        zz_err ret = ZZ_OK;
 
-        if (zz_init(&tmp) || shift > INT64_MAX
-            || zz_set((int64_t)shift, &tmp)
-            || zz_add(exp, &tmp, exp))
-        {
+        if (zz_init(&tmp) || (ret = zz_add(exp, shift, exp))) {
             /* LCOV_EXCL_START */
             zz_clear(&tmp);
-            return ZZ_MEM;
+            return ret;
             /* LCOV_EXCL_STOP */
         }
         zz_clear(&tmp);
@@ -2498,14 +2496,12 @@ do_rnd:
     }
 
     zz_t tmp;
+    zz_err ret = ZZ_OK;
 
-    if (zz_init(&tmp) || zbits > INT64_MAX
-        || zz_set((int64_t)zbits, &tmp)
-        || zz_add(exp, &tmp, exp))
-    {
+    if (zz_init(&tmp) || (ret = zz_add(exp, zbits, exp))) {
         /* LCOV_EXCL_START */
         zz_clear(&tmp);
-        return ZZ_MEM;
+        return ret;
         /* LCOV_EXCL_STOP */
     }
     zz_clear(&tmp);
@@ -2545,13 +2541,19 @@ gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 
     MPZ_Object *man = (MPZ_Object *)plus(args[1]);
     MPZ_Object *exp = MPZ_from_int(args[2]);
+    zz_err ret = ZZ_OK;
 
-    if (!exp || !man || zz_mpmath_normalize(prec, rnd, &negative,
-                                            &man->z, &exp->z, &bc))
+    if (!exp || !man || (ret = zz_mpmath_normalize(prec, rnd, &negative,
+                                                   &man->z, &exp->z, &bc)))
     {
         /* LCOV_EXCL_START */
         Py_XDECREF((PyObject *)man);
         Py_XDECREF((PyObject *)exp);
+        if (ret == ZZ_BUF) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "too many digits in integer");
+            return NULL;
+        }
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
@@ -2628,13 +2630,19 @@ gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     }
 
     MPZ_Object *exp = MPZ_from_int(args[1]);
+    zz_err ret = ZZ_OK;
 
-    if (!exp || zz_mpmath_normalize(prec, rnd, &negative,
-                                    &man->z, &exp->z, &bc))
+    if (!exp || (ret = zz_mpmath_normalize(prec, rnd, &negative,
+                                           &man->z, &exp->z, &bc)))
     {
         /* LCOV_EXCL_START */
         Py_DECREF(man);
         Py_XDECREF((PyObject *)exp);
+        if (ret == ZZ_BUF) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "too many digits in integer");
+            return NULL;
+        }
         return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
