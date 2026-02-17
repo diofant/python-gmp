@@ -1345,18 +1345,6 @@ numbers:
         }                       \
     }                           \
 
-#define CHECK_OP_INTv2(u, a)    \
-    if (MPZ_Check(a)) {         \
-        u = (MPZ_Object *)a;    \
-        Py_INCREF(u);           \
-    }                           \
-    else if (PyLong_Check(a)) { \
-        ;                       \
-    }                           \
-    else {                      \
-        goto end;               \
-    }                           \
-
 #define BINOP_INT(suff)                                         \
     static PyObject *                                           \
     nb_##suff(PyObject *self, PyObject *other)                  \
@@ -1391,90 +1379,7 @@ numbers:
         return (PyObject *)res;                                 \
     }
 
-#define BINOP_INTv2(suff)                                            \
-    static PyObject *                                                \
-    nb_##suff(PyObject *self, PyObject *other)                       \
-    {                                                                \
-        MPZ_Object *u = NULL, *v = NULL, *res = NULL;                \
-                                                                     \
-        CHECK_OP_INTv2(u, self);                                     \
-        CHECK_OP_INTv2(v, other);                                    \
-                                                                     \
-        res = MPZ_new();                                             \
-        if (!res) {                                                  \
-            goto end;                                                \
-        }                                                            \
-                                                                     \
-        zz_err ret = ZZ_OK;                                          \
-                                                                     \
-        if (!u) {                                                    \
-            int error = PyLong_IsNegative(self) || zz_isneg(&v->z);  \
-                                                                     \
-            if (!error) {                                            \
-                int64_t temp = PyLong_AsSdigit_t(self, &error);      \
-                                                                     \
-                if (!error) {                                        \
-                    ret = zz_i64_##suff(temp, &v->z, &res->z);       \
-                    goto done;                                       \
-                }                                                    \
-            }                                                        \
-            u = MPZ_from_int(self);                                  \
-            if (!u) {                                                \
-                goto end;                                            \
-            }                                                        \
-        }                                                            \
-        if (!v) {                                                    \
-            int error = zz_isneg(&u->z) || PyLong_IsNegative(other); \
-                                                                     \
-            if (!error) {                                            \
-                int64_t temp = PyLong_AsSdigit_t(other, &error);     \
-                                                                     \
-                if (!error) {                                        \
-                    ret = zz_##suff##_i64(&u->z, temp, &res->z);     \
-                    goto done;                                       \
-                }                                                    \
-            }                                                        \
-            v = MPZ_from_int(other);                                 \
-            if (!v) {                                                \
-                goto end;                                            \
-            }                                                        \
-        }                                                            \
-        ret = zz_##suff(&u->z, &v->z, &res->z);                      \
-done:                                                                \
-        if (ret) {                                                   \
-            /* LCOV_EXCL_START */                                    \
-            Py_CLEAR(res);                                           \
-            if (ret == ZZ_VAL) {                                     \
-                PyErr_SetString(PyExc_ValueError,                    \
-                                "negative shift count");             \
-            }                                                        \
-            else if (ret == ZZ_BUF) {                                \
-                PyErr_SetString(PyExc_OverflowError,                 \
-                                "too many digits in integer");       \
-            }                                                        \
-            else {                                                   \
-                PyErr_NoMemory();                                    \
-            }                                                        \
-            /* LCOV_EXCL_STOP */                                     \
-        }                                                            \
-    end:                                                             \
-        Py_XDECREF((PyObject *)u);                                   \
-        Py_XDECREF((PyObject *)v);                                   \
-        return (PyObject *)res;                                      \
-    }
-
-static inline zz_err
-zz_and_i64(const zz_t *u, int64_t v, zz_t *w)
-{
-    if (zz_iszero(u) || !v) {
-        return zz_set(0, w);
-    }
-    assert(!zz_isneg(u) && v > 0);
-    return zz_set(u->digits[0] & (zz_digit_t)v, w);
-}
-#define zz_i64_and(x, y, r) zz_and_i64((y), (x), (r))
-
-BINOP_INTv2(and)
+BINOP_INT(and)
 BINOP_INT(or)
 BINOP_INT(xor)
 
