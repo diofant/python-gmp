@@ -720,22 +720,23 @@ def test_power_errors():
         pow(object(), mpz(321))
     if platform.python_implementation() == "GraalVM":
         return  # issue oracle/graalpython#551
+    with pytest.raises(OverflowError):
+        pow(mpz(2), mpz(1<<64))
     if BITCNT_MAX < (1<<64) - 1:
-        with pytest.raises(MemoryError):
+        with pytest.raises(OverflowError):
             pow(mpz(1<<64), (1<<31) - 1)
-        with pytest.raises(MemoryError):
+        with pytest.raises(OverflowError):
             pow(mpz(1<<64), (1<<31))
+        with pytest.raises(OverflowError):
+            mpz(1) << ((1 << 63) - 1)
     else:
-        with pytest.raises(MemoryError):
+        with pytest.raises(OverflowError):
             pow(mpz(1<<64), (1<<63) - 1)
         if platform.system() != "Darwin":
-            with pytest.raises(MemoryError):
+            with pytest.raises(OverflowError):
                 pow(mpz(1<<64), (1<<63))
-    with pytest.raises(OverflowError):
-        mpz(1) << ((1 << 64) - 1)
-    if platform.system() != "Darwin":
-        with pytest.raises(MemoryError):
-            mpz(1) << ((1 << 63) - 1)
+        with pytest.raises(OverflowError):
+            mpz(1) << ((1 << 64) - 1)
 
 
 @given(bigints(), integers(max_value=12345))
@@ -981,6 +982,12 @@ def test_round_interface():
         x.__round__(1, 2)
     with pytest.raises(TypeError):
         x.__round__(1j)
+    with pytest.raises(OverflowError):
+        x.__round__((-1<<64) + 1)
+    with pytest.raises(OverflowError):
+        x.__round__((-1<<62))
+    with pytest.raises(OverflowError):
+        x.__round__(-1<<127)
 
 
 @pytest.mark.skipif(platform.python_implementation() == "PyPy",
