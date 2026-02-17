@@ -1470,7 +1470,7 @@ zz_and_i64(const zz_t *u, int64_t v, zz_t *w)
         return zz_set(0, w);
     }
     assert(!zz_isneg(u) && v > 0);
-    return zz_set((int64_t)(u->digits[0] & (zz_digit_t)v), w);
+    return zz_set(u->digits[0] & (zz_digit_t)v, w);
 }
 #define zz_i64_and(x, y, r) zz_and_i64((y), (x), (r))
 
@@ -1485,12 +1485,12 @@ zz_lshift(const zz_t *u, const zz_t *v, zz_t *w)
         return ZZ_VAL;
     }
 
-    int64_t shift;
+    uint64_t shift;
 
     if (zz_get(v, &shift)) {
         return ZZ_BUF;
     }
-    return zz_mul_2exp(u, (zz_bitcnt_t)shift, w);
+    return zz_mul_2exp(u, shift, w);
 }
 
 static inline zz_err
@@ -1500,12 +1500,12 @@ zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
         return ZZ_VAL;
     }
 
-    int64_t shift;
+    uint64_t shift;
 
     if (zz_get(v, &shift)) {
         return zz_set(zz_isneg(u) ? -1 : 0, w);
     }
-    return zz_quo_2exp(u, (zz_bitcnt_t)shift, w);
+    return zz_quo_2exp(u, shift, w);
 }
 
 BINOP_INT(lshift)
@@ -1554,7 +1554,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
             return resf;
         }
 
-        int64_t exp;
+        uint64_t exp;
 
         if (zz_get(&v->z, &exp)) {
             PyErr_SetString(PyExc_OverflowError,
@@ -1563,7 +1563,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
         else {
             res = MPZ_new();
             if (res) {
-                zz_err ret = zz_pow(&u->z, (uint64_t)exp, &res->z);
+                zz_err ret = zz_pow(&u->z, exp, &res->z);
 
                 if (ret) {
                     Py_CLEAR(res);
@@ -1905,7 +1905,7 @@ noop:
     }
 
     zz_t divisor;
-    int64_t exp;
+    uint64_t exp;
 
     (void)zz_neg(&ndigits->z, &ndigits->z);
     if (zz_init(&divisor) || zz_set(10, &divisor)) {
@@ -1919,7 +1919,7 @@ noop:
         goto overflow;
     }
 
-    zz_err ret = zz_pow(&divisor, (uint64_t)exp, &divisor);
+    zz_err ret = zz_pow(&divisor, exp, &divisor);
 
     if (ret) {
         zz_clear(&divisor);
@@ -2311,17 +2311,24 @@ gmp_fac(PyObject *Py_UNUSED(module), PyObject *arg)
         goto err;
     }
 
-    int64_t n;
+    uint64_t n;
 
-    if (zz_get(&x->z, &n) || n > LONG_MAX) {
+    if (zz_get(&x->z, &n)) {
+overflow:
         PyErr_Format(PyExc_OverflowError,
                      "fac() argument should not exceed %ld",
-                     LONG_MAX);
+                     ULONG_MAX);
         goto err;
     }
     Py_XDECREF((PyObject *)x);
-    if (zz_fac((zz_digit_t)n, &res->z)) {
+
+    zz_err ret = zz_fac((zz_digit_t)n, &res->z);
+
+    if (ret) {
         /* LCOV_EXCL_START */
+        if (ret == ZZ_BUF) {
+            goto overflow;
+        }
         PyErr_NoMemory();
         goto err;
         /* LCOV_EXCL_STOP */
@@ -2354,11 +2361,10 @@ gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
         goto err;
     }
 
-    int64_t n, k;
+    uint64_t n, k;
 
-    if ((zz_get(&x->z, &n) || n > ULONG_MAX)
-        || (zz_get(&y->z, &k) || k > ULONG_MAX))
-    {
+    if (zz_get(&x->z, &n) || zz_get(&y->z, &k)) {
+overflow:
         PyErr_Format(PyExc_OverflowError,
                      "comb() arguments should not exceed %ld",
                      ULONG_MAX);
@@ -2366,8 +2372,14 @@ gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     }
     Py_XDECREF((PyObject *)x);
     Py_XDECREF((PyObject *)y);
-    if (zz_bin((zz_digit_t)n, (zz_digit_t)k, &res->z)) {
+
+    zz_err ret = zz_bin(n, k, &res->z);
+
+    if (ret) {
         /* LCOV_EXCL_START */
+        if (ret == ZZ_BUF) {
+            goto overflow;
+        }
         PyErr_NoMemory();
         goto err;
         /* LCOV_EXCL_STOP */
@@ -2403,11 +2415,10 @@ gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
         goto err;
     }
 
-    int64_t n, k;
+    uint64_t n, k;
 
-    if ((zz_get(&x->z, &n) || n > ULONG_MAX)
-        || (zz_get(&y->z, &k) || k > ULONG_MAX))
-    {
+    if (zz_get(&x->z, &n) || zz_get(&y->z, &k)) {
+overflow:
         PyErr_Format(PyExc_OverflowError,
                      "perm() arguments should not exceed %ld",
                      ULONG_MAX);
@@ -2427,12 +2438,17 @@ gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
         goto err;
         /* LCOV_EXCL_STOP */
     }
-    if (zz_fac((zz_digit_t)n, &res->z)
-        || zz_fac((zz_digit_t)(n-k), &den->z)
+
+    zz_err ret = zz_fac((zz_digit_t)n, &res->z);
+
+    if (ret || zz_fac((zz_digit_t)(n-k), &den->z)
         || zz_div(&res->z, &den->z, &res->z, NULL))
     {
         /* LCOV_EXCL_START */
         Py_DECREF(den);
+        if (ret == ZZ_BUF) {
+            goto overflow;
+        }
         PyErr_NoMemory();
         goto err;
         /* LCOV_EXCL_STOP */

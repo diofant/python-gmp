@@ -720,6 +720,8 @@ def test_power_errors():
         pow(object(), mpz(321))
     if platform.python_implementation() == "GraalVM":
         return  # issue oracle/graalpython#551
+    with pytest.raises(OverflowError):
+        pow(mpz(2), mpz(1<<64))
     if BITCNT_MAX < (1<<64) - 1:
         with pytest.raises(OverflowError):
             pow(mpz(1<<64), (1<<31) - 1)
