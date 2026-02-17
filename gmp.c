@@ -1090,6 +1090,82 @@ BINOP_INT(xor)
         }                       \
     }                           \
 
+<<<<<<< HEAD
+=======
+#define BINOP_INT(suff)                                         \
+    static PyObject *                                           \
+    nb_##suff(PyObject *self, PyObject *other)                  \
+    {                                                           \
+        MPZ_Object *u = NULL, *v = NULL, *res = NULL;           \
+                                                                \
+        CHECK_OP_INT(u, self);                                  \
+        CHECK_OP_INT(v, other);                                 \
+                                                                \
+        res = MPZ_new();                                        \
+        zz_err ret = ZZ_OK;                                     \
+                                                                \
+        if (res && (ret = zz_##suff(&u->z, &v->z, &res->z))) {  \
+            /* LCOV_EXCL_START */                               \
+            Py_CLEAR(res);                                      \
+            if (ret == ZZ_VAL) {                                \
+                PyErr_SetString(PyExc_ValueError,               \
+                                "negative shift count");        \
+            }                                                   \
+            else if (ret == ZZ_BUF) {                           \
+                PyErr_SetString(PyExc_OverflowError,            \
+                                "too many digits in integer");  \
+            }                                                   \
+            else {                                              \
+                PyErr_NoMemory();                               \
+            }                                                   \
+            /* LCOV_EXCL_STOP */                                \
+        }                                                       \
+    end:                                                        \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
+        return (PyObject *)res;                                 \
+    }
+
+BINOP_INT(and)
+BINOP_INT(or)
+BINOP_INT(xor)
+
+static inline zz_err
+zz_lshift(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    if (zz_isneg(v)) {
+        return ZZ_VAL;
+    }
+
+    uint64_t shift;
+
+    if (zz_get(v, &shift)) {
+        return ZZ_BUF;
+    }
+    return zz_mul_2exp(u, shift, w);
+}
+
+static inline zz_err
+zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
+{
+    if (zz_isneg(v)) {
+        return ZZ_VAL;
+    }
+
+    uint64_t shift;
+
+    if (zz_get(v, &shift)) {
+        return zz_set(zz_isneg(u) ? -1 : 0, w);
+    }
+    return zz_quo_2exp(u, shift, w);
+}
+
+BINOP_INT(lshift)
+BINOP_INT(rshift)
+
+typedef PyObject * (*Py_nb_power_func)(PyObject *, PyObject *, PyObject *);
+
+>>>>>>> 23b195b (Remove nb_and specialization)
 static PyObject *
 power(PyObject *self, PyObject *other, PyObject *module)
 {
