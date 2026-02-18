@@ -743,7 +743,15 @@ hash(PyObject *self)
         return u->hash_cache;
     }
 
+<<<<<<< HEAD
     bool negative = zz_isneg(&u->z);
+=======
+    zz_t w;
+
+    if (zz_init(&w)) {
+        return -1; /* LCOV_EXCL_LINE */
+    }
+>>>>>>> 3b1f672 (Avoid static zz_t initialization in heap())
 
     if (negative) {
         (void)zz_abs(&u->z, &u->z);
@@ -751,11 +759,19 @@ hash(PyObject *self)
 
     Py_hash_t r;
 
+<<<<<<< HEAD
     assert(-(uint64_t)INT64_MIN > PyHASH_MODULUS);
     (void)zz_rem_u64(&u->z, (uint64_t)PyHASH_MODULUS, (uint64_t *)&r);
     if (negative) {
         (void)zz_neg(&u->z, &u->z);
         r = -r;
+=======
+    assert(sizeof(Py_hash_t) == 8);
+    (void)zz_get(&w, (int64_t *)&r);
+    zz_clear(&w);
+    if (zz_isneg(&u->z) && r) {
+        r = -(pyhash_modulus - r);
+>>>>>>> 3b1f672 (Avoid static zz_t initialization in heap())
     }
     if (r == -1) {
         r = -2;
