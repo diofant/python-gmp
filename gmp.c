@@ -850,8 +850,11 @@ hash(PyObject *self)
         return u->hash_cache;
     }
 
-    zz_digit_t digits[1];
-    zz_t w = {false, 1, 1, digits};
+    zz_t w;
+
+    if (zz_init(&w)) {
+        return -1; /* LCOV_EXCL_LINE */
+    }
 
     assert((int64_t)INT64_MAX > pyhash_modulus);
     (void)zz_div(&u->z, (int64_t)pyhash_modulus, NULL, &w);
@@ -860,6 +863,7 @@ hash(PyObject *self)
 
     assert(sizeof(Py_hash_t) == 8);
     (void)zz_get(&w, (int64_t *)&r);
+    zz_clear(&w);
     if (zz_isneg(&u->z) && r) {
         r = -(pyhash_modulus - r);
     }
