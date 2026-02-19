@@ -12,7 +12,7 @@
 #else
 #  define MAX_CACHE_SIZE 0
 #endif
-#define MAX_CACHED_NDIGITS 16
+#define MAX_CACHED_SIZEOF 256
 
 typedef struct {
     MPZ_Object *gmp_cache[MAX_CACHE_SIZE + 1];
@@ -660,7 +660,7 @@ dealloc(PyObject *self)
     MPZ_Object *u = (MPZ_Object *)self;
 
     if (global.gmp_cache_size < MAX_CACHE_SIZE
-        && (u->z).alloc <= MAX_CACHED_NDIGITS
+        && zz_sizeof(&u->z) <= MAX_CACHED_SIZEOF
         && MPZ_CheckExact(self))
     {
         global.gmp_cache[global.gmp_cache_size++] = u;
@@ -1884,8 +1884,8 @@ __sizeof__(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
     MPZ_Object *u = (MPZ_Object *)self;
 
-    return PyLong_FromSize_t(sizeof(MPZ_Object)
-                             + (size_t)(u->z).alloc*sizeof(zz_digit_t));
+    return PyLong_FromSize_t(sizeof(MPZ_Object) - sizeof(zz_t)
+                             + zz_sizeof(&u->z));
 }
 
 static PyObject *
