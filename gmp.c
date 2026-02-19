@@ -11,6 +11,7 @@
 #if defined(_MSC_VER)
 #  define _Thread_local __declspec(thread)
 #endif
+<<<<<<< HEAD
 
 #if !defined(PYPY_VERSION)
 #  define CACHE_SIZE (99)
@@ -18,6 +19,9 @@
 #  define CACHE_SIZE (0)
 #endif
 #define MAX_CACHE_MPZ_LIMBS (64)
+=======
+#define MAX_CACHED_SIZEOF 256
+>>>>>>> ede9094 (Use zz_sizeof())
 
 typedef struct {
     MPZ_Object *gmp_cache[CACHE_SIZE + 1];
@@ -602,8 +606,13 @@ dealloc(PyObject *self)
     MPZ_Object *u = (MPZ_Object *)self;
     PyTypeObject *type = Py_TYPE(self);
 
+<<<<<<< HEAD
     if (global.gmp_cache_size < CACHE_SIZE
         && (u->z).alloc <= MAX_CACHE_MPZ_LIMBS
+=======
+    if (global.gmp_cache_size < MAX_CACHE_SIZE
+        && zz_sizeof(&u->z) <= MAX_CACHED_SIZEOF
+>>>>>>> ede9094 (Use zz_sizeof())
         && MPZ_CheckExact(self))
     {
         global.gmp_cache[(global.gmp_cache_size)++] = u;
@@ -1539,8 +1548,13 @@ __sizeof__(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
     MPZ_Object *u = (MPZ_Object *)self;
 
+<<<<<<< HEAD
     return PyLong_FromSize_t(sizeof(MPZ_Object)
                              + (unsigned int)(u->z).alloc*sizeof(zz_limb_t));
+=======
+    return PyLong_FromSize_t(sizeof(MPZ_Object) - sizeof(zz_t)
+                             + zz_sizeof(&u->z));
+>>>>>>> ede9094 (Use zz_sizeof())
 }
 
 static PyObject *
