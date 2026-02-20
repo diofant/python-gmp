@@ -6,7 +6,26 @@ build:
     os: ubuntu-24.04
     apt_packages:
         - libgmp-dev
+<<<<<<< HEAD
         - gcc
+=======
+        - build-essential
+        - pkg-config
+    jobs:
+      pre_create_environment:
+        - |
+          PREFIX=$(pwd)/.local
+          ZZ_VERSION=0.9.0a4
+          ZZ_DIR=zz-${ZZ_VERSION}
+          GITHUB_URL=https://github.com/diofant/zz/releases/download/
+          ZZ_URL=${GITHUB_URL}v${ZZ_VERSION}/${ZZ_DIR}.tar.gz
+          wget ${ZZ_URL}
+          tar xzf ${ZZ_DIR}.tar.gz
+          cd ${ZZ_DIR}
+          ./configure -q --prefix=$PREFIX
+          make -s
+          make -s install
+>>>>>>> 33cfa0e (Use libzz v0.9.0a4)
     tools:
         python: "3"
 python:
