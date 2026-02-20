@@ -12,7 +12,7 @@
 #else
 #  define MAX_CACHE_SIZE 0
 #endif
-#define MAX_CACHED_NDIGITS 16
+#define MAX_CACHED_SIZEOF 256
 
 typedef struct {
     MPZ_Object *gmp_cache[MAX_CACHE_SIZE + 1];
@@ -660,7 +660,7 @@ dealloc(PyObject *self)
     MPZ_Object *u = (MPZ_Object *)self;
 
     if (global.gmp_cache_size < MAX_CACHE_SIZE
-        && (u->z).alloc <= MAX_CACHED_NDIGITS
+        && zz_sizeof(&u->z) <= MAX_CACHED_SIZEOF
         && MPZ_CheckExact(self))
     {
         global.gmp_cache[global.gmp_cache_size++] = u;
@@ -850,8 +850,11 @@ hash(PyObject *self)
         return u->hash_cache;
     }
 
-    zz_digit_t digits[1];
-    zz_t w = {false, 1, 1, digits};
+    zz_t w;
+
+    if (zz_init(&w)) {
+        return -1; /* LCOV_EXCL_LINE */
+    }
 
     assert((int64_t)INT64_MAX > pyhash_modulus);
     (void)zz_div(&u->z, (int64_t)pyhash_modulus, NULL, &w);
@@ -860,6 +863,7 @@ hash(PyObject *self)
 
     assert(sizeof(Py_hash_t) == 8);
     (void)zz_get(&w, (int64_t *)&r);
+    zz_clear(&w);
     if (zz_isneg(&u->z) && r) {
         r = -(pyhash_modulus - r);
     }
@@ -1880,8 +1884,8 @@ __sizeof__(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
     MPZ_Object *u = (MPZ_Object *)self;
 
-    return PyLong_FromSize_t(sizeof(MPZ_Object)
-                             + (size_t)(u->z).alloc*sizeof(zz_digit_t));
+    return PyLong_FromSize_t(sizeof(MPZ_Object) - sizeof(zz_t)
+                             + zz_sizeof(&u->z));
 }
 
 static PyObject *

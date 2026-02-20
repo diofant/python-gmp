@@ -36,8 +36,17 @@ def collatz1(n):
         total += 1
     return total
 
+def collatz2(n):
+    total = 0
+    n = mpz(n)
+    while n > 1:
+        n = n*3 + 1 if n & one else n//2
+        total += 1
+    return total
+
+
 runner = pyperf.Runner()
-for f in [collatz0, collatz1]:
+for f in [collatz0, collatz1, collatz2]:
     for v in ["97", "871", "(1<<128)+31"]:
         h = f"{f.__name__}({v})"
         i = eval(v)
