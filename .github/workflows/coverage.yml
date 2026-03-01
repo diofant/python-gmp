@@ -64,7 +64,7 @@ jobs:
           fetch-depth: 0
       - run: sudo apt-get update
       - run: sudo apt-get install lcov diff-cover
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
           path: build/
