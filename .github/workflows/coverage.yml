@@ -48,7 +48,7 @@ jobs:
           lcov --remove coverage.info "*.h" --ignore-errors unused \
                --output-file coverage.info
           cp coverage.info build/coverage-${{ matrix.python-version }}.info
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.python-version }}
           path: |
@@ -75,7 +75,7 @@ jobs:
       - run: |
           diff-cover build/coverage*.info --fail-under=100 \
             --compare-branch=origin/master
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: |
