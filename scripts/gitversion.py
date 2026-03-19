@@ -5,7 +5,6 @@ import os
 import re
 import subprocess
 import sys
-import textwrap
 
 
 def git_version():
@@ -47,14 +46,10 @@ if __name__ == "__main__":
         version = git_version()
     except (FileNotFoundError, RuntimeError):
         sys.path.insert(0, os.getcwd())
-        from version import version
+        from _version import version
 
     if args.write:
-        template = textwrap.dedent(f"""
-            version = "{version}"
-            __version__ = version
-                                   """)
-
+        template = f'version = "{version}"'
         outfile = args.write
         if args.meson_dist:
             outfile = os.path.join(
