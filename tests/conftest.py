@@ -23,6 +23,8 @@ def pytest_report_header(config):
   Bits per digit    :      {gmp.mpz_info.bits_per_digit}
   sizeof(zz_digit_t):      {gmp.mpz_info.sizeof_digit}
   Maximal bit count :      {gmp.mpz_info.bitcnt_max}
+
+  The gmp module v{gmp.__version__}
 """)
 
 
