@@ -3,7 +3,7 @@ project('gmp', 'c',
                              check: true).stdout().strip(),
         default_options: ['c_std=c17'])
 py = import('python').find_installation(pure: false)
-libzz = dependency('zz', version: '>= 0.7.0')
+libzz = dependency('zz', version: '>= 0.9.0a4')
 py.extension_module('gmp', ['fmt.c', 'gmp.c', 'utils.c'],
                     install: true, dependencies: libzz)
 install_dir = py.get_install_dir()
