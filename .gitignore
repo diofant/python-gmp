@@ -8,4 +8,6 @@ venv/
 *.egg-info/
 *.swp
 build/
+dist/
 .local/
+version.py
