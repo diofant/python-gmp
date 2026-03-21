@@ -729,22 +729,21 @@ str(PyObject *self)
 
 #define Number_Check(op) (PyFloat_Check((op)) || PyComplex_Check((op)))
 
-#define CHECK_OP(u, a)          \
-    if (MPZ_Check(a)) {         \
-        u = (MPZ_Object *)a;    \
-        Py_INCREF(a);           \
-    }                           \
-    else if (PyLong_Check(a)) { \
-        u = MPZ_from_int(a);    \
-        if (!u) {               \
-            goto end;           \
-        }                       \
-    }                           \
-    else if (Number_Check(a)) { \
-        goto numbers;           \
-    }                           \
-    else {                      \
-        goto fallback;          \
+#define CHECK_OP(u, a)                  \
+    if (MPZ_Check(a)) {                 \
+        u = (MPZ_Object *)Py_NewRef(a); \
+    }                                   \
+    else if (PyLong_Check(a)) {         \
+        u = MPZ_from_int(a);            \
+        if (!u) {                       \
+            goto end;                   \
+        }                               \
+    }                                   \
+    else if (Number_Check(a)) {         \
+        goto numbers;                   \
+    }                                   \
+    else {                              \
+        goto fallback;                  \
     }
 
 PyObject *
@@ -916,19 +915,18 @@ to_bool(PyObject *self)
     return !zz_iszero(&((MPZ_Object *)self)->z);
 }
 
-#define CHECK_OPv2(u, a)        \
-    if (MPZ_Check(a)) {         \
-        u = (MPZ_Object *)a;    \
-        Py_INCREF(a);           \
-    }                           \
-    else if (PyLong_Check(a)) { \
-        ;                       \
-    }                           \
-    else if (Number_Check(a)) { \
-        goto numbers;           \
-    }                           \
-    else {                      \
-        goto fallback;          \
+#define CHECK_OPv2(u, a)                \
+    if (MPZ_Check(a)) {                 \
+        u = (MPZ_Object *)Py_NewRef(a); \
+    }                                   \
+    else if (PyLong_Check(a)) {         \
+        ;                               \
+    }                                   \
+    else if (Number_Check(a)) {         \
+        goto numbers;                   \
+    }                                   \
+    else {                              \
+        goto fallback;                  \
     }
 
 #define BINOP(suff, slot)                                       \
@@ -1004,8 +1002,7 @@ done:                                                           \
         PyObject *uf, *vf, *rf;                                 \
                                                                 \
         if (Number_Check(self)) {                               \
-            uf = self;                                          \
-            Py_INCREF(uf);                                      \
+            uf = Py_NewRef(self);                               \
         }                                                       \
         else {                                                  \
             uf = to_float(self);                                \
@@ -1014,8 +1011,7 @@ done:                                                           \
             }                                                   \
         }                                                       \
         if (Number_Check(other)) {                              \
-            vf = other;                                         \
-            Py_INCREF(vf);                                      \
+            vf = Py_NewRef(other);                              \
         }                                                       \
         else {                                                  \
             vf = to_float(other);                               \
@@ -1309,8 +1305,7 @@ numbers:
     PyObject *uf, *vf;
 
     if (Number_Check(self)) {
-        uf = self;
-        Py_INCREF(uf);
+        uf = Py_NewRef(self);
     }
     else {
         uf = to_float(self);
@@ -1319,8 +1314,7 @@ numbers:
         }
     }
     if (Number_Check(other)) {
-        vf = other;
-        Py_INCREF(vf);
+        vf = Py_NewRef(other);
     }
     else {
         vf = to_float(other);
@@ -1337,17 +1331,16 @@ numbers:
     return res;
 }
 
-#define CHECK_OP_INT(u, a)      \
-    if (MPZ_Check(a)) {         \
-        u = (MPZ_Object *)a;    \
-        Py_INCREF(a);           \
-    }                           \
-    else {                      \
-        u = MPZ_from_int(a);    \
-        if (!u) {               \
-            goto end;           \
-        }                       \
-    }                           \
+#define CHECK_OP_INT(u, a)              \
+    if (MPZ_Check(a)) {                 \
+        u = (MPZ_Object *)Py_NewRef(a); \
+    }                                   \
+    else {                              \
+        u = MPZ_from_int(a);            \
+        if (!u) {                       \
+            goto end;                   \
+        }                               \
+    }                                   \
 
 #define BINOP_INT(suff)                                         \
     static PyObject *                                           \
@@ -1527,8 +1520,7 @@ numbers:
     PyObject *uf, *vf;
 
     if (Number_Check(self)) {
-        uf = self;
-        Py_INCREF(uf);
+        uf = Py_NewRef(self);
     }
     else {
         uf = to_float(self);
@@ -1537,8 +1529,7 @@ numbers:
         }
     }
     if (Number_Check(other)) {
-        vf = other;
-        Py_INCREF(vf);
+        vf = Py_NewRef(other);
     }
     else {
         vf = to_float(other);
