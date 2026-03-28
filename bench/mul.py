@@ -1,18 +1,10 @@
-# mul.py
+# bench/mul.py
 
-import os
 from operator import mul
 
 import pyperf
 
-if os.getenv("T") == "gmpy2.mpz":
-    from gmpy2 import mpz
-elif os.getenv("T") == "flint.fmpz":
-    from flint import fmpz as mpz
-elif os.getenv("T") == "int":
-    mpz = int
-else:
-    from gmp import mpz
+from bench.utils import mpz
 
 values = ["1<<7", "1<<38", "1<<300", "1<<3000"]
 
