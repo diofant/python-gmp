@@ -7,7 +7,7 @@ elif os.getenv("T") == "flint.fmpz":
 elif os.getenv("T") == "int":
     mpz = int
 else:
-    pass
+    from gmp import mpz  # noqa: F401
 
 
 def mysum(xs):
