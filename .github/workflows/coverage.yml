@@ -81,7 +81,7 @@ jobs:
           path: |
             build/coverage/
             build/coverage*.info
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           gcov_ignore: pythoncapi_compat.h
