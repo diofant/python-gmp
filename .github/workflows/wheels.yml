@@ -6,7 +6,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-26-intel, macos-26,
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-26,
              windows-2025]
         msystem: [ucrt64]
         menv: [ucrt-x86_64]
