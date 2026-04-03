@@ -513,8 +513,6 @@ def test_divmod_bulk(x, y):
         with pytest.raises(ZeroDivisionError):
             x % my
         return
-    if y < 0 and platform.python_implementation() == "GraalVM":
-        return  # issue oracle/graalpython#534
     r = x // y
     assert mx // my == r
     assert mx // y == r
