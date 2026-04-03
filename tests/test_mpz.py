@@ -127,9 +127,9 @@ def test_format_interface():
         mx.__format__(321)
     with pytest.raises(ValueError, match="Unknown format code"):
         format(mx, "q")
-    if platform.python_implementation() != "PyPy":  # XXX: pypy/pypy#5311
-        with pytest.raises(ValueError, match="Unknown format code"):
-            format(mx, "\x81")
+    with pytest.raises(ValueError,
+                       match="(Unknown format code|Invalid format specifier)"):
+        format(mx, "\x81")
     with pytest.raises(ValueError,
                        match=(r"Negative zero coercion \(z\) not allowed|"
                               "Invalid conversion specification")):
@@ -194,10 +194,6 @@ def test_format_interface():
     if sys.version_info >= (3, 14):
         assert format(mx, ".,f") == "123.000,000"
         assert format(mx, "._f") == "123.000_000"
-
-    if (platform.python_implementation() == "PyPy"
-            and sys.pypy_version_info[:3] <= (7, 3, 20)):
-        return  # XXX: pypy/pypy#5311
 
     try:
         locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
@@ -700,11 +696,11 @@ def test_power_mod(x, y, z):
         assert pow(mx, my, mz) == r
         assert pow(mx, my, z) == r
         assert pow(mx, y, mz) == r
-        if platform.python_implementation() == "PyPy":
-            return  # XXX: pypy/pypy#5207
         assert pow(x, my, mz) == r
         assert pow(mx, y, z) == r
         assert pow(x, my, z) == r
+        if platform.python_implementation() == "PyPy":
+            return  # XXX: pypy/pypy#5207
         assert pow(x, y, mz) == r
 
 
