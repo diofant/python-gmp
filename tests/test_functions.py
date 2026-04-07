@@ -142,6 +142,7 @@ def test_mpmath_normalize(sign, man, exp, prec, rnd):
     sign = int(sign)
     bc = mman.bit_length()
     res = mpmath.libmp.libmpf._normalize(sign, man, exp, bc, prec, rnd)
+    assert all(type(_) is int for _ in res)
     assert _mpmath_normalize(sign, mman, exp, bc, prec, rnd) == res
 
 
@@ -154,6 +155,7 @@ def test_mpmath_create(man, exp, prec, rnd):
     mpmath = pytest.importorskip("mpmath")
     mman = mpz(man)
     res = mpmath.libmp.from_man_exp(man, exp, prec, rnd)
+    assert all(type(_) is int for _ in res)
     assert _mpmath_create(mman, exp, prec, rnd) == res
     assert mman == man
     assert _mpmath_create(man, exp, prec, rnd) == res
