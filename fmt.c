@@ -935,6 +935,7 @@ format_long_internal(MPZ_Object *value, const InternalFormatSpec *format)
     Py_ssize_t prefix = 0;
     NumberFieldWidths spec;
     int32_t x = -1;
+    gmp_state *state = PyType_GetModuleState(Py_TYPE(value));
 
     /* Locale settings, either from the actual locale or
        from a hard-code pseudo-locale */
@@ -1021,7 +1022,7 @@ format_long_internal(MPZ_Object *value, const InternalFormatSpec *format)
         if (format->sign != '+' && format->sign != ' '
             && format->width == -1 && format->type != 'n'
             && !format->thousands_separators
-            && MPZ_CheckExact(value))
+            && MPZ_CheckExact(state, value))
         {
             /* Fast path */
             return MPZ_to_str(value, base, format->alternate ? OPT_PREFIX : 0);
