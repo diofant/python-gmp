@@ -819,6 +819,8 @@ def test_methods(x):
         assert meth(mx) == meth(x)
 
 
+@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
+                    reason="oracle/graalpython#883")
 @given(bigints(), integers(min_value=0, max_value=10000),
        sampled_from(["big", "little"]), booleans())
 @example(0, 0, "big", False)
