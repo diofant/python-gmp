@@ -321,10 +321,6 @@ zz_get_bytes(const zz_t *u, size_t length, bool is_signed,
         if (!is_signed) {
             return ZZ_BUF;
         }
-        if (8*length/bits_per_digit + 1 < u->size) {
-            zz_clear(&tmp);
-            return ZZ_BUF;
-        }
         if (zz_set(1, &tmp) || zz_mul_2exp(&tmp, 8*length, &tmp)
             || zz_add(&tmp, u, &tmp))
         {
@@ -338,7 +334,7 @@ zz_get_bytes(const zz_t *u, size_t length, bool is_signed,
 
     size_t nbits = zz_bitlen(u);
 
-    if (nbits > 8*length
+    if (zz_isneg(u) || nbits > 8*length
         || (is_signed && ((!nbits && is_negative)
             || (nbits && (nbits == 8 * length ? !is_negative : is_negative)))))
     {
