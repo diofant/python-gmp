@@ -235,9 +235,8 @@ def test_interfaces():
         _mpmath_normalize(1, mpz(111), 11, 12, 13, 1j)
 
 
-# See pypy/pypy#5368 and oracle/graalpython#593
-@pytest.mark.skipif(platform.python_implementation() != "CPython",
-                    reason="no way to specify a signature")
+@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
+                    reason="oracle/graalpython#593")
 def test_func_api():
     for fn in ["comb", "factorial", "gcd", "isqrt", "lcm", "perm"]:
         f = getattr(math, fn)
