@@ -1076,9 +1076,8 @@ def test_mpz_collatz(xs):
         assert all(f.result() == 1 for f in futures)
 
 
-# See pypy/pypy#5368 and oracle/graalpython#593
-@pytest.mark.skipif(platform.python_implementation() != "CPython",
-                    reason="no way to specify a signature")
+@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
+                    reason="oracle/graalpython#593")
 def test_int_api():
     for meth in dir(int):
         m = getattr(int, meth)
