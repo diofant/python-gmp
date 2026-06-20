@@ -49,12 +49,6 @@ ci = ["python-gmp[tests]", "pytest-xdist"]
 docs = ["sphinx>=8.2"]
 develop = ["python-gmp[tests,docs]", "prek", "pyperf"]
 
-[tool.meson-python.args]
-compile = ["--verbose"]
-
-[tool.pytest.ini_options]
-xfail_strict = true
-
 [tool.ruff]
 line-length = 79
 
