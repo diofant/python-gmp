@@ -44,7 +44,7 @@ Homepage = "https://github.com/diofant/python-gmp"
 Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 
 [project.optional-dependencies]
-tests = ["pytest", "hypothesis", "mpmath"]
+tests = ["pytest", "hypothesis"]
 ci = ["python-gmp[tests]", "pytest-xdist"]
 docs = ["sphinx>=8.2"]
 develop = ["python-gmp[tests,docs]", "pre-commit", "pyperf"]

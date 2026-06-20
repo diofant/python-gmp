@@ -182,3 +182,125 @@ def numbers(draw):
     if draw(booleans()):
         return draw(floats())
     return draw(complex_numbers())
+
+
+# All supported rounding modes
+round_nearest = sys.intern("n")
+round_floor = sys.intern("f")
+round_ceiling = sys.intern("c")
+round_up = sys.intern("u")
+round_down = sys.intern("d")
+round_fast = round_down
+
+
+# These masks are used to pick out segments of numbers to determine
+# which direction to round when rounding to nearest.
+class h_mask_big:
+    def __getitem__(self, n):
+        return (1<<(n-1))-1
+
+h_mask_small = [0]+[((1<<(_-1))-1) for _ in range(1, 300)]
+h_mask = [h_mask_big(), h_mask_small]
+
+
+# The >> operator rounds to floor. shifts_down[rnd][sign]
+# tells whether this is the right direction to use, or if the
+# number should be negated before shifting
+shifts_down = {round_floor:(1,0), round_ceiling:(0,1),
+               round_down:(1,1), round_up:(0,0)}
+
+
+small_trailing = [0] * 256
+for j in range(1, 8):
+    small_trailing[1<<j::1<<(j+1)] = [j] * (1<<(7-j))
+
+
+def trailing(n):
+    """Count the number of trailing zero bits in abs(n)."""
+    if not n:
+        return 0
+    low_byte = n & 0xff
+    if low_byte:
+        return small_trailing[low_byte]
+    t = 8
+    n >>= 8
+    while not n & 0xff:
+        n >>= 8
+        t += 8
+    return t + small_trailing[n & 0xff]
+
+trailtable = [trailing(n) for n in range(256)]
+
+
+def mpmath_normalize(sign, man, exp, bc, prec, rnd):
+    """
+    Create a raw mpf tuple with value (-1)**sign * man * 2**exp and
+    normalized mantissa. The mantissa is rounded in the specified
+    direction if its size exceeds the precision. Trailing zero bits
+    are also stripped from the mantissa to ensure that the
+    representation is canonical.
+    """
+    if not man:
+        return 0, 0, 0, 0
+    # Cut mantissa down to size if larger than target precision
+    n = bc - prec
+    if n > 0:
+        if rnd == round_nearest:
+            t = man >> (n-1)
+            if t & 1 and ((t & 2) or (man & h_mask[n<300][n])):
+                man = (t>>1)+1
+            else:
+                man = t>>1
+        elif shifts_down[rnd][sign]:
+            man >>= n
+        else:
+            man = -((-man)>>n)
+        exp += n
+        bc = prec
+    # Strip trailing bits
+    if not man & 1:
+        t = trailtable[man & 255]
+        if not t:
+            while not man & 255:
+                man >>= 8
+                exp += 8
+                bc -= 8
+            t = trailtable[man & 255]
+        man >>= t
+        exp += t
+        bc -= t
+    # Bit count can be wrong if the input mantissa was 1 less than
+    # a power of 2 and got rounded up, thereby adding an extra bit.
+    # With trailing bits removed, all powers of two have mantissa 1,
+    # so this is easy to check for.
+    if man == 1:
+        bc = 1
+    return sign, man, exp, bc
+
+
+def mpmath_from_man_exp(man, exp, prec=0, rnd=round_fast):
+    """Create raw mpf from (man, exp) pair. The mantissa may be signed.
+    If no precision is specified, the mantissa is stored exactly."""
+    sign = 0
+    if man < 0:
+        sign = 1
+        man = -man
+    bc = man.bit_length()
+    if not prec:
+        if not man:
+            return 0, 0, 0, 0
+        if not man & 1:
+            if man & 2:
+                return sign, man >> 1, exp + 1, bc - 1
+            t = trailtable[man & 255]
+            if not t:
+                while not man & 255:
+                    man >>= 8
+                    exp += 8
+                    bc -= 8
+                t = trailtable[man & 255]
+            man >>= t
+            exp += t
+            bc -= t
+        return sign, man, exp, bc
+    return mpmath_normalize(sign, man, exp, bc, prec, rnd)
