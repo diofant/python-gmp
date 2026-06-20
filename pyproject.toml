@@ -79,10 +79,8 @@ CFLAGS = "-Wall -Wpedantic -Werror -Wconversion"
 [tool.cibuildwheel.windows]
 archs = ["auto64"]
 before-all = "msys2 -c scripts/cibw_before_all.sh"
-before-build = "pip install delvewheel"
-repair-wheel-command = """delvewheel repair -w {dest_dir} {wheel} \
-                          --add-path .local/bin"""
 
 [tool.cibuildwheel.windows.environment]
 PYTEST_ADDOPTS = "-n 2"
 CFLAGS = ""
+PATH = ".\\\\.local\\\\bin;$PATH"
