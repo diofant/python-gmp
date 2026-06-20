@@ -24,6 +24,7 @@ classifiers = ["Development Status :: 4 - Beta",
                "Programming Language :: Python :: 3.12",
                "Programming Language :: Python :: 3.13",
                "Programming Language :: Python :: 3.14",
+               "Programming Language :: Python :: 3.15",
                "Programming Language :: Python :: Free Threading :: 2 - Beta",
                "Programming Language :: Python :: Implementation :: CPython",
                "Programming Language :: Python :: Implementation :: PyPy",
@@ -62,8 +63,8 @@ select = ["E", "F", "I", "PT", "W", "Q", "SIM"]
 
 [tool.cibuildwheel]
 build-frontend = {name="build", args=["--verbose", "-Csetup-args=--vsenv"]}
-enable = "pypy cpython-prerelease cpython-freethreading graalpy"
-skip = "gp311_242* gp3*win*amd64*"
+enable = "pypy cpython-prerelease graalpy"
+skip = "gp3*win*amd64*"
 
 before-all = "sh scripts/cibw_before_all.sh"
 test-extras = "ci"

@@ -142,6 +142,7 @@ def test_mpmath_normalize(sign, man, exp, prec, rnd):
     sign = int(sign)
     bc = mman.bit_length()
     res = mpmath.libmp.libmpf._normalize(sign, man, exp, bc, prec, rnd)
+    assert all(type(_) is int for _ in res)
     assert _mpmath_normalize(sign, mman, exp, bc, prec, rnd) == res
 
 
@@ -154,6 +155,7 @@ def test_mpmath_create(man, exp, prec, rnd):
     mpmath = pytest.importorskip("mpmath")
     mman = mpz(man)
     res = mpmath.libmp.from_man_exp(man, exp, prec, rnd)
+    assert all(type(_) is int for _ in res)
     assert _mpmath_create(mman, exp, prec, rnd) == res
     assert mman == man
     assert _mpmath_create(man, exp, prec, rnd) == res
@@ -233,9 +235,8 @@ def test_interfaces():
         _mpmath_normalize(1, mpz(111), 11, 12, 13, 1j)
 
 
-# See pypy/pypy#5368 and oracle/graalpython#593
-@pytest.mark.skipif(platform.python_implementation() != "CPython",
-                    reason="no way to specify a signature")
+@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
+                    reason="oracle/graalpython#593")
 def test_func_api():
     for fn in ["comb", "factorial", "gcd", "isqrt", "lcm", "perm"]:
         f = getattr(math, fn)

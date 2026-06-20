@@ -1,15 +1,8 @@
-# collatz.py
-
-import os
+# bench/collatz.py
 
 import pyperf
 
-if os.getenv("T") == "gmpy2.mpz":
-    from gmpy2 import mpz
-elif os.getenv("T") == "flint.fmpz":
-    from flint import fmpz as mpz
-else:
-    from gmp import mpz
+from bench.utils import mpz
 
 zero = mpz(0)
 one = mpz(1)

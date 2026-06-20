@@ -48,7 +48,7 @@ jobs:
           lcov --remove coverage.info "*.h" --ignore-errors unused \
                --output-file coverage.info
           cp coverage.info build/coverage-${{ matrix.python-version }}.info
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.python-version }}
           path: |
@@ -64,7 +64,7 @@ jobs:
           fetch-depth: 0
       - run: sudo apt-get update
       - run: sudo apt-get install lcov diff-cover
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
           path: build/
@@ -75,13 +75,13 @@ jobs:
       - run: |
           diff-cover build/coverage*.info --fail-under=100 \
             --compare-branch=origin/master
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: |
             build/coverage/
             build/coverage*.info
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           gcov_ignore: pythoncapi_compat.h

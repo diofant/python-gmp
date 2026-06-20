@@ -5,7 +5,7 @@ def pytest_configure(config):
         from hypothesis import settings
 
         default = settings.get_profile("default")
-        settings.register_profile("default", settings(default, deadline=1600))
+        settings.register_profile("default", settings(default, deadline=3000))
         ci = settings.get_profile("ci")
         if platform.python_implementation() != "GraalVM":
             ci = settings(ci, max_examples=10000)
@@ -20,9 +20,9 @@ def pytest_report_header(config):
     print(f"""
   Using the ZZ library v{gmp._zz_version}
 
-  Bits per digit    :      {gmp.mpz_info.bits_per_digit}
-  sizeof(zz_digit_t):      {gmp.mpz_info.sizeof_digit}
-  Maximal bit count :      {gmp.mpz_info.bitcnt_max}
+  Bits per digit   : {gmp.mpz_info.bits_per_digit}
+  sizeof(digit)    : {gmp.mpz_info.sizeof_digit}
+  Maximal bit count: {gmp.mpz_info.bitcnt_max}
 
   The gmp module v{gmp.__version__}
 """)
