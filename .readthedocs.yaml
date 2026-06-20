@@ -17,8 +17,6 @@ build:
 python:
     install:
         - path: .
-          extra_requirements:
-              - docs
 sphinx:
     fail_on_warning: true
     configuration: docs/conf.py
