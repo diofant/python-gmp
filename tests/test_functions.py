@@ -22,6 +22,8 @@ from hypothesis import example, given
 from hypothesis.strategies import booleans, integers, lists, sampled_from
 from utils import (
     bigints,
+    mpmath_from_man_exp,
+    mpmath_normalize,
     python_gcdext,
     python_isqrtrem,
 )
@@ -137,11 +139,10 @@ def test_lcm_nary(xs):
 @example(1, 6277101735386680763495507056286727952638980837032266301441,
          0, 64, "f")
 def test_mpmath_normalize(sign, man, exp, prec, rnd):
-    mpmath = pytest.importorskip("mpmath")
     mman = mpz(man)
     sign = int(sign)
     bc = mman.bit_length()
-    res = mpmath.libmp.libmpf._normalize(sign, man, exp, bc, prec, rnd)
+    res = mpmath_normalize(sign, man, exp, bc, prec, rnd)
     assert all(type(_) is int for _ in res)
     assert _mpmath_normalize(sign, mman, exp, bc, prec, rnd) == res
 
@@ -152,9 +153,8 @@ def test_mpmath_normalize(sign, man, exp, prec, rnd):
 @example(-6277101735386680763495507056286727952638980837032266301441,
          0, 64, "f")
 def test_mpmath_create(man, exp, prec, rnd):
-    mpmath = pytest.importorskip("mpmath")
     mman = mpz(man)
-    res = mpmath.libmp.from_man_exp(man, exp, prec, rnd)
+    res = mpmath_from_man_exp(man, exp, prec, rnd)
     assert all(type(_) is int for _ in res)
     assert _mpmath_create(mman, exp, prec, rnd) == res
     assert mman == man

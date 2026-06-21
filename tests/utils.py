@@ -182,3 +182,54 @@ def numbers(draw):
     if draw(booleans()):
         return draw(floats())
     return draw(complex_numbers())
+
+
+def mpmath_normalize(sign, man, exp, bc, prec, rnd):
+    """
+    Create a raw mpf tuple with value (-1)**sign * man * 2**exp and
+    normalized mantissa. The mantissa is rounded in the specified
+    direction if its size exceeds the precision. Trailing zero bits
+    are also stripped from the mantissa to ensure that the
+    representation is canonical.
+    """
+    if not man:
+        return 0, 0, 0, 0
+    # Cut mantissa down to size if larger than target precision
+    n = bc - prec
+    if n > 0:
+        # The >> operator rounds to floor.  shifts_down[rnd][sign]
+        # tells whether this is the right direction to use, or if the
+        # number should be negated before shifting
+        shifts_down = {"f": (1, 0), "c": (0, 1), "d": (1, 1), "u": (0, 0)}
+        if rnd == "n":
+            t = man >> (n - 1)
+            if t & 1 and ((t & 2) or (man & ((1 << (n - 1)) - 1))):
+                man = (t >> 1) + 1
+            else:
+                man = t >> 1
+        elif shifts_down[rnd][sign]:
+            man >>= n
+        else:
+            man = -((-man) >> n)
+        exp += n
+    # Strip trailing bits
+    while man & 1 == 0:
+        man >>= 1
+        exp += 1
+    return sign, man, exp, man.bit_length()
+
+
+def mpmath_from_man_exp(man, exp, prec=0, rnd="d"):
+    """
+    Create raw mpf from (man, exp) pair.  The mantissa may be signed.
+    If no precision is specified, the mantissa is stored exactly.
+    """
+    if man < 0:
+        sign = 1
+        man = -man
+    else:
+        sign = 0
+    bc = man.bit_length()
+    if not prec:
+        prec = bc
+    return mpmath_normalize(sign, man, exp, bc, prec, rnd)
