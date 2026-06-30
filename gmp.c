@@ -486,8 +486,6 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
     return res;
 }
 
-typedef PyObject * (*Py_nb_int_func)(PyObject *);
-
 static PyObject *
 new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
 {
@@ -506,7 +504,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wpedantic"
 #endif
-            Py_nb_int_func nb_int = PyType_GetSlot(Py_TYPE(arg), Py_nb_int);
+            unaryfunc nb_int = PyType_GetSlot(Py_TYPE(arg), Py_nb_int);
 #ifdef __GNUC__
 #  pragma GCC diagnostic pop
 #endif
@@ -648,8 +646,6 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     return new_impl(type, arg, base);
 }
 
-typedef void (*Py_tp_free_func)(void *);
-
 static void
 dealloc(PyObject *self)
 {
@@ -662,22 +658,23 @@ dealloc(PyObject *self)
         global.gmp_cache[global.gmp_cache_size++] = u;
     }
     else {
-        zz_clear(&u->z);
+        freefunc tp_free;
+
         if (MPZ_CheckExact(self)) {
-            PyObject_Free(self);
+            tp_free = PyObject_Free;
         }
         else {
 #ifdef __GNUC__
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wpedantic"
 #endif
-            Py_tp_free_func tp_free = PyType_GetSlot(Py_TYPE(self), Py_tp_free);
+            tp_free = PyType_GetSlot(Py_TYPE(self), Py_tp_free);
 #ifdef __GNUC__
 #  pragma GCC diagnostic pop
 #endif
-
-            tp_free(self);
         }
+        zz_clear(&u->z);
+        tp_free(self);
     }
 }
 
@@ -1409,8 +1406,6 @@ zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
 BINOP_INT(lshift)
 BINOP_INT(rshift)
 
-typedef PyObject * (*Py_nb_power_func)(PyObject *, PyObject *, PyObject *);
-
 static PyObject *
 power(PyObject *self, PyObject *other, PyObject *module)
 {
@@ -1440,8 +1435,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wpedantic"
 #endif
-            Py_nb_power_func nb_power = PyType_GetSlot(&PyFloat_Type,
-                                                       Py_nb_power);
+            ternaryfunc nb_power = PyType_GetSlot(&PyFloat_Type, Py_nb_power);
 #ifdef __GNUC__
 #  pragma GCC diagnostic pop
 #endif
