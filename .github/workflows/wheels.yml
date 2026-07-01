@@ -15,10 +15,10 @@ jobs:
             msystem: clangarm64
             menv: clang-aarch64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: msys2/setup-msys2@v2.31.1
+      - uses: msys2/setup-msys2@v2.32.0
         name: Setup msys2
         with:
           install: >-
