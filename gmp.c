@@ -486,8 +486,6 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
     return res;
 }
 
-typedef PyObject * (*Py_nb_int_func)(PyObject *);
-
 static PyObject *
 new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
 {
@@ -502,14 +500,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
         }
         if (PyNumber_Check(arg)) {
             PyObject *integer = NULL;
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wpedantic"
-#endif
-            Py_nb_int_func nb_int = PyType_GetSlot(Py_TYPE(arg), Py_nb_int);
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
+            unaryfunc nb_int = PyType_GetSlot(Py_TYPE(arg), Py_nb_int);
 
             if (nb_int) {
                 integer = nb_int(arg);
@@ -648,8 +639,6 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     return new_impl(type, arg, base);
 }
 
-typedef void (*Py_tp_free_func)(void *);
-
 static void
 dealloc(PyObject *self)
 {
@@ -662,22 +651,16 @@ dealloc(PyObject *self)
         global.gmp_cache[global.gmp_cache_size++] = u;
     }
     else {
-        zz_clear(&u->z);
+        freefunc tp_free;
+
         if (MPZ_CheckExact(self)) {
-            PyObject_Free(self);
+            tp_free = PyObject_Free;
         }
         else {
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wpedantic"
-#endif
-            Py_tp_free_func tp_free = PyType_GetSlot(Py_TYPE(self), Py_tp_free);
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
-
-            tp_free(self);
+            tp_free = PyType_GetSlot(Py_TYPE(self), Py_tp_free);
         }
+        zz_clear(&u->z);
+        tp_free(self);
     }
 }
 
@@ -1409,8 +1392,6 @@ zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
 BINOP_INT(lshift)
 BINOP_INT(rshift)
 
-typedef PyObject * (*Py_nb_power_func)(PyObject *, PyObject *, PyObject *);
-
 static PyObject *
 power(PyObject *self, PyObject *other, PyObject *module)
 {
@@ -1436,15 +1417,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
                 return NULL;
             }
 
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wpedantic"
-#endif
-            Py_nb_power_func nb_power = PyType_GetSlot(&PyFloat_Type,
-                                                       Py_nb_power);
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
+            ternaryfunc nb_power = PyType_GetSlot(&PyFloat_Type, Py_nb_power);
 
             resf = nb_power(uf, vf, Py_None);
             Py_DECREF(uf);
@@ -2804,10 +2777,6 @@ fail1:
     return 0;
 }
 
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wpedantic"
-#endif
 static PyModuleDef_Slot gmp_slots[] = {
     {Py_mod_exec, gmp_exec},
 #if PY_VERSION_HEX >= 0x030C0000
@@ -2817,9 +2786,6 @@ static PyModuleDef_Slot gmp_slots[] = {
     {Py_mod_gil, Py_MOD_GIL_NOT_USED},
 #endif
     {0, NULL}};
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
 
 static struct PyModuleDef gmp_module = {
     PyModuleDef_HEAD_INIT,
