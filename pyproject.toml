@@ -67,7 +67,7 @@ test-command = "pytest {package}"
 LD_LIBRARY_PATH = "$(pwd)/.local/lib:$LD_LIBRARY_PATH"
 PKG_CONFIG_PATH = "$(pwd)/.local/lib/pkgconfig"
 PYTEST_ADDOPTS = "-n 2"
-CFLAGS = "-Wall -Wpedantic -Werror -Wconversion"
+CFLAGS = "-Wall -Werror -Wconversion"
 
 [tool.cibuildwheel.windows]
 archs = ["auto64"]

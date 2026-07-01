@@ -500,14 +500,7 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
         }
         if (PyNumber_Check(arg)) {
             PyObject *integer = NULL;
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wpedantic"
-#endif
             unaryfunc nb_int = PyType_GetSlot(Py_TYPE(arg), Py_nb_int);
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
 
             if (nb_int) {
                 integer = nb_int(arg);
@@ -664,14 +657,7 @@ dealloc(PyObject *self)
             tp_free = PyObject_Free;
         }
         else {
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wpedantic"
-#endif
             tp_free = PyType_GetSlot(Py_TYPE(self), Py_tp_free);
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
         }
         zz_clear(&u->z);
         tp_free(self);
@@ -1431,14 +1417,7 @@ power(PyObject *self, PyObject *other, PyObject *module)
                 return NULL;
             }
 
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wpedantic"
-#endif
             ternaryfunc nb_power = PyType_GetSlot(&PyFloat_Type, Py_nb_power);
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
 
             resf = nb_power(uf, vf, Py_None);
             Py_DECREF(uf);
@@ -2798,10 +2777,6 @@ fail1:
     return 0;
 }
 
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wpedantic"
-#endif
 static PyModuleDef_Slot gmp_slots[] = {
     {Py_mod_exec, gmp_exec},
 #if PY_VERSION_HEX >= 0x030C0000
@@ -2811,9 +2786,6 @@ static PyModuleDef_Slot gmp_slots[] = {
     {Py_mod_gil, Py_MOD_GIL_NOT_USED},
 #endif
     {0, NULL}};
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
 
 static struct PyModuleDef gmp_module = {
     PyModuleDef_HEAD_INIT,
