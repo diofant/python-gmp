@@ -236,7 +236,7 @@ def test_interfaces():
 
 
 @pytest.mark.skipif(platform.python_implementation() == "GraalVM",
-                    reason="oracle/graalpython#593")
+                    reason="oracle/graalpython#998")
 def test_func_api():
     for fn in ["comb", "factorial", "gcd", "isqrt", "lcm", "perm"]:
         f = getattr(math, fn)
