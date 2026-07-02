@@ -34,7 +34,6 @@ MPZ_new(void)
     if (global.gmp_cache_size) {
         res = global.gmp_cache[--global.gmp_cache_size];
         (void)zz_set(0, &res->z);
-        Py_XINCREF((PyObject *)res);
     }
     else {
         res = PyObject_New(MPZ_Object, &MPZ_Type);
@@ -640,14 +639,24 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
 }
 
 static void
-dealloc(PyObject *self)
+finalize(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
 
     if (global.gmp_cache_size < MAX_CACHE_SIZE
-        && zz_sizeof(&u->z) <= MAX_CACHED_SIZEOF
-        && MPZ_CheckExact(self))
+        && MPZ_CheckExact(self)
+        && zz_sizeof(&u->z) <= MAX_CACHED_SIZEOF)
     {
+        Py_INCREF(self);
+    }
+}
+
+static void
+dealloc(PyObject *self)
+{
+    MPZ_Object *u = (MPZ_Object *)self;
+
+    if (PyObject_CallFinalizerFromDealloc(self)) {
         global.gmp_cache[global.gmp_cache_size++] = u;
     }
     else {
@@ -1977,6 +1986,7 @@ PyTypeObject MPZ_Type = {
     .tp_basicsize = sizeof(MPZ_Object),
     .tp_new = new,
     .tp_dealloc = dealloc,
+    .tp_finalize = finalize,
     .tp_repr = repr,
     .tp_str = str,
     .tp_richcompare = richcompare,
