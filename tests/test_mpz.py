@@ -944,12 +944,14 @@ def test_from_bytes_interface():
 @example(1<<116)
 @example(646541478744828163276576707651635923929979156076518566789121)
 @example((0xfffffffffffff8<<(242*4)) + (1<<970))
+@example(0xa<<10000)
 def test_to_float(x):
     mx = mpz(x)
     try:
         fx = float(x)
     except OverflowError:
-        pytest.raises(OverflowError, lambda: float(mx))
+        with pytest.raises(OverflowError):
+            float(mx)
     else:
         assert str(float(mx)) == str(fx)
 
