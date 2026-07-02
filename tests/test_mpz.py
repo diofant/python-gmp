@@ -452,10 +452,6 @@ def test_add_int_subclasses():
 def test_binary_mixed(x, y):
     mx = mpz(x)
     for op in [operator.add, operator.mul, operator.sub]:
-        if (platform.python_implementation() == "GraalVM"
-                and op in [operator.add, operator.sub]
-                and str(y.imag) == "-0.0"):
-            continue  # issue oracle/graalpython#585
         assert str(op(mx, y)) == str(op(x, y))
         assert str(op(y, mx)) == str(op(y, x))
         if op != operator.sub:
@@ -712,8 +708,6 @@ def test_power_errors():
         pow(mpz(10**1000), 1j)
     with pytest.raises(TypeError):
         pow(object(), mpz(321))
-    if platform.python_implementation() == "GraalVM":
-        return  # issue oracle/graalpython#551
     with pytest.raises(OverflowError):
         pow(mpz(2), mpz(1<<64))
     if BITCNT_MAX < (1<<64) - 1:
@@ -814,8 +808,6 @@ def test_methods(x):
         assert meth(mx) == meth(x)
 
 
-@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
-                    reason="oracle/graalpython#883")
 @given(bigints(), integers(min_value=0, max_value=10000),
        sampled_from(["big", "little"]), booleans())
 @example(0, 0, "big", False)
@@ -840,6 +832,7 @@ def test_methods(x):
 @example(128, 1, "big", False)
 @example(-32383289396013590652, 0, "big", True)
 @example(-384, 1, "big", True)
+@example(32768, 2, "big", True)
 def test_to_bytes_bulk(x, length, byteorder, signed):
     try:
         rx = x.to_bytes(length, byteorder, signed=signed)
