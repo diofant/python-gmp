@@ -182,7 +182,6 @@ MPZ_from_str(PyObject *obj, int base)
 
 static zz_err zz_set_bytes(const unsigned char *buffer, size_t length,
                            bool is_signed, zz_t *u);
-static void revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r);
 
 static MPZ_Object *
 MPZ_from_int(PyObject *obj)
@@ -201,7 +200,7 @@ MPZ_from_int(PyObject *obj)
 
 #if defined(ON_CPYTHON) && PY_VERSION_HEX > 0x030D00A0 \
         && !defined(Py_LIMITED_API)
-    Py_ssize_t expected = PyLong_AsNativeBytes(obj, NULL, 0, -1);
+    Py_ssize_t expected = PyLong_AsNativeBytes(obj, NULL, 0, 0);
 
     if (expected < 0) {
         return NULL; /* LCOV_EXCL_LINE */
@@ -213,7 +212,7 @@ MPZ_from_int(PyObject *obj)
         return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
 
-    expected = PyLong_AsNativeBytes(obj, buffer, expected, -1);
+    expected = PyLong_AsNativeBytes(obj, buffer, expected, 0);
     if (expected < 0) {
 free:
         /* LCOV_EXCL_START */
@@ -228,16 +227,8 @@ free:
         goto free; /* LCOV_EXCL_LINE */
     }
 
-    zz_err ret;
+    zz_err ret = zz_set_bytes(buffer, (size_t)expected, true, &res->z);
 
-    if (PyLong_IsNegative(obj)) {
-        revstr(buffer, 0, expected - 1);
-        ret = zz_set_bytes(buffer, (size_t)expected, true, &res->z);
-    }
-    else {
-        ret = zz_import((size_t)expected, buffer,
-                        (zz_layout){8, 1, -1, 0}, &res->z);
-    }
     free(buffer);
     if (ret) {
         /* LCOV_EXCL_START */
@@ -267,6 +258,7 @@ free:
 
 static zz_err zz_get_bytes(const zz_t *u, size_t length,
                            bool is_signed, unsigned char **buffer);
+static void revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r);
 
 static PyObject *
 MPZ_to_int(MPZ_Object *u)
