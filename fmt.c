@@ -2,7 +2,7 @@
 
 #include <locale.h>
 
-#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON)
+#if defined(ON_CPYTHON) && PY_VERSION_HEX >= 0x030D00A0
 
 static void
 unknown_presentation_type(Py_UCS4 presentation_type, PyObject* type_name)
@@ -1167,4 +1167,4 @@ __format__(PyObject *self, PyObject *format_spec)
     Py_DECREF(integer);
     return res;
 }
-#endif /* !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON) */
+#endif /* defined(ON_CPYTHON) && PY_VERSION_HEX >= 0x030D00A0 */

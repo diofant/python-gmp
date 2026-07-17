@@ -7,21 +7,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if !defined(PYPY_VERSION)
-#  define MAX_CACHE_SIZE 100
-#else
-#  define MAX_CACHE_SIZE 0
-#endif
-#define MAX_CACHED_SIZEOF 256
+#ifdef ON_CPYTHON
+#  define MAX_FREELIST_SIZE 100
+#  define MAX_FREELIST_SIZEOF 256
 
 typedef struct {
-    MPZ_Object *gmp_cache[MAX_CACHE_SIZE + 1];
-    size_t gmp_cache_size;
+    MPZ_Object *freelist[MAX_FREELIST_SIZE + 1];
+    size_t freelist_size;
 } gmp_global;
 
 _Thread_local gmp_global global = {
-    .gmp_cache_size = 0,
+    .freelist_size = 0,
 };
+#endif
 
 uint8_t bits_per_digit;
 Py_hash_t pyhash_modulus;
@@ -31,11 +29,13 @@ MPZ_new(void)
 {
     MPZ_Object *res;
 
-    if (global.gmp_cache_size) {
-        res = global.gmp_cache[--global.gmp_cache_size];
+#ifdef ON_CPYTHON
+    if (global.freelist_size) {
+        res = global.freelist[--global.freelist_size];
         (void)zz_set(0, &res->z);
     }
     else {
+#endif
         res = PyObject_New(MPZ_Object, &MPZ_Type);
         if (!res) {
             return NULL; /* LCOV_EXCL_LINE */
@@ -43,7 +43,9 @@ MPZ_new(void)
         if (zz_init(&res->z)) {
             return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
         }
+#ifdef ON_CPYTHON
     }
+#endif
     res->hash_cache = -1;
     return res;
 }
@@ -180,8 +182,7 @@ MPZ_from_str(PyObject *obj, int base)
 static MPZ_Object *
 MPZ_from_int(PyObject *obj)
 {
-#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON) \
-    && !defined(Py_LIMITED_API)
+#if defined(ON_CPYTHON) && !defined(Py_LIMITED_API)
     PyLongExport long_export = {0, 0, 0, 0, 0};
     const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
     MPZ_Object *res = NULL;
@@ -243,7 +244,7 @@ MPZ_from_int(PyObject *obj)
 
     Py_DECREF(str);
     return res;
-#endif
+#endif /* defined(ON_CPYTHON) && !defined(Py_LIMITED_API) */
 }
 
 static PyObject *
@@ -255,8 +256,7 @@ MPZ_to_int(MPZ_Object *u)
         return PyLong_FromInt64(value);
     }
 
-#if !defined(PYPY_VERSION) && !defined(GRAALVM_PYTHON) \
-    && !defined(Py_LIMITED_API)
+#if defined(ON_CPYTHON) && !defined(Py_LIMITED_API)
     const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
     size_t size = (zz_bitlen(&u->z) + int_layout->bits_per_digit
                    - 1)/int_layout->bits_per_digit;
@@ -288,7 +288,7 @@ MPZ_to_int(MPZ_Object *u)
 
     free(buf);
     return res;
-#endif
+#endif /* defined(ON_CPYTHON) && !defined(Py_LIMITED_API) */
 }
 
 static void
@@ -498,46 +498,14 @@ new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
             return Py_NewRef(arg);
         }
         if (PyNumber_Check(arg)) {
-            PyObject *integer = NULL;
-            unaryfunc nb_int = PyType_GetSlot(Py_TYPE(arg), Py_nb_int);
+            PyObject *integer = PyNumber_Long(arg);
+            PyObject *mpz = NULL;
 
-            if (nb_int) {
-                integer = nb_int(arg);
-                if (!integer) {
-                    return NULL;
-                }
-                if (!PyLong_Check(integer)) {
-                    PyErr_Format(PyExc_TypeError,
-                                 "__int__ returned non-int (type %U)",
-                                 PyType_GetFullyQualifiedName(Py_TYPE(integer)));
-                    Py_XDECREF(integer);
-                    return NULL;
-                }
-                if (!PyLong_CheckExact(integer)
-                    && PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
-                                        "__int__ returned non-int (type %U).  "
-                                        "The ability to return an instance of a "
-                                        "strict subclass of int "
-                                        "is deprecated, and may be removed "
-                                        "in a future version of Python.",
-                                        PyType_GetFullyQualifiedName(Py_TYPE(integer))))
-                {
-                    Py_XDECREF(integer);
-                    return NULL;
-                }
-            }
-            else {
-                integer = PyNumber_Index(arg);
-                if (!integer) {
-                    return NULL;
-                }
-            }
             if (integer) {
-                PyObject *mpz = (PyObject *)MPZ_from_int(integer);
-
+                mpz = (PyObject *)MPZ_from_int(integer);
                 Py_DECREF(integer);
-                return (PyObject *)mpz;
             }
+            return mpz;
         }
         goto str;
     }
@@ -638,28 +606,32 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     return new_impl(type, arg, base);
 }
 
+#ifdef ON_CPYTHON
 static void
 finalize(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
 
-    if (global.gmp_cache_size < MAX_CACHE_SIZE
-        && MPZ_CheckExact(self)
-        && zz_sizeof(&u->z) <= MAX_CACHED_SIZEOF)
+    if (global.freelist_size < MAX_FREELIST_SIZE
+        && zz_sizeof(&u->z) <= MAX_FREELIST_SIZEOF
+        && MPZ_CheckExact(self))
     {
         Py_INCREF(self);
     }
 }
+#endif
 
 static void
 dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
 
+#ifdef ON_CPYTHON
     if (PyObject_CallFinalizerFromDealloc(self)) {
-        global.gmp_cache[global.gmp_cache_size++] = u;
+        global.freelist[global.freelist_size++] = u;
     }
     else {
+#endif
         freefunc tp_free;
 
         if (MPZ_CheckExact(self)) {
@@ -670,7 +642,9 @@ dealloc(PyObject *self)
         }
         zz_clear(&u->z);
         tp_free(self);
+#ifdef ON_CPYTHON
     }
+#endif
 }
 
 static PyObject *
@@ -1986,7 +1960,9 @@ PyTypeObject MPZ_Type = {
     .tp_basicsize = sizeof(MPZ_Object),
     .tp_new = new,
     .tp_dealloc = dealloc,
+#ifdef ON_CPYTHON
     .tp_finalize = finalize,
+#endif
     .tp_repr = repr,
     .tp_str = str,
     .tp_richcompare = richcompare,
@@ -2054,8 +2030,8 @@ gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
 
     zz_err ret = zz_gcdext(&x->z, &y->z, &g->z, &s->z, &t->z);
 
-    Py_XDECREF((PyObject *)x);
-    Py_XDECREF((PyObject *)y);
+    Py_DECREF(x);
+    Py_DECREF(y);
     if (ret == ZZ_MEM) {
         return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
@@ -2199,7 +2175,7 @@ overflow:
                      ULONG_MAX);
         goto err;
     }
-    Py_XDECREF((PyObject *)x);
+    Py_DECREF((PyObject *)x);
 
     zz_err ret = zz_fac((zz_digit_t)n, &res->z);
 
@@ -2249,8 +2225,8 @@ overflow:
                      ULONG_MAX);
         goto err;
     }
-    Py_XDECREF((PyObject *)x);
-    Py_XDECREF((PyObject *)y);
+    Py_DECREF((PyObject *)x);
+    Py_DECREF((PyObject *)y);
 
     zz_err ret = zz_bin(n, k, &res->z);
 
@@ -2303,8 +2279,8 @@ overflow:
                      ULONG_MAX);
         goto err;
     }
-    Py_XDECREF((PyObject *)x);
-    Py_XDECREF((PyObject *)y);
+    Py_DECREF((PyObject *)x);
+    Py_DECREF((PyObject *)y);
     if (k > n) {
         return (PyObject *)res;
     }
@@ -2621,19 +2597,6 @@ gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     return Py_BuildValue("(bNNK)", negative, man, iexp, bc);
 }
 
-static PyObject *
-gmp__free_cache(PyObject *Py_UNUSED(module), PyObject *Py_UNUSED(args))
-{
-    while (global.gmp_cache_size) {
-        MPZ_Object *u = global.gmp_cache[--global.gmp_cache_size];
-        PyObject *self = (PyObject *)u;
-
-        zz_clear(&u->z);
-        PyObject_Free(self);
-    }
-    Py_RETURN_NONE;
-}
-
 static PyMethodDef gmp_functions[] = {
     {"gcd", (PyCFunction)gmp_gcd, METH_FASTCALL,
      ("gcd($module, /, *integers)\n--\n\n"
@@ -2666,8 +2629,6 @@ static PyMethodDef gmp_functions[] = {
     {"_mpmath_create", (PyCFunction)gmp__mpmath_create, METH_FASTCALL,
      ("_mpmath_create($module, man, exp, prec=0, rnd='d', /)\n--\n\n"
       "Helper function for mpmath.")},
-    {"_free_cache", gmp__free_cache, METH_NOARGS,
-     "_free_cache($module)\n--\n\nFree mpz's cache."},
     {NULL} /* sentinel */
 };
 

@@ -79,14 +79,7 @@ gmp_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
     }
 
     Py_UCS1 *out = PyUnicode_1BYTE_DATA(result);
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic push /* XXX: oracle/graalpython#580 */
-#  pragma GCC diagnostic ignored "-Wsign-conversion"
-#endif
-    int kind = PyUnicode_KIND(unicode);
-#if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic pop
-#endif
+    int kind = (int)PyUnicode_KIND(unicode); /* oracle/graalpython#580 */
     const void *data = PyUnicode_DATA(unicode);
 
     for (Py_ssize_t i = 0; i < len; ++i) {
@@ -112,43 +105,3 @@ gmp_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode)
     }
     return result;
 }
-
-#if PY_VERSION_HEX < 0x030D00A0
-static PyObject *
-PyType_GetModuleName(PyTypeObject *type)
-{
-    return PyObject_GetAttrString((PyObject *)type, "__module__");
-}
-
-PyObject *
-_PyType_GetFullyQualifiedName(PyTypeObject *type)
-{
-    PyObject *qualname = PyType_GetQualName(type);
-    if (qualname == NULL) {
-        return NULL; /* LCOV_EXCL_LINE */
-    }
-
-    PyObject *module = PyType_GetModuleName(type);
-    if (module == NULL) {
-        /* LCOV_EXCL_START */
-        Py_DECREF(qualname);
-        return NULL;
-        /* LCOV_EXCL_STOP */
-    }
-
-    PyObject *result;
-
-    if (PyUnicode_Check(module)
-        && !PyUnicode_EqualToUTF8(module, "builtins")
-        && !PyUnicode_EqualToUTF8(module, "__main__"))
-    {
-        result = PyUnicode_FromFormat("%U.%U", module, qualname);
-    }
-    else {
-        result = Py_NewRef(qualname);
-    }
-    Py_XDECREF(module);
-    Py_XDECREF(qualname);
-    return result;
-}
-#endif
