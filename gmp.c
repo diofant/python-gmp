@@ -32,12 +32,11 @@ MPZ_new(gmp_state * state, PyTypeObject *type)
         res = global.freelist[--global.freelist_size];
         (void)zz_set(0, &res->z);
         Py_INCREF((PyObject *)res);
-        PyObject_GC_Track((PyObject *)res);
     }
     else {
 #endif
         if (type == state->MPZ_Type) {
-            res = PyObject_GC_New(MPZ_Object, state->MPZ_Type);
+            res = PyObject_New(MPZ_Object, state->MPZ_Type);
         }
         else {
             allocfunc tp_alloc = PyType_GetSlot(type, Py_tp_alloc);
@@ -49,9 +48,6 @@ MPZ_new(gmp_state * state, PyTypeObject *type)
         }
         if (zz_init(&res->z)) {
             return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
-        }
-        if (type == state->MPZ_Type) {
-            PyObject_GC_Track((PyObject *)res);
         }
 #ifdef ON_CPYTHON
     }
@@ -525,10 +521,7 @@ dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
     PyTypeObject *type = Py_TYPE(self);
-
-    PyObject_GC_UnTrack(self);
 #ifdef ON_CPYTHON
-
     gmp_state *state = get_state(type);
 
     if (global.freelist_size < MAX_FREELIST_SIZE
@@ -548,13 +541,6 @@ dealloc(PyObject *self)
 #ifdef ON_CPYTHON
     }
 #endif
-}
-
-Py_LOCAL(int)
-traverse(PyObject *self, visitproc visit, void *arg)
-{
-    Py_VISIT(Py_TYPE(self));
-    return 0;
 }
 
 #if PY_VERSION_HEX > 0x030E00A0
@@ -2116,7 +2102,6 @@ static PyType_Slot mpz_slots[] = {
 //  {Py_tp_token, Py_TP_USE_SPEC},
     {Py_tp_dealloc, dealloc},
     {Py_tp_getattro, PyObject_GenericGetAttr},
-    {Py_tp_traverse, traverse},
     {Py_tp_repr, repr},
     {Py_tp_hash, hash},
     {Py_tp_str, str},
@@ -2161,7 +2146,7 @@ static PyType_Spec mpz_spec = {
 #if PY_VERSION_HEX > 0x030E00A0
               Py_TPFLAGS_HAVE_VECTORCALL |
 #endif
-              Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE),
+              Py_TPFLAGS_IMMUTABLETYPE),
     .slots = mpz_slots,
 };
 
