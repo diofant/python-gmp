@@ -305,20 +305,10 @@ fill_number(PyUnicodeWriter *writer, const NumberFieldWidths *spec,
 Py_LOCAL(void)
 insert_from_end_inplace(char *str, Py_ssize_t n, char c)
 {
-    assert(str && n > 0);
+    Py_ssize_t len = (Py_ssize_t)strlen(str);
+    Py_ssize_t src = len, dest = len + (len - 1)/n, count = -1;
 
-    size_t len = strlen(str);
-
-    if (len <= n) {
-        return;
-    }
-
-    Py_ssize_t num_separators = ((Py_ssize_t)len - 1) / n;
-    Py_ssize_t new_len = (Py_ssize_t)len + num_separators;
-    Py_ssize_t src = (Py_ssize_t)len;
-    Py_ssize_t dest = new_len;
-    Py_ssize_t count = -1;
-
+    assert(str && 0 < n);
     while (src >= 0) {
         if (count > 0 && count % n == 0 && src < len) {
             str[dest--] = c;
@@ -440,9 +430,11 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
        }
        p -= min_leading;
     }
+    p += negative;
     if (group > 0 && u->z.size) {
-        insert_from_end_inplace(p + negative, group, '_');
+        insert_from_end_inplace(p, group, '_');
     }
+    p -= negative;
     if (saved_char) {
         *p = saved_char;
     }
