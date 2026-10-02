@@ -318,8 +318,6 @@ insert_from_end_inplace(char *str, Py_ssize_t n, char c)
     }
 }
 
-extern PyObject * MPZ_to_str(MPZ_Object *u, int base, bool tag);
-
 Py_LOCAL(PyObject *)
 MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
 {
@@ -349,14 +347,6 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
     case 'd':
         base = 10;
         break;
-    }
-    /* Fast path */
-    if (!format->alternate && !sign
-        && format->width == -1
-        && !format->thousands_separators
-        && MPZ_CheckExact(u))
-    {
-        return MPZ_to_str(u, base, false);
     }
     sign |= negative;
     if (format->thousands_separators) {
