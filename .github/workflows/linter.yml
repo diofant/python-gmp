@@ -4,10 +4,10 @@ jobs:
   linter:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.x"
-      - uses: j178/prek-action@v2
+      - uses: j178/prek-action@v3.0.0
