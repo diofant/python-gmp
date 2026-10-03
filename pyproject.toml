@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "mesonpy"
-requires = ["meson-python", "meson<1.12"]
+requires = ["meson-python"]
 
 [project]
 name = "python-gmp"
@@ -44,7 +44,9 @@ Homepage = "https://github.com/diofant/python-gmp"
 Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 
 [project.optional-dependencies]
-tests = ["pytest", "hypothesis", "mpmath"]
+tests = ["pytest", "hypothesis; implementation_name != 'pypy'",
+         "hypothesis<=6.150.0; implementation_name == 'pypy'",
+         "mpmath"]
 ci = ["python-gmp[tests]", "pytest-xdist"]
 docs = ["sphinx>=8.2"]
 develop = ["python-gmp[tests,docs]", "pre-commit", "pyperf"]
@@ -64,7 +66,7 @@ select = ["E", "F", "I", "PT", "W", "Q", "SIM"]
 [tool.cibuildwheel]
 build-frontend = {name="build", args=["--verbose", "-Csetup-args=--vsenv"]}
 enable = "pypy cpython-prerelease graalpy"
-skip = "gp3*win*amd64*"
+skip = "gp3*win*amd64* gp312_250-macos*"
 
 before-all = "sh scripts/cibw_before_all.sh"
 test-extras = "ci"

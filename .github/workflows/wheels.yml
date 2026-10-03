@@ -15,10 +15,10 @@ jobs:
             msystem: clangarm64
             menv: clang-aarch64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: msys2/setup-msys2@v2.31.1
+      - uses: msys2/setup-msys2@v2.33.0
         name: Setup msys2
         with:
           install: >-
@@ -42,7 +42,7 @@ jobs:
       - run: echo "PKG_CONFIG_PATH=${{ github.workspace }}/.local/lib/pkgconfig" >> $env:GITHUB_ENV
         if: ${{ startsWith(matrix.os, 'windows') }}
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4.0.0
+        uses: pypa/cibuildwheel@84f6233892f964b4c2aba196595e85602bc61b34
       - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
