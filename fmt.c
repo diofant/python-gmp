@@ -365,10 +365,10 @@ insert_from_end_inplace(char *str, Py_ssize_t n, char c)
 }
 
 Py_LOCAL(PyObject *)
-MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
+zz_format(const zz_t *u, const InternalFormatSpec *format)
 {
     size_t len = 0;
-    bool negative = zz_isneg(&u->z);
+    bool negative = zz_isneg(u);
     bool sign = format->sign;
     Py_ssize_t min_leading = 0, width = -1;
 
@@ -376,7 +376,7 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
         width = format->width;
     }
     sign |= negative;
-    (void)zz_sizeinbase(&u->z, format->base, &len);
+    (void)zz_sizeinbase(u, format->base, &len);
     if (format->alternate) {
         len += 2;
     }
@@ -417,7 +417,7 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
         *(p++) = '0';
     }
 
-    zz_err ret = zz_get_str(&u->z, format->base, p);
+    zz_err ret = zz_get_str(u, format->base, p);
 
     if (min_leading > 0) {
        if (negative) {
@@ -426,7 +426,7 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
        p -= min_leading;
     }
     p += negative;
-    if (format->group && u->z.size) {
+    if (format->group && !zz_iszero(u)) {
         insert_from_end_inplace(p, format->group, '_');
     }
     p -= negative;
@@ -464,14 +464,14 @@ format_mpz_internal(MPZ_Object *value, const InternalFormatSpec *format)
     if (!format->alternate || format->base == 10) {
         n_prefix = 0;
     }
-    tmp = MPZ_format(value, format);
+    tmp = zz_format(&value->z, format);
     if (tmp == NULL) {
         goto done; /* LCOV_EXCL_LINE */
     }
     n_digits = PyUnicode_GetLength(tmp);
     /* Is a sign character present in the output?  If so, remember it
        and skip it */
-    if (PyUnicode_ReadChar(tmp, inumeric_chars) == '-') {
+    if (zz_isneg(&value->z)) {
         sign_char = '-';
         prefix++;
         n_digits--;
