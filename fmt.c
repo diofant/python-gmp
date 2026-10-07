@@ -67,7 +67,7 @@ typedef struct {
     int alternate;
     char sign;
     Py_ssize_t width;
-    char thousands_separators;
+    char group;
     char type;
 } InternalFormatSpec;
 
@@ -87,13 +87,14 @@ parse_internal_render_format_spec(PyObject *obj,
     const char *data = PyUnicode_AsUTF8AndSize(format_spec, NULL);
     int align_specified = 0;
     int fill_char_specified = 0;
+    int thousands_separators = 0;
 
     format->fill_char = ' ';
     format->align = '>';
     format->alternate = 0;
     format->sign = '\0';
     format->width = -1;
-    format->thousands_separators = '\0';
+    format->group = 0;
     format->type = 'd';
     if (!data) {
         return 0; /* LCOV_EXCL_LINE */
@@ -139,7 +140,7 @@ parse_internal_render_format_spec(PyObject *obj,
     }
     /* Underscore signifies add thousands separators */
     if (end-pos && data[pos] == '_') {
-        format->thousands_separators = '_';
+        thousands_separators = 1;
         ++pos;
     }
     /* Finally, parse the type field. */
@@ -163,6 +164,14 @@ parse_internal_render_format_spec(PyObject *obj,
     if (end-pos == 1) {
         format->type = data[pos];
         ++pos;
+    }
+    if (thousands_separators) {
+        if (format->type == 'd') {
+            format->group = 3;
+        }
+        else {
+            format->group = 4;
+        }
     }
     return 1;
 }
@@ -324,7 +333,7 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
     size_t len = 0;
     bool negative = zz_isneg(&u->z);
     bool sign = format->sign == '+' || format->sign == ' ';
-    Py_ssize_t min_leading = 0, group = 0, width = -1;
+    Py_ssize_t min_leading = 0, width = -1;
     int base;
 
     if (format->fill_char == '0' && format->align == '=') {
@@ -349,30 +358,22 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
         break;
     }
     sign |= negative;
-    if (format->thousands_separators) {
-        if (format->type == 'd') {
-            group = 3;
-        }
-        else {
-            group = 4;
-        }
-    }
     (void)zz_sizeinbase(&u->z, base, &len);
     if (format->alternate) {
         len += 2;
     }
     min_leading = width - (Py_ssize_t)len - sign;
     if (min_leading > 0) {
-        if (group > 0) {
-            min_leading = ((group*(width - sign))/(group + 1)
+        if (format->group) {
+            min_leading = ((format->group*(width - sign))/(format->group + 1)
                            + 1 - (Py_ssize_t)len);
         }
         if (min_leading > 0) {
             len += (size_t)min_leading;
         }
     }
-    if (group > 0) {
-        len += (len - 1) / (size_t)group;
+    if (format->group) {
+        len += (len - 1) / (size_t)format->group;
     }
     len += sign;
     len++; /* '\0' */
@@ -421,8 +422,8 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
        p -= min_leading;
     }
     p += negative;
-    if (group > 0 && u->z.size) {
-        insert_from_end_inplace(p, group, '_');
+    if (format->group && u->z.size) {
+        insert_from_end_inplace(p, format->group, '_');
     }
     p -= negative;
     if (saved_char) {
