@@ -68,6 +68,7 @@ typedef struct {
     char sign;
     Py_ssize_t width;
     char group;
+    int base;
     char type;
 } InternalFormatSpec;
 
@@ -95,6 +96,7 @@ parse_internal_render_format_spec(PyObject *obj,
     format->sign = '\0';
     format->width = -1;
     format->group = 0;
+    format->base = 10;
     format->type = 'd';
     if (!data) {
         return 0; /* LCOV_EXCL_LINE */
@@ -163,10 +165,28 @@ parse_internal_render_format_spec(PyObject *obj,
     }
     if (end-pos == 1) {
         format->type = data[pos];
+        switch (format->type) {
+        case 'b':
+            format->base = 2;
+            break;
+        case 'o':
+            format->base = 8;
+            break;
+        case 'x':
+            format->base = 16;
+            break;
+        case 'X':
+            format->base = -16;
+            break;
+        default:
+        case 'd':
+            format->base = 10;
+            break;
+        }
         ++pos;
     }
     if (thousands_separators) {
-        if (format->type == 'd') {
+        if (format->base == 10) {
             format->group = 3;
         }
         else {
@@ -334,31 +354,12 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
     bool negative = zz_isneg(&u->z);
     bool sign = format->sign == '+' || format->sign == ' ';
     Py_ssize_t min_leading = 0, width = -1;
-    int base;
 
     if (format->fill_char == '0' && format->align == '=') {
         width = format->width;
     }
-    switch (format->type) {
-    case 'b':
-        base = 2;
-        break;
-    case 'o':
-        base = 8;
-        break;
-    case 'x':
-        base = 16;
-        break;
-    case 'X':
-        base = -16;
-        break;
-    default:
-    case 'd':
-        base = 10;
-        break;
-    }
     sign |= negative;
-    (void)zz_sizeinbase(&u->z, base, &len);
+    (void)zz_sizeinbase(&u->z, format->base, &len);
     if (format->alternate) {
         len += 2;
     }
@@ -388,19 +389,19 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
         *(p++) = saved_char;
     }
     if (format->alternate) {
-        if (base == 2) {
+        if (format->base == 2) {
             *(p++) = '0';
             *(p++) = 'b';
         }
-        else if (base == 8) {
+        else if (format->base == 8) {
             *(p++) = '0';
             *(p++) = 'o';
         }
-        else if (base == 16) {
+        else if (format->base == 16) {
             *(p++) = '0';
             *(p++) = 'x';
         }
-        else if (base == -16) {
+        else if (format->base == -16) {
             *(p++) = '0';
             *(p++) = 'X';
         }
@@ -413,7 +414,7 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
         *(p++) = '0';
     }
 
-    zz_err ret = zz_get_str(&u->z, base, p);
+    zz_err ret = zz_get_str(&u->z, format->base, p);
 
     if (min_leading > 0) {
        if (negative) {
@@ -457,7 +458,7 @@ format_mpz_internal(MPZ_Object *value, const InternalFormatSpec *format)
 
     /* The number of prefix chars is the same as the leading
        chars to skip */
-    if (!format->alternate || format->type == 'd') {
+    if (!format->alternate || format->base == 10) {
         n_prefix = 0;
     }
     tmp = MPZ_format(value, format);
