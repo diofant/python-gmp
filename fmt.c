@@ -69,6 +69,7 @@ typedef struct {
     Py_ssize_t width;
     char group;
     int base;
+    char prefix[2];
     char type;
 } InternalFormatSpec;
 
@@ -97,6 +98,8 @@ parse_internal_render_format_spec(PyObject *obj,
     format->width = -1;
     format->group = 0;
     format->base = 10;
+    format->prefix[0] = '0';
+    format->prefix[1] = '\0';
     format->type = 'd';
     if (!data) {
         return 0; /* LCOV_EXCL_LINE */
@@ -181,9 +184,23 @@ parse_internal_render_format_spec(PyObject *obj,
         default:
         case 'd':
             format->base = 10;
+            format->alternate = 0;
             break;
         }
-        ++pos;
+    }
+    if (format->alternate) {
+        if (format->base == 2) {
+            format->prefix[1] = 'b';
+        }
+        else if (format->base == 8) {
+            format->prefix[1] = 'o';
+        }
+        else if (format->base == 16) {
+            format->prefix[1] = 'x';
+        }
+        else {
+            format->prefix[1] = 'X';
+        }
     }
     if (thousands_separators) {
         if (format->base == 10) {
@@ -388,23 +405,9 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
         saved_char = '-';
         *(p++) = saved_char;
     }
-    if (format->alternate) {
-        if (format->base == 2) {
-            *(p++) = '0';
-            *(p++) = 'b';
-        }
-        else if (format->base == 8) {
-            *(p++) = '0';
-            *(p++) = 'o';
-        }
-        else if (format->base == 16) {
-            *(p++) = '0';
-            *(p++) = 'x';
-        }
-        else if (format->base == -16) {
-            *(p++) = '0';
-            *(p++) = 'X';
-        }
+    if (format->prefix[1]) {
+        memcpy(p, format->prefix, 2);
+        p += 2;
     }
     if (saved_char) {
         saved_char = *(--p);
