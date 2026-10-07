@@ -369,7 +369,7 @@ MPZ_format(MPZ_Object *u, const InternalFormatSpec *format)
 {
     size_t len = 0;
     bool negative = zz_isneg(&u->z);
-    bool sign = format->sign == '+' || format->sign == ' ';
+    bool sign = format->sign;
     Py_ssize_t min_leading = 0, width = -1;
 
     if (format->fill_char == '0' && format->align == '=') {
