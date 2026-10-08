@@ -156,7 +156,7 @@ parse_internal_render_format_spec(PyObject *obj,
         if (actual_format_spec != NULL) {
             PyErr_Format(PyExc_ValueError,
                          ("Invalid format specifier '%U' for object "
-                          "of type '%.200s'"), actual_format_spec,
+                          "of type '%.200U'"), actual_format_spec,
                          PyType_GetFullyQualifiedName(Py_TYPE(obj)));
             Py_DECREF(actual_format_spec);
         }
