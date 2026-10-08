@@ -1,9 +1,5 @@
 #include "mpz.h"
 
-extern PyObject * to_int(PyObject *self);
-
-#if defined(ON_CPYTHON) && PY_VERSION_HEX >= 0x030D00A0
-
 /************************************************************************/
 /*********** standard format specifier parsing **************************/
 /************************************************************************/
@@ -300,52 +296,37 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
 }
 
 /* Fill in the digit parts of a number's string representation,
-   as determined in calc_number_widths().
-   Return -1 on error, or 0 on success. */
-Py_LOCAL(int)
-fill_number(PyUnicodeWriter *writer, const NumberFieldWidths *spec,
-            PyObject *digits, Py_ssize_t d_start,
-            Py_ssize_t p_start, char fill_char)
+   as determined in calc_number_widths(). */
+Py_LOCAL(void)
+fill_number(const NumberFieldWidths *spec,
+            char *digits, const char prefix[2], char fill_char)
 {
+    Py_ssize_t cur = 0;
+
     if (spec->n_lpadding) {
         for (Py_ssize_t i = 0; i < spec->n_lpadding; i++) {
-            if (PyUnicodeWriter_WriteChar(writer, (Py_UCS4)fill_char)) {
-                return -1; /* LCOV_EXCL_LINE */
-            }
+            digits[cur++] = fill_char;
         }
     }
     if (spec->n_sign == 1) {
-        if(PyUnicodeWriter_WriteChar(writer, (Py_UCS4)spec->sign)) {
-            return -1; /* LCOV_EXCL_LINE */
-        }
+        digits[cur++] = spec->sign;
     }
     if (spec->n_prefix) {
-        if (PyUnicodeWriter_WriteSubstring(writer, digits, p_start,
-                                           spec->n_prefix + p_start))
-        {
-            return -1; /* LCOV_EXCL_LINE */
-        }
+        digits[cur++] = prefix[0];
+        digits[cur++] = prefix[1];
     }
     if (spec->n_spadding) {
         for (Py_ssize_t i = 0; i < spec->n_spadding; i++) {
-            if (PyUnicodeWriter_WriteChar(writer, (Py_UCS4)fill_char)) {
-                return -1; /* LCOV_EXCL_LINE */
-            }
+            digits[cur++] = fill_char;
         }
     }
-    if (PyUnicodeWriter_WriteSubstring(writer, digits, d_start,
-                                       spec->n_digits + d_start))
-    {
-        return -1; /* LCOV_EXCL_LINE */
-    }
+    cur += spec->n_digits;
     if (spec->n_rpadding) {
         for (Py_ssize_t i = 0; i < spec->n_rpadding; i++) {
-            if (PyUnicodeWriter_WriteChar(writer, (Py_UCS4)fill_char)) {
-                return -1; /* LCOV_EXCL_LINE */
-            }
+            digits[cur++] = fill_char;
         }
     }
-    return 0;
+    digits[cur] = '\0';
 }
 
 Py_LOCAL(void)
@@ -456,13 +437,12 @@ format_mpz_internal(MPZ_Object *value, const InternalFormatSpec *format)
     Py_ssize_t n_digits; /* Count of digits need from the computed string */
     Py_ssize_t n_prefix = 2; /* Count of prefix chars, (e.g., '0x') */
     Py_ssize_t n_total;
-    Py_ssize_t prefix = 0;
     Py_ssize_t min_leading = 0;
     NumberFieldWidths spec;
 
     /* The number of prefix chars is the same as the leading
        chars to skip */
-    if (!format->alternate || format->base == 10) {
+    if (!format->alternate) {
         n_prefix = 0;
     }
     n_digits = (Py_ssize_t)calc_len(&value->z, format, &min_leading);
@@ -475,16 +455,10 @@ format_mpz_internal(MPZ_Object *value, const InternalFormatSpec *format)
         /* LCOV_EXCL_STOP */
     }
     n_digits = (Py_ssize_t)strlen(buf);
-    tmp = PyUnicode_FromString(buf);
-    free(buf);
-    if (tmp == NULL) {
-        goto done; /* LCOV_EXCL_LINE */
-    }
     /* Is a sign character present in the output?  If so, remember it
        and skip it */
     if (zz_isneg(&value->z)) {
         sign_char = '-';
-        prefix++;
         n_digits--;
         inumeric_chars++;
     }
@@ -498,22 +472,26 @@ format_mpz_internal(MPZ_Object *value, const InternalFormatSpec *format)
         goto done; /* LCOV_EXCL_LINE */
     }
 
-    /* Allocate the memory. */
-    PyUnicodeWriter *writer = PyUnicodeWriter_Create(n_total);
+    char *old_buf = buf;
 
-    if (!writer) {
-        goto done; /* LCOV_EXCL_LINE */
-    }
-    /* Populate the memory. */
-    if (fill_number(writer, &spec, tmp, inumeric_chars, prefix,
-                    format->fill_char))
-    {
+    buf = realloc(old_buf, (size_t)n_total + 1);
+    if (buf == NULL) {
         /* LCOV_EXCL_START */
-        PyUnicodeWriter_Discard(writer);
+        free(old_buf);
+        PyErr_NoMemory();
         goto done;
         /* LCOV_EXCL_STOP */
     }
-    return PyUnicodeWriter_Finish(writer);
+    memmove(buf + spec.n_lpadding + spec.n_sign + spec.n_prefix + spec.n_spadding,
+            buf + inumeric_chars, (size_t)spec.n_digits);
+    /* Populate the memory. */
+    fill_number(&spec, buf, format->prefix, format->fill_char);
+    tmp = PyUnicode_FromString(buf);
+    free(buf);
+    if (tmp == NULL) {
+        goto done; /* LCOV_EXCL_LINE */
+    }
+    return tmp;
     /* LCOV_EXCL_START */
 done:
     Py_XDECREF(tmp);
@@ -522,6 +500,7 @@ done:
 }
 
 extern PyObject * to_float(PyObject *self);
+extern PyObject * to_int(PyObject *self);
 
 PyObject *
 __format__(PyObject *self, PyObject *format_spec)
@@ -601,19 +580,3 @@ fallback:
         return res;
     }
 }
-#else
-PyObject *
-__format__(PyObject *self, PyObject *format_spec)
-{
-    PyObject *num = to_int(self);
-
-    if (!num) {
-        return NULL; /* LCOV_EXCL_LINE */
-    }
-
-    PyObject *res = PyObject_CallMethod(num, "__format__", "O", format_spec);
-
-    Py_DECREF(num);
-    return res;
-}
-#endif /* defined(ON_CPYTHON) && PY_VERSION_HEX >= 0x030D00A0 */
