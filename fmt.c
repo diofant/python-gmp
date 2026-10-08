@@ -364,13 +364,14 @@ insert_from_end_inplace(char *str, Py_ssize_t n, char c)
     }
 }
 
-Py_LOCAL(PyObject *)
-zz_format(const zz_t *u, const InternalFormatSpec *format)
+Py_LOCAL(size_t)
+calc_len(const zz_t *u, const InternalFormatSpec *format,
+         Py_ssize_t *min_leading)
 {
     size_t len = 0;
     bool negative = zz_isneg(u);
     bool sign = format->sign;
-    Py_ssize_t min_leading = 0, width = -1;
+    Py_ssize_t width = -1;
 
     if (format->fill_char == '0' && format->align == '=') {
         width = format->width;
@@ -380,27 +381,33 @@ zz_format(const zz_t *u, const InternalFormatSpec *format)
     if (format->alternate) {
         len += 2;
     }
-    min_leading = width - (Py_ssize_t)len - sign;
-    if (min_leading > 0) {
+    *min_leading = width - (Py_ssize_t)len - sign;
+    if (*min_leading > 0) {
         if (format->group) {
-            min_leading = ((format->group*(width - sign))/(format->group + 1)
-                           + 1 - (Py_ssize_t)len);
+            *min_leading = ((format->group*(width - sign))/(format->group + 1)
+                            + 1 - (Py_ssize_t)len);
         }
-        if (min_leading > 0) {
-            len += (size_t)min_leading;
+        if (*min_leading > 0) {
+            len += (size_t)*min_leading;
         }
     }
     if (format->group) {
         len += (len - 1) / (size_t)format->group;
     }
-    len += sign;
-    len++; /* '\0' */
-
-    char *buf = malloc(len), *p = buf, saved_char = 0;
-
-    if (!buf) {
-        return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
+    len += negative;
+    if (*min_leading < 0) {
+        *min_leading = 0;
     }
+    return len;
+}
+
+Py_LOCAL(zz_err)
+zz_format(const zz_t *u, Py_ssize_t min_leading,
+          const InternalFormatSpec *format, char *buf)
+{
+    bool negative = zz_isneg(u);
+    char *p = buf, saved_char = 0;
+
     if (negative) {
         saved_char = '-';
         *(p++) = saved_char;
@@ -419,6 +426,9 @@ zz_format(const zz_t *u, const InternalFormatSpec *format)
 
     zz_err ret = zz_get_str(u, format->base, p);
 
+    if (ret) {
+        return ret; /* LCOV_EXCL_LINE */
+    }
     if (min_leading > 0) {
        if (negative) {
            *p = '0';
@@ -433,30 +443,21 @@ zz_format(const zz_t *u, const InternalFormatSpec *format)
     if (saved_char) {
         *p = saved_char;
     }
-    if (ret) {
-        /* LCOV_EXCL_START */
-        free(buf);
-        return PyErr_NoMemory();
-        /* LCOV_EXCL_STOP */
-    }
-    p += strlen(p);
-
-    PyObject *res = PyUnicode_FromString(buf);
-
-    free(buf);
-    return res;
+    return ZZ_OK;
 }
 
 Py_LOCAL(PyObject *)
 format_mpz_internal(MPZ_Object *value, const InternalFormatSpec *format)
 {
     PyObject *tmp = NULL;
+    char *buf = NULL;
     Py_ssize_t inumeric_chars = 0;
     char sign_char = '\0';
     Py_ssize_t n_digits; /* Count of digits need from the computed string */
     Py_ssize_t n_prefix = 2; /* Count of prefix chars, (e.g., '0x') */
     Py_ssize_t n_total;
     Py_ssize_t prefix = 0;
+    Py_ssize_t min_leading = 0;
     NumberFieldWidths spec;
 
     /* The number of prefix chars is the same as the leading
@@ -464,11 +465,21 @@ format_mpz_internal(MPZ_Object *value, const InternalFormatSpec *format)
     if (!format->alternate || format->base == 10) {
         n_prefix = 0;
     }
-    tmp = zz_format(&value->z, format);
+    n_digits = (Py_ssize_t)calc_len(&value->z, format, &min_leading);
+    buf = malloc((size_t)n_digits + 1);
+    if (buf == NULL || zz_format(&value->z, min_leading, format, buf)) {
+        /* LCOV_EXCL_START */
+        free(buf);
+        PyErr_NoMemory();
+        goto done;
+        /* LCOV_EXCL_STOP */
+    }
+    n_digits = (Py_ssize_t)strlen(buf);
+    tmp = PyUnicode_FromString(buf);
+    free(buf);
     if (tmp == NULL) {
         goto done; /* LCOV_EXCL_LINE */
     }
-    n_digits = PyUnicode_GetLength(tmp);
     /* Is a sign character present in the output?  If so, remember it
        and skip it */
     if (zz_isneg(&value->z)) {
