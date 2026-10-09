@@ -8,12 +8,13 @@
    returns nonnegative integer or -1 on error.
 */
 Py_LOCAL(Py_ssize_t)
-get_integer(const char *str, Py_ssize_t *ppos, Py_ssize_t end)
+get_integer(char **start, const char *end)
 {
-    Py_ssize_t accumulator = 0, digitval, pos = *ppos;
+    char *pos = *start;
+    Py_ssize_t accumulator = 0, digitval;
 
     for (; pos < end; pos++) {
-        digitval = str[pos] - '0';
+        digitval = *pos - '0';
         if (digitval < 0 || digitval > 9) {
             break;
         }
@@ -21,12 +22,11 @@ get_integer(const char *str, Py_ssize_t *ppos, Py_ssize_t end)
         if (accumulator > (PY_SSIZE_T_MAX - digitval) / 10) {
             PyErr_Format(PyExc_ValueError,
                          "Too many decimal digits in format string");
-            *ppos = pos;
             return -1;
         }
         accumulator = accumulator * 10 + digitval;
     }
-    *ppos = pos;
+    *start = pos;
     return accumulator;
 }
 
@@ -77,12 +77,11 @@ typedef struct {
 */
 Py_LOCAL(int)
 parse_internal_render_format_spec(PyObject *obj,
-                                  PyObject *format_spec,
-                                  Py_ssize_t start, Py_ssize_t end,
+                                  const char *start,
+                                  const char *end,
                                   InternalFormatSpec *format)
 {
-    Py_ssize_t pos = start;
-    const char *data = PyUnicode_AsUTF8AndSize(format_spec, NULL);
+    char *pos = (char *)start;
     int align_specified = 0;
     int fill_char_specified = 0;
     int thousands_separators = 0;
@@ -97,41 +96,36 @@ parse_internal_render_format_spec(PyObject *obj,
     format->prefix[0] = '0';
     format->prefix[1] = '\0';
     format->type = 'd';
-    if (!data) {
-        return 0; /* LCOV_EXCL_LINE */
-    }
+    assert(pos);
     /* If the second char is an alignment token, then parse the fill char */
-    if (end-pos >= 2 && is_alignment_token(data[pos+1])) {
-        format->align = data[pos+1];
-        format->fill_char = data[pos];
+    if (end-pos >= 2 && is_alignment_token(*(pos + 1))) {
+        format->fill_char = *pos++;
+        format->align = *pos++;
         fill_char_specified = 1;
         align_specified = 1;
-        pos += 2;
     }
-    else if (end-pos >= 1 && is_alignment_token(data[pos])) {
-        format->align = data[pos];
+    else if (end-pos >= 1 && is_alignment_token(*pos)) {
+        format->align = *pos++;
         align_specified = 1;
-        ++pos;
     }
     /* Parse the various sign options */
-    if (end-pos >= 1 && is_sign_element(data[pos])) {
-        format->sign = data[pos];
-        ++pos;
+    if (end-pos >= 1 && is_sign_element(*pos)) {
+        format->sign = *pos++;
     }
     /* If the next character is #, we're in alternate mode */
-    if (end-pos >= 1 && data[pos] == '#') {
+    if (end-pos >= 1 && *pos == '#') {
         format->alternate = 1;
-        ++pos;
+        pos++;
     }
     /* The special case for 0-padding (backwards compat) */
-    if (!fill_char_specified && end-pos >= 1 && data[pos] == '0') {
+    if (!fill_char_specified && end-pos >= 1 && *pos == '0') {
         format->fill_char = '0';
         if (!align_specified) {
             format->align = '=';
         }
-        ++pos;
+        pos++;
     }
-    format->width = get_integer(data, &pos, end);
+    format->width = get_integer(&pos, end);
     if (format->width == -1) {
         return 0; /* overflow */
     }
@@ -140,9 +134,9 @@ parse_internal_render_format_spec(PyObject *obj,
         format->width = -1;
     }
     /* Underscore signifies add thousands separators */
-    if (end-pos && data[pos] == '_') {
+    if (end-pos && *pos == '_') {
         thousands_separators = 1;
-        ++pos;
+        pos++;
     }
     /* Finally, parse the type field. */
     if (end-pos > 1) {
@@ -150,20 +144,18 @@ parse_internal_render_format_spec(PyObject *obj,
            specifier. */
         /* Create a temporary object that contains the format spec we're
            operating on.  It's format_spec[start:end] (in Python syntax). */
-        PyObject* actual_format_spec = PyUnicode_FromStringAndSize(data
-                                                                   + start,
-                                                                   end-start);
-        if (actual_format_spec != NULL) {
+        PyObject* actual_spec = PyUnicode_FromStringAndSize(start, end-start);
+        if (actual_spec != NULL) {
             PyErr_Format(PyExc_ValueError,
                          ("Invalid format specifier '%U' for object "
-                          "of type '%.200U'"), actual_format_spec,
+                          "of type '%.200U'"), actual_spec,
                          PyType_GetFullyQualifiedName(Py_TYPE(obj)));
-            Py_DECREF(actual_format_spec);
+            Py_DECREF(actual_spec);
         }
         return 0;
     }
     if (end-pos == 1) {
-        format->type = data[pos];
+        format->type = *pos++;
         switch (format->type) {
         case 'b':
             format->base = 2;
@@ -520,14 +512,28 @@ __format__(PyObject *self, PyObject *format_spec)
 
     InternalFormatSpec format;
     unaryfunc cast = to_int;
+    PyObject *bytes = PyUnicode_AsASCIIString(format_spec);
 
-    if (!parse_internal_render_format_spec(self, format_spec, 0, end, &format))
-    {
-        PyErr_Clear();
-        cast = to_int;
-        goto fallback;
+    if (bytes) {
+        char *format_str = PyBytes_AsString(bytes);
+
+        if (!parse_internal_render_format_spec(self, format_str,
+                                               format_str + end,
+                                               &format))
+        {
+            Py_DECREF(bytes);
+            PyErr_Clear();
+            goto fallback;
+        }
+        Py_DECREF(bytes);
     }
-
+    else {
+        if (PyErr_ExceptionMatches(PyExc_UnicodeEncodeError)) {
+            PyErr_Clear();
+            goto fallback;
+        }
+        return NULL; /* LCOV_EXCL_LINE */
+    }
     switch (format.type) {
     case 'b':
     case 'd':
