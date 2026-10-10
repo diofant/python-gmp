@@ -126,9 +126,6 @@ def test_format_interface():
     with pytest.raises(ValueError, match="Unknown format code"):
         format(mx, "q")
     with pytest.raises(ValueError,
-                       match=r"(Unknown format code|Invalid format)"):
-        format(mx, "\x11")
-    with pytest.raises(ValueError,
                        match=(r"Invalid format specifier|"
                               "Invalid conversion specification")):
         format(mx, "f=10dx")

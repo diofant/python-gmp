@@ -540,21 +540,9 @@ __format__(PyObject *self, PyObject *format_spec)
         cast = to_float;
         break;
     default:
-        {
-            PyObject *type_name = PyType_GetFullyQualifiedName(Py_TYPE(self));
-
-            /* %c might be out-of-range, hence the two cases. */
-            if (format.type > 32) {
-                PyErr_Format(PyExc_ValueError,
-                             "Unknown format code '%c' for object of type '%U'",
-                             (char)format.type, type_name);
-            }
-            else {
-                PyErr_Format(PyExc_ValueError,
-                             "Unknown format code '\\x%x' for object of type '%U'",
-                             (unsigned int)format.type, type_name);
-            }
-        }
+        PyErr_Format(PyExc_ValueError,
+                     "Unknown format code '%c' for object of type '%U'",
+                     format.type, PyType_GetFullyQualifiedName(Py_TYPE(self)));
         return NULL;
     }
 
