@@ -295,10 +295,8 @@ fill_number(const NumberFieldWidths *spec,
 {
     Py_ssize_t cur = 0;
 
-    if (spec->n_lpadding) {
-        for (Py_ssize_t i = 0; i < spec->n_lpadding; i++) {
-            digits[cur++] = fill_char;
-        }
+    for (Py_ssize_t i = 0; i < spec->n_lpadding; i++) {
+        digits[cur++] = fill_char;
     }
     if (spec->n_sign == 1) {
         digits[cur++] = spec->sign;
@@ -307,16 +305,12 @@ fill_number(const NumberFieldWidths *spec,
         digits[cur++] = prefix[0];
         digits[cur++] = prefix[1];
     }
-    if (spec->n_spadding) {
-        for (Py_ssize_t i = 0; i < spec->n_spadding; i++) {
-            digits[cur++] = fill_char;
-        }
+    for (Py_ssize_t i = 0; i < spec->n_spadding; i++) {
+        digits[cur++] = fill_char;
     }
     cur += spec->n_digits;
-    if (spec->n_rpadding) {
-        for (Py_ssize_t i = 0; i < spec->n_rpadding; i++) {
-            digits[cur++] = fill_char;
-        }
+    for (Py_ssize_t i = 0; i < spec->n_rpadding; i++) {
+        digits[cur++] = fill_char;
     }
     digits[cur] = '\0';
 }
