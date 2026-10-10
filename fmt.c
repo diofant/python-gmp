@@ -365,11 +365,7 @@ calc_len(const zz_t *u, const InternalFormatSpec *format,
     if (format->group) {
         len += (len - 1) / (size_t)format->group;
     }
-    len += negative;
-    if (*min_leading < 0) {
-        *min_leading = 0;
-    }
-    return len;
+    return len + negative;
 }
 
 Py_LOCAL(zz_err)
@@ -406,11 +402,9 @@ zz_format(const zz_t *u, Py_ssize_t min_leading,
        }
        p -= min_leading;
     }
-    p += negative;
     if (format->group && !zz_iszero(u)) {
-        insert_from_end_inplace(p, format->group, '_');
+        insert_from_end_inplace(p + negative, format->group, '_');
     }
-    p -= negative;
     if (saved_char) {
         *p = saved_char;
     }
