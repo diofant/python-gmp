@@ -356,10 +356,8 @@ calc_len(const zz_t *u, const InternalFormatSpec *format,
     }
     *min_leading = width - (Py_ssize_t)len - sign;
     if (*min_leading > 0) {
-        if (format->group) {
-            *min_leading = ((format->group*(width - sign))/(format->group + 1)
-                            + 1 - (Py_ssize_t)len);
-        }
+        *min_leading = ((format->group*(width - sign))/(format->group + 1)
+                        + 1 - (Py_ssize_t)len);
         if (*min_leading > 0) {
             len += (size_t)*min_leading;
         }
