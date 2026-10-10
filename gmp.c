@@ -51,7 +51,7 @@ MPZ_new(void)
 
 static const char *MPZ_TAG = "mpz(";
 
-PyObject *
+static PyObject *
 MPZ_to_str(MPZ_Object *u, int base, bool tag)
 {
     size_t len = 0;

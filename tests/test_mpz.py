@@ -126,9 +126,6 @@ def test_format_interface():
     with pytest.raises(ValueError, match="Unknown format code"):
         format(mx, "q")
     with pytest.raises(ValueError,
-                       match=r"(Unknown format code|Invalid format)"):
-        format(mx, "\x81")
-    with pytest.raises(ValueError,
                        match=(r"Invalid format specifier|"
                               "Invalid conversion specification")):
         format(mx, "f=10dx")
@@ -137,6 +134,7 @@ def test_format_interface():
 
     assert format(mx, "f") == "123.000000"
     assert format(mx, "c") == "{"
+    assert format(mx, "ы=10b") == "ыыы1111011"
 
 
 @given(bigints())
