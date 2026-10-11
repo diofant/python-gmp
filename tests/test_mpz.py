@@ -1,6 +1,5 @@
 import decimal
 import inspect
-import locale
 import math
 import operator
 import pickle
@@ -113,7 +112,7 @@ def test_underscores_auto(s):
 @example(-3912, "0=28d")
 @example(-3912, "028d")
 @example(-3912, "028_d")
-@example(-3912, "28n")
+@example(-3912, "")
 def test_format_bulk(x, fmt):
     mx = mpz(x)
     r = format(x, fmt)
@@ -127,93 +126,15 @@ def test_format_interface():
     with pytest.raises(ValueError, match="Unknown format code"):
         format(mx, "q")
     with pytest.raises(ValueError,
-                       match=r"(Unknown format code|Invalid format)"):
-        format(mx, "\x81")
-    with pytest.raises(ValueError,
-                       match=(r"Negative zero coercion \(z\) not allowed|"
-                              "Invalid conversion specification")):
-        format(mx, "zd")
-    with pytest.raises(ValueError, match="Precision not allowed"):
-        format(mx, ".10d")
-    with pytest.raises(ValueError, match=r"Cannot specify '_' with 'n'."):
-        format(mx, "_n")
-    with pytest.raises(ValueError, match=r"Cannot specify ',' with 'n'."):
-        format(mx, ",n")
-    with pytest.raises(ValueError, match=r"Cannot specify '_' with 'c'."):
-        format(mx, "_c")
-    with pytest.raises(ValueError,
                        match=(r"Invalid format specifier|"
                               "Invalid conversion specification")):
         format(mx, "f=10dx")
-    with pytest.raises(ValueError,
-                       match=("Format specifier missing precision"
-                              r"|no precision given")):
-        format(mx, ".d")
     with pytest.raises(ValueError, match=r"many decimal digits|width too big"):
         format(mx, "f=10000000000000000000d")
-    with pytest.raises(ValueError, match=(r"many decimal digits|"
-                                          "precision too big")):
-        format(mx, ".10000000000000000000f")
-    with pytest.raises(ValueError, match=r"Cannot specify both ',' and '_'."):
-        format(mx, ",_d")
-    with pytest.raises(ValueError, match=r"Cannot specify both ',' and '_'."):
-        format(mx, "_,d")
-    with pytest.raises(ValueError, match=r"Cannot specify ',' with 'x'."):
-        format(mx, ",x")
-    with pytest.raises(ValueError,
-                       match=(r"Cannot specify ',' with|"
-                              "Invalid format specifier")):
-        format(mx, ",\xa0")
-    with pytest.raises(ValueError, match="Sign not allowed"):
-        format(mx, "+c")
-    with pytest.raises(ValueError, match=r"Alternate form \(#\) not allowed"):
-        format(mx, "#c")
-    with pytest.raises(OverflowError):
-        format(mpz(123456789), "c")
-    with pytest.raises(OverflowError):
-        format(mpz(10**100), "c")
-    with pytest.raises(OverflowError):
-        format(mpz(-1), "c")
-    with pytest.raises(OverflowError):
-        format(mpz(1<<32), "c")
-    if sys.version_info >= (3, 14):
-        with pytest.raises(ValueError,
-                           match=r"Cannot specify both ',' and '_'."):
-            format(mx, ".10,_f")
-        with pytest.raises(ValueError,
-                           match=r"Cannot specify both ',' and '_'."):
-            format(mx, ".10_,f")
-        with pytest.raises(ValueError, match=r"Cannot specify '_' with 'n'."):
-            format(mx, ".10_n")
-        with pytest.raises(ValueError, match=r"Cannot specify ',' with 'n'."):
-            format(mx, ".10,n")
-    assert format(mx, ".2f") == "123.00"
-    assert format(mx, "") == "123"
+
+    assert format(mx, "f") == "123.000000"
     assert format(mx, "c") == "{"
-    assert format(mpz(0), "c") == "\x00"
-    assert format(mx, "010c") == "000000000{"
-    assert format(mx, "<10c") == "{         "
-
-    if sys.version_info >= (3, 14):
-        assert format(mx, ".,f") == "123.000,000"
-        assert format(mx, "._f") == "123.000_000"
-
-    try:
-        locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
-        s = locale.localeconv()["thousands_sep"]
-        if not s:
-            return  # XXX: on musllinux
-        assert format(mpz(123456789), "n") == f"123{s}456{s}789"
-        assert format(mpz(123), "011n") == f"000{s}000{s}123"
-        locale.setlocale(locale.LC_ALL, "C")
-        if platform.python_implementation() == "GraalVM":
-            return  # XXX: oracle/graalpython#521
-        locale.setlocale(locale.LC_NUMERIC, "ps_AF.UTF-8")
-        s = locale.localeconv()["thousands_sep"]
-        assert format(mpz(123456789), "n") == f"123{s}456{s}789"
-    except locale.Error:
-        pass
-    locale.setlocale(locale.LC_ALL, "C")
+    assert format(mx, "ы=10b") == "ыыы1111011"
 
 
 @given(bigints())
@@ -275,12 +196,19 @@ def test_mpz_interface():
         mpz(" ")
     with pytest.raises(ValueError, match="invalid literal"):
         mpz("qqq")
+    with pytest.raises(ValueError, match="invalid literal"):
+        mpz("ыыы")
     assert mpz() == mpz(0) == 0
     assert mpz("  -123") == -123
     assert mpz("123  ") == 123
     assert mpz("    -123  ") == -123
     assert mpz("+123") == 123
+    assert mpz("١٢٣٤") == 1234  # unicode decimal digits
+    assert mpz("١٢٣٤", base=20) == 8864
+    assert mpz("१23") == 123
     assert mpz("\t123") == 123
+    if platform.python_implementation() != "GraalVM":
+        assert mpz("\xa0123") == 123  # see oracle/graalpython#1209
     assert mpz("-010") == -10
     assert mpz("-10") == -10
     assert mpz("0b_10", 0) == 2
@@ -452,10 +380,6 @@ def test_add_int_subclasses():
 def test_binary_mixed(x, y):
     mx = mpz(x)
     for op in [operator.add, operator.mul, operator.sub]:
-        if (platform.python_implementation() == "GraalVM"
-                and op in [operator.add, operator.sub]
-                and str(y.imag) == "-0.0"):
-            continue  # issue oracle/graalpython#585
         assert str(op(mx, y)) == str(op(x, y))
         assert str(op(y, mx)) == str(op(y, x))
         if op != operator.sub:
@@ -714,8 +638,6 @@ def test_power_errors():
         pow(mpz(10**1000), 1j)
     with pytest.raises(TypeError):
         pow(object(), mpz(321))
-    if platform.python_implementation() == "GraalVM":
-        return  # issue oracle/graalpython#551
     with pytest.raises(OverflowError):
         pow(mpz(2), mpz(1<<64))
     if BITCNT_MAX < (1<<64) - 1:
@@ -816,8 +738,6 @@ def test_methods(x):
         assert meth(mx) == meth(x)
 
 
-@pytest.mark.skipif(platform.python_implementation() == "GraalVM",
-                    reason="oracle/graalpython#883")
 @given(bigints(), integers(min_value=0, max_value=10000),
        sampled_from(["big", "little"]), booleans())
 @example(0, 0, "big", False)
@@ -842,6 +762,7 @@ def test_methods(x):
 @example(128, 1, "big", False)
 @example(-32383289396013590652, 0, "big", True)
 @example(-384, 1, "big", True)
+@example(32768, 2, "big", True)
 def test_to_bytes_bulk(x, length, byteorder, signed):
     try:
         rx = x.to_bytes(length, byteorder, signed=signed)

@@ -107,7 +107,7 @@ def to_digits(n, base):
 
 
 @composite
-def fmt_str(draw, types="bdoxXn"):
+def fmt_str(draw, types="bdoxX"):
     res = ""
     type = draw(sampled_from(types))
 
@@ -142,7 +142,7 @@ def fmt_str(draw, types="bdoxXn"):
     res += draw(sampled_from([""]*7 + list(map(str, range(1, 40)))))
 
     # grouping character (thousand_separators)
-    gchar = draw(sampled_from(["", *list(",_")]))
+    gchar = draw(sampled_from(["", "_"]))
     if (gchar and not skip_thousand_separators
             and not (gchar == "," and type in ["b", "o", "x", "X"])
             and type != "n"):

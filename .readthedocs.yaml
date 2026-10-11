@@ -10,6 +10,8 @@ build:
         - pkg-config
         - curl
     jobs:
+      post_checkout:
+        - git fetch --tags  # readthedocs/readthedocs.org#10715
       pre_create_environment:
         - sh scripts/cibw_before_all.sh --skip-gmp
     tools:

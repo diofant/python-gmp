@@ -58,11 +58,9 @@ MPZ_new(gmp_state * state, PyTypeObject *type)
 }
 
 static const char *MPZ_TAG = "mpz(";
-static int OPT_TAG = 0x1;
-int OPT_PREFIX = 0x2;
 
-PyObject *
-MPZ_to_str(MPZ_Object *u, int base, int options)
+static PyObject *
+MPZ_to_str(MPZ_Object *u, int base, bool tag)
 {
     size_t len = 0;
     bool negative = zz_isneg(&u->z);
@@ -72,56 +70,24 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
                         "mpz base must be >= 2 and <= 36");
         return NULL;
     }
-    len += negative;
-    if (options & OPT_TAG) {
+    if (tag) {
         len += strlen(MPZ_TAG) + 1;
     }
-    if (options & OPT_PREFIX) {
-        len += 2;
-    }
-    len++;
+    len += negative;
+    len++; /* '\0' */
 
-    char *buf = malloc(len), *p = buf, saved_char = 0;
+    char *buf = malloc(len), *p = buf;
 
     if (!buf) {
         return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-    if (options & OPT_TAG) {
+    if (tag) {
         strcpy(p, MPZ_TAG);
         p += strlen(MPZ_TAG);
-    }
-    if (options & OPT_PREFIX) {
-        if (negative) {
-            *(p++) = '-';
-            saved_char = '-';
-        }
-        if (base == 2) {
-            *(p++) = '0';
-            *(p++) = 'b';
-        }
-        else if (base == 8) {
-            *(p++) = '0';
-            *(p++) = 'o';
-        }
-        else if (base == 16) {
-            *(p++) = '0';
-            *(p++) = 'x';
-        }
-        else if (base == -16) {
-            *(p++) = '0';
-            *(p++) = 'X';
-        }
-    }
-    if (saved_char) {
-        saved_char = *(--p);
-        assert(saved_char);
     }
 
     zz_err ret = zz_get_str(&u->z, base, p);
 
-    if (saved_char) {
-        *p = saved_char;
-    }
     if (ret) {
         /* LCOV_EXCL_START */
         free(buf);
@@ -129,7 +95,7 @@ MPZ_to_str(MPZ_Object *u, int base, int options)
         /* LCOV_EXCL_STOP */
     }
     p += strlen(p);
-    if (options & OPT_TAG) {
+    if (tag) {
         *(p++) = ')';
         *p = '\0';
     }
@@ -447,9 +413,42 @@ new_impl(gmp_state *state, PyTypeObject *type, PyObject *arg, PyObject *base_arg
     }
 str:
     if (PyUnicode_Check(arg)) {
-        PyObject *res = (PyObject *)MPZ_from_str(state, type, arg, base);
+        if (PyUnicode_IS_ASCII(arg)) {
+            return (PyObject *)MPZ_from_str(state, type, arg, base);
+        }
 
-        return res;
+        PyObject *builtins = PyEval_GetFrameBuiltins();
+
+        if (!builtins) {
+            return NULL; /* LCOV_EXCL_LINE */
+        }
+
+        PyObject *int_func = PyDict_GetItemString(builtins, "int");
+
+        Py_DECREF(builtins);
+        if (!int_func) {
+            return NULL; /* LCOV_EXCL_LINE */
+        }
+
+
+        PyObject *integer;
+
+        if (Py_IsNone(base_arg)) {
+            integer = PyObject_CallOneArg(int_func, arg);
+        }
+        else {
+            integer = PyObject_CallFunction(int_func, "OO", arg, base_arg);
+        }
+        if (integer) {
+            PyObject *res = (PyObject *)MPZ_from_int(state, type, integer);
+
+            if (!res) {
+                return NULL; /* LCOV_EXCL_LINE */
+            }
+            Py_DECREF(integer);
+            return res;
+        }
+        return NULL; /* LCOV_EXCL_LINE */
     }
     else if (PyByteArray_Check(arg) || PyBytes_Check(arg)) {
         const char *string;
@@ -581,13 +580,13 @@ vectorcall(PyObject *type, PyObject *const *args, size_t nargsf,
 static PyObject *
 repr(PyObject *self)
 {
-    return MPZ_to_str((MPZ_Object *)self, 10, OPT_TAG);
+    return MPZ_to_str((MPZ_Object *)self, 10, true);
 }
 
 static PyObject *
 str(PyObject *self)
 {
-    return MPZ_to_str((MPZ_Object *)self, 10, 0);
+    return MPZ_to_str((MPZ_Object *)self, 10, false);
 }
 
 #define Number_Check(op) (PyFloat_Check((op)) || PyComplex_Check((op)))
@@ -1582,7 +1581,7 @@ digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
             return NULL;
         }
     }
-    return MPZ_to_str((MPZ_Object *)self, base, 0);
+    return MPZ_to_str((MPZ_Object *)self, base, false);
 }
 
 extern PyObject * __format__(PyObject *self, PyObject *format_spec);
@@ -1656,8 +1655,8 @@ The signed argument indicates whether two’s complement is used."},
 
 PyDoc_STRVAR(mpz_doc,
              "mpz(number=0, /)\nmpz(string, /, base=10)\n\n\
-Convert a number or an ASCII string to an integer.  If numeric argument is not\n\
-an int subclass, return mpz(int(number)).\n\n\
+Convert a number or a string to an integer.  If numeric argument is not\n\
+an int subclass, return same as mpz(int(number)).\n\n\
 If argument is not a number or if base is given, then it must be a string,\n\
 bytes, or bytearray instance representing an integer literal in the\n\
 given base.  The literal can be preceded by '+' or '-' and be surrounded\n\
@@ -2290,9 +2289,10 @@ A named tuple that holds information about mpz type.\n\
 The attributes are read only.");
 
 static PyStructSequence_Field mpz_info_fields[] = {
-    {"bits_per_digit", "size of a digit in bits"},
-    {"sizeof_digit", "size in bytes of the C type, used to represent a digit"},
-    {"bitcnt_max", "maximal count of bits in integer"},
+    {"bits_per_digit", "The size of a digit in bits."},
+    {"sizeof_digit",
+     "The size in bytes of the C type used to represent a digit."},
+    {"bitcnt_max", "The maximal count of bits in an integer."},
     {NULL}};
 
 static PyStructSequence_Desc mpz_info_desc = {
@@ -2365,7 +2365,7 @@ fail1:
                        "numbers.Integral.register(gmp.mpz)\n"
                        "gmp.fac = gmp.factorial\n"
                        "gmp.__all__ = ['comb', 'factorial', 'gcd', 'isqrt',\n"
-                       "               'lcm', 'mpz', 'perm']\n"
+                       "               'lcm', 'mpz', 'perm', 'mpz_info']\n"
                        "gmp.__version__ = imp.version('python-gmp')\n");
     PyObject *codeobj = Py_CompileString(str, "<file>", Py_file_input);
     PyObject *res;
@@ -2441,7 +2441,8 @@ static PyModuleDef_Slot gmp_slots[] = {
 static struct PyModuleDef gmp_module = {
     PyModuleDef_HEAD_INIT,
     .m_name = "gmp",
-    .m_doc = "Bindings to the GNU GMP for Python.",
+    .m_doc = "Bindings to the GNU GMP for Python, providing int-compatible\n\
+integer type and functions as in the math.integer submodule.",
     .m_size = sizeof(gmp_state),
     .m_methods = gmp_functions,
     .m_slots = gmp_slots,

@@ -61,3 +61,11 @@ gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
     }
     return 0;
 }
+
+#if PY_VERSION_HEX < 0x030D00A6
+PyObject *
+PyEval_GetFrameBuiltins(void)
+{
+    return Py_XNewRef(PyEval_GetBuiltins());
+}
+#endif
