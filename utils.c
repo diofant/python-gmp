@@ -69,3 +69,18 @@ PyEval_GetFrameBuiltins(void)
     return Py_XNewRef(PyEval_GetBuiltins());
 }
 #endif
+
+#ifdef Py_LIMITED_API
+unsigned int
+PyUnicode_IS_ASCII(PyObject *unicode)
+{
+    PyObject *bytes = PyUnicode_AsASCIIString(unicode);
+
+    if (bytes) {
+        Py_DECREF(bytes);
+        return 1;
+    }
+    PyErr_Clear();
+    return 0;
+}
+#endif

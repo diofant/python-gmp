@@ -38,4 +38,8 @@ int gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
 PyObject * PyEval_GetFrameBuiltins(void);
 #endif
 
+#ifdef Py_LIMITED_API
+unsigned int PyUnicode_IS_ASCII(PyObject *unicode);
+#endif
+
 #endif /* UTILS_H */

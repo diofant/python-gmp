@@ -434,7 +434,7 @@ str:
         PyObject *integer;
 
         if (Py_IsNone(base_arg)) {
-            integer = PyObject_CallOneArg(int_func, arg);
+            integer = PyObject_CallFunction(int_func, "O", arg);
         }
         else {
             integer = PyObject_CallFunction(int_func, "OO", arg, base_arg);
