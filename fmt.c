@@ -1,5 +1,7 @@
 #include <stdlib.h>
-
+#ifndef SSIZE_MAX
+#  define SSIZE_MAX LLONG_MAX
+#endif
 #include "mpz.h"
 
 /************************************************************************/
