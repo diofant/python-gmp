@@ -22,7 +22,7 @@ _Thread_local gmp_global global = {
 uint8_t bits_per_digit;
 Py_hash_t pyhash_modulus;
 
-static MPZ_Object *
+Py_LOCAL(MPZ_Object *)
 MPZ_new(void)
 {
     MPZ_Object *res;
@@ -51,7 +51,7 @@ MPZ_new(void)
 
 static const char *MPZ_TAG = "mpz(";
 
-static PyObject *
+Py_LOCAL(PyObject *)
 MPZ_to_str(MPZ_Object *u, int base, bool tag)
 {
     size_t len = 0;
@@ -98,7 +98,7 @@ MPZ_to_str(MPZ_Object *u, int base, bool tag)
     return res;
 }
 
-static MPZ_Object *
+Py_LOCAL(MPZ_Object *)
 MPZ_from_str(PyObject *obj, int base)
 {
     const char *str = PyUnicode_AsUTF8AndSize(obj, NULL);
@@ -145,7 +145,7 @@ MPZ_from_str(PyObject *obj, int base)
     return res;
 }
 
-static MPZ_Object *
+Py_LOCAL(MPZ_Object *)
 MPZ_from_int(PyObject *obj)
 {
 #if defined(ON_CPYTHON) && !defined(Py_LIMITED_API)
@@ -213,7 +213,7 @@ MPZ_from_int(PyObject *obj)
 #endif /* defined(ON_CPYTHON) && !defined(Py_LIMITED_API) */
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 MPZ_to_int(MPZ_Object *u)
 {
     int64_t value;
@@ -257,7 +257,7 @@ MPZ_to_int(MPZ_Object *u)
 #endif /* defined(ON_CPYTHON) && !defined(Py_LIMITED_API) */
 }
 
-static void
+Py_LOCAL(void)
 revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r)
 {
     while (l < r) {
@@ -270,7 +270,7 @@ revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r)
     }
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
 {
     PyObject *bytes = PyBytes_FromStringAndSize(NULL, length);
@@ -311,7 +311,7 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
     /* LCOV_EXCL_STOP */
 }
 
-static MPZ_Object *
+Py_LOCAL(MPZ_Object *)
 MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
 {
     PyObject *bytes = PyObject_Bytes(obj);
@@ -373,7 +373,7 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
     return res;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
 {
     int base = 10;
@@ -474,7 +474,7 @@ str:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 new(PyTypeObject *type, PyObject *args, PyObject *keywds)
 {
     static char *kwlist[] = {"", "base", NULL};
@@ -520,7 +520,7 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     return new_impl(type, arg, base);
 }
 
-static void
+Py_LOCAL(void)
 dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -549,7 +549,7 @@ dealloc(PyObject *self)
 #endif
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 vectorcall(PyObject *type, PyObject *const *args, size_t nargsf,
            PyObject *kwnames)
 {
@@ -579,13 +579,13 @@ vectorcall(PyObject *type, PyObject *const *args, size_t nargsf,
     }
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 repr(PyObject *self)
 {
     return MPZ_to_str((MPZ_Object *)self, 10, true);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 str(PyObject *self)
 {
     return MPZ_to_str((MPZ_Object *)self, 10, false);
@@ -625,7 +625,7 @@ to_float(PyObject *self)
     return PyFloat_FromDouble(d);
 }
 
-static inline int64_t
+Py_LOCAL_INLINE(int64_t)
 PyLong_AsSdigit_t(PyObject *obj, int *error)
 {
 #if SIZEOF_LONG == 8
@@ -640,7 +640,7 @@ PyLong_AsSdigit_t(PyObject *obj, int *error)
     return (int64_t)value;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 richcompare(PyObject *self, PyObject *other, int op)
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -704,7 +704,7 @@ numbers:
     return res;
 }
 
-static Py_hash_t
+Py_LOCAL(Py_hash_t)
 hash(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -745,7 +745,7 @@ hash(PyObject *self)
 }
 
 #define UNOP(suff, func)                                       \
-    static PyObject *                                          \
+    Py_LOCAL(PyObject *)                                       \
     func(PyObject *self)                                       \
     {                                                          \
         MPZ_Object *u = (MPZ_Object *)self;                    \
@@ -781,7 +781,7 @@ to_int(PyObject *self)
     return MPZ_to_int((MPZ_Object *)self);
 }
 
-static int
+Py_LOCAL(int)
 to_bool(PyObject *self)
 {
     return !zz_iszero(&((MPZ_Object *)self)->z);
@@ -810,7 +810,7 @@ to_bool(PyObject *self)
     }
 
 #define BINOP(suff, slot)                                       \
-    static PyObject *                                           \
+    Py_LOCAL(PyObject *)                                        \
     nb_##suff(PyObject *self, PyObject *other)                  \
     {                                                           \
         MPZ_Object *u = NULL, *v = NULL, *res = NULL;           \
@@ -907,7 +907,7 @@ BINOP(rem, PyNumber_Remainder)
         }                               \
     }                                   \
 
-static PyObject *
+Py_LOCAL(PyObject *)
 nb_divmod(PyObject *self, PyObject *other)
 {
     PyObject *res = PyTuple_New(2);
@@ -957,7 +957,7 @@ end:
     /* LCOV_EXCL_STOP */
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 nb_truediv(PyObject *self, PyObject *other)
 {
     PyObject *res = NULL;
@@ -1026,7 +1026,7 @@ numbers:
 }
 
 #define BINOP_INT(suff)                                         \
-    static PyObject *                                           \
+    Py_LOCAL(PyObject *)                                        \
     nb_##suff(PyObject *self, PyObject *other)                  \
     {                                                           \
         MPZ_Object *u = NULL, *v = NULL, *res = NULL;           \
@@ -1065,7 +1065,7 @@ BINOP_INT(xor)
 BINOP_INT(lshift)
 BINOP_INT(rshift)
 
-static PyObject *
+Py_LOCAL(PyObject *)
 power(PyObject *self, PyObject *other, PyObject *module)
 {
     MPZ_Object *res = NULL;
@@ -1212,13 +1212,13 @@ static PyNumberMethods as_number = {
     .nb_bool = to_bool,
 };
 
-static PyObject *
+Py_LOCAL_INLINE(PyObject *)
 get_copy(PyObject *self, void *Py_UNUSED(closure))
 {
     return Py_NewRef(self);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 get_one(PyObject *Py_UNUSED(self), void *Py_UNUSED(closure))
 {
     MPZ_Object *res = MPZ_new();
@@ -1229,7 +1229,7 @@ get_one(PyObject *Py_UNUSED(self), void *Py_UNUSED(closure))
     return (PyObject *)res;
 }
 
-static PyObject *
+Py_LOCAL_INLINE(PyObject *)
 get_zero(PyObject *Py_UNUSED(self), void *Py_UNUSED(closure))
 {
     return (PyObject *)MPZ_new();
@@ -1247,7 +1247,7 @@ static PyGetSetDef getsetters[] = {
     {NULL} /* sentinel */
 };
 
-static PyObject *
+Py_LOCAL(PyObject *)
 bit_length(PyObject *self, PyObject *Py_UNUSED(args))
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -1256,7 +1256,7 @@ bit_length(PyObject *self, PyObject *Py_UNUSED(args))
     return PyLong_FromUnsignedLongLong(digit);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 bit_count(PyObject *self, PyObject *Py_UNUSED(args))
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -1265,7 +1265,7 @@ bit_count(PyObject *self, PyObject *Py_UNUSED(args))
     return PyLong_FromUnsignedLongLong(count);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
          PyObject *kwnames)
 {
@@ -1336,13 +1336,13 @@ to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
     return MPZ_to_bytes((MPZ_Object *)self, length, is_little, is_signed);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 _from_bytes(PyObject *Py_UNUSED(type), PyObject *arg)
 {
     return (PyObject *)MPZ_from_bytes(arg, 0, 1);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 from_bytes(PyTypeObject *Py_UNUSED(type), PyObject *const *args,
            Py_ssize_t nargs, PyObject *kwnames)
 {
@@ -1397,7 +1397,7 @@ from_bytes(PyTypeObject *Py_UNUSED(type), PyObject *const *args,
     return (PyObject *)MPZ_from_bytes(args[argidx[0]], is_little, is_signed);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 as_integer_ratio(PyObject *self, PyObject *Py_UNUSED(args))
 {
     PyObject *one = get_one(NULL, NULL);
@@ -1414,7 +1414,7 @@ as_integer_ratio(PyObject *self, PyObject *Py_UNUSED(args))
     return ratio_tuple;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 __round__(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs > 1) {
@@ -1501,7 +1501,7 @@ overflow:
     return (PyObject *)res;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 __reduce_ex__(PyObject *self, PyObject *Py_UNUSED(args))
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -1512,7 +1512,7 @@ __reduce_ex__(PyObject *self, PyObject *Py_UNUSED(args))
                          MPZ_to_bytes(u, (Py_ssize_t)(len + 7)/8 + 1, 0, 1));
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 __sizeof__(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -1521,13 +1521,13 @@ __sizeof__(PyObject *self, PyObject *Py_UNUSED(ignored))
                              + zz_sizeof(&u->z));
 }
 
-static PyObject *
+Py_LOCAL_INLINE(PyObject *)
 is_integer(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(args))
 {
     Py_RETURN_TRUE;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
        PyObject *kwnames)
 {
@@ -2095,7 +2095,7 @@ PyTypeObject MPZ_Type = {
     .tp_vectorcall = vectorcall,
 };
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_gcd(PyObject *Py_UNUSED(module), PyObject *const *args, Py_ssize_t nargs)
 {
     MPZ_Object *res = MPZ_new();
@@ -2126,7 +2126,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
            Py_ssize_t nargs)
 {
@@ -2170,7 +2170,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_lcm(PyObject *Py_UNUSED(module), PyObject *const *args, Py_ssize_t nargs)
 {
     MPZ_Object *res = MPZ_new();
@@ -2209,7 +2209,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_isqrt(PyObject *Py_UNUSED(module), PyObject *arg)
 {
     MPZ_Object *x, *root = MPZ_new();
@@ -2237,7 +2237,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_isqrt_rem(PyObject *Py_UNUSED(module), PyObject *arg)
 {
     MPZ_Object *x, *root = MPZ_new(), *rem = MPZ_new();
@@ -2271,7 +2271,7 @@ end:
     return tup;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_fac(PyObject *Py_UNUSED(module), PyObject *arg)
 {
     MPZ_Object *x, *res = MPZ_new();
@@ -2315,7 +2315,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs != 2) {
@@ -2366,7 +2366,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs > 2 || nargs < 1) {
@@ -2436,7 +2436,7 @@ end:
     return NULL;
 }
 
-static zz_rnd
+Py_LOCAL(zz_rnd)
 get_round_mode(PyObject *rndstr)
 {
     if (!PyUnicode_Check(rndstr)) {
@@ -2471,7 +2471,7 @@ invalid:
     return rnd;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs != 6) {
@@ -2529,7 +2529,7 @@ gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     return Py_BuildValue("(bNNK)", negative, man, iexp, bc);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs < 2 || nargs > 4) {
@@ -2668,7 +2668,7 @@ static PyStructSequence_Field mpz_info_fields[] = {
 static PyStructSequence_Desc mpz_info_desc = {
     "gmp.mpz_info", mpz_info__doc__, mpz_info_fields, 3};
 
-static int
+Py_LOCAL(int)
 gmp_exec(PyObject *m)
 {
     if (zz_setup()) {
