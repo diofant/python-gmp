@@ -34,8 +34,4 @@ int gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
                      PyObject *const *args, Py_ssize_t nargs,
                      PyObject *kwnames);
 
-#if PY_VERSION_HEX < 0x030D00A6
-PyObject * PyEval_GetFrameBuiltins(void);
-#endif
-
 #endif /* UTILS_H */

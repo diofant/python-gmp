@@ -498,27 +498,20 @@ __format__(PyObject *self, PyObject *format_spec)
 
     InternalFormatSpec format;
     unaryfunc cast = to_int;
-    PyObject *bytes = PyUnicode_AsASCIIString(format_spec);
 
-    if (bytes) {
-        char *format_str = PyBytes_AsString(bytes);
+    if (PyUnicode_IS_ASCII(format_spec)) {
+        const char *format_str = PyUnicode_AsUTF8AndSize(format_spec, NULL);
 
         if (!parse_internal_render_format_spec(self, format_str,
                                                format_str + end,
                                                &format))
         {
-            Py_DECREF(bytes);
             PyErr_Clear();
             goto fallback;
         }
-        Py_DECREF(bytes);
     }
     else {
-        if (PyErr_ExceptionMatches(PyExc_UnicodeEncodeError)) {
-            PyErr_Clear();
-            goto fallback;
-        }
-        return NULL; /* LCOV_EXCL_LINE */
+        goto fallback;
     }
     switch (format.type) {
     case 'b':
