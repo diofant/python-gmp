@@ -1,9 +1,5 @@
 #include "mpz.h"
 
-/************************************************************************/
-/*********** standard format specifier parsing **************************/
-/************************************************************************/
-
 /* Accomulates decimal digit characters from an input string,
    returns nonnegative integer or -1 on error.
 */
@@ -18,7 +14,6 @@ get_integer(char **start, const char *end)
         if (digitval < 0 || digitval > 9) {
             break;
         }
-        /* Detect possible overflow before it happens */
         if (accumulator > (PY_SSIZE_T_MAX - digitval) / 10) {
             PyErr_Format(PyExc_ValueError,
                          "Too many decimal digits in format string");
@@ -60,35 +55,34 @@ is_sign_element(char c)
 typedef struct {
     char fill_char;
     char align;
-    int alternate;
+    bool zeropad;
+    bool alternate;
     char sign;
     Py_ssize_t width;
     char group;
     int base;
     char prefix[2];
     char type;
-} InternalFormatSpec;
+} IntFormatSpec;
 
-/*
-  ptr points to the start of the format_spec, end points just past its end.
-  fills in format with the parsed information.
-  returns 1 on success, 0 on failure.
-  if failure, sets the exception
+/* Fills in format with the parsed information.  Returns 1 on success,
+   0 on failure with an exception set.
 */
 Py_LOCAL(int)
-parse_internal_render_format_spec(PyObject *obj,
-                                  const char *start,
-                                  const char *end,
-                                  InternalFormatSpec *format)
+parse_int_format_spec(PyObject *obj, PyObject *format_spec,
+                      Py_ssize_t len, IntFormatSpec *format)
 {
+    const char *start = PyUnicode_AsUTF8AndSize(format_spec, NULL);
     char *pos = (char *)start;
-    int align_specified = 0;
-    int fill_char_specified = 0;
-    int thousands_separators = 0;
+    const char *end = start + len;
+    bool align_specified = false;
+    bool fill_char_specified = false;
+    bool thousands_separators = false;
 
     format->fill_char = ' ';
     format->align = '>';
-    format->alternate = 0;
+    format->zeropad = false;
+    format->alternate = false;
     format->sign = '\0';
     format->width = -1;
     format->group = 0;
@@ -97,27 +91,27 @@ parse_internal_render_format_spec(PyObject *obj,
     format->prefix[1] = '\0';
     format->type = 'd';
     assert(pos);
-    /* If the second char is an alignment token, then parse the fill char */
+    /* If the second char is an alignment token, then parse the fill char. */
     if (end-pos >= 2 && is_alignment_token(*(pos + 1))) {
         format->fill_char = *pos++;
         format->align = *pos++;
-        fill_char_specified = 1;
-        align_specified = 1;
+        fill_char_specified = true;
+        align_specified = true;
     }
     else if (end-pos >= 1 && is_alignment_token(*pos)) {
         format->align = *pos++;
-        align_specified = 1;
+        align_specified = true;
     }
-    /* Parse the various sign options */
+    /* Parse the various sign options. */
     if (end-pos >= 1 && is_sign_element(*pos)) {
         format->sign = *pos++;
     }
-    /* If the next character is #, we're in alternate mode */
+    /* If the next character is #, we're in alternate mode. */
     if (end-pos >= 1 && *pos == '#') {
-        format->alternate = 1;
+        format->alternate = true;
         pos++;
     }
-    /* The special case for 0-padding (backwards compat) */
+    /* The special case for 0-padding (backwards compat). */
     if (!fill_char_specified && end-pos >= 1 && *pos == '0') {
         format->fill_char = '0';
         if (!align_specified) {
@@ -129,29 +123,28 @@ parse_internal_render_format_spec(PyObject *obj,
     if (format->width == -1) {
         return 0; /* overflow */
     }
-    /* If we didn't consume any characters, reset the width to -1 */
+    /* If we didn't consume any characters, reset the width to -1. */
     if (format->width == 0) {
         format->width = -1;
     }
-    /* Underscore signifies add thousands separators */
+    if (format->fill_char == '0' && format->align == '='
+        && format->width > 0)
+    {
+        format->zeropad = true;
+    }
+    /* Underscore signifies thousands separators. */
     if (end-pos && *pos == '_') {
-        thousands_separators = 1;
+        thousands_separators = true;
         pos++;
     }
     /* Finally, parse the type field. */
     if (end-pos > 1) {
         /* More than one char remains, so this is an invalid format
            specifier. */
-        /* Create a temporary object that contains the format spec we're
-           operating on.  It's format_spec[start:end] (in Python syntax). */
-        PyObject* actual_spec = PyUnicode_FromStringAndSize(start, end-start);
-        if (actual_spec != NULL) {
-            PyErr_Format(PyExc_ValueError,
-                         ("Invalid format specifier '%U' for object "
-                          "of type '%.200U'"), actual_spec,
-                         PyType_GetFullyQualifiedName(Py_TYPE(obj)));
-            Py_DECREF(actual_spec);
-        }
+        PyErr_Format(PyExc_ValueError,
+                     ("Invalid format specifier '%U' for object "
+                      "of type '%.200U'"), format_spec,
+                     PyType_GetFullyQualifiedName(Py_TYPE(obj)));
         return 0;
     }
     if (end-pos == 1) {
@@ -201,71 +194,80 @@ parse_internal_render_format_spec(PyObject *obj,
     return 1;
 }
 
-/* describes the layout for an integer, see the comment in
-   calc_number_widths() for details */
+/* Describes the layout for an integer, see the comment in
+   calc_number_widths() for details. */
 typedef struct {
     Py_ssize_t n_lpadding;
     Py_ssize_t n_prefix;
     Py_ssize_t n_spadding;
     Py_ssize_t n_rpadding;
     char sign;
-    Py_ssize_t n_sign; /* number of digits needed for sign (0/1) */
-    Py_ssize_t n_digits; /* The number of digits, including separators. */
-} NumberFieldWidths;
+    Py_ssize_t n_leading_zeros;
+    Py_ssize_t n_sign; /* number of digits needed for sign */
+    Py_ssize_t n_digits; /* the number of digits, */
+    Py_ssize_t n_grouped_digits;  /* ... including separators. */
+} IntFieldWidths;
 
 Py_LOCAL(Py_ssize_t)
-calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
-                   char sign_char, Py_ssize_t n_start,
-                   Py_ssize_t n_end, const InternalFormatSpec *format)
+calc_number_widths(bool negative, size_t len, const IntFormatSpec *format,
+                   IntFieldWidths *spec)
 {
-    spec->n_digits = n_end - n_start;
     spec->n_lpadding = 0;
-    spec->n_prefix = n_prefix;
+    spec->n_prefix = format->alternate ? 2 : 0;
     spec->n_spadding = 0;
     spec->n_rpadding = 0;
     spec->sign = '\0';
     spec->n_sign = 0;
+    spec->n_leading_zeros = 0;
+    spec->n_digits = (Py_ssize_t)len;
+    spec->n_grouped_digits = spec->n_digits;
     /* The output will look like:
-       |                                                           |
-       | <lpadding> <sign> <prefix> <spadding> <digits> <rpadding> |
-       |                                                           |
+       |                                                                   |
+       | <lpadding> <sign> <prefix> <spadding> <grouped_digits> <rpadding> |
+       |                                                                   |
 
        Sign is computed from format->sign and the actual sign of the number.
        Prefix is given (it's for the '0x' prefix).
        Digits is already known.
-       The total width is either given, or computed from the
-       actual digits.
-
-       Only one of lpadding, spadding, and rpadding can be non-zero,
-       and it's calculated from the width and other fields.
+       The total width is either given, or computed from the actual digits.
     */
     switch (format->sign) {
     case '+':
-        /* always put a + or - */
         spec->n_sign = 1;
-        spec->sign = (sign_char == '-' ? '-' : '+');
+        spec->sign = negative ? '-' : '+';
         break;
     case ' ':
         spec->n_sign = 1;
-        spec->sign = (sign_char == '-' ? '-' : ' ');
+        spec->sign = negative ? '-' : ' ';
         break;
     case '-':
     default:
-        if (sign_char == '-') {
+        if (negative) {
             spec->n_sign = 1;
             spec->sign = '-';
         }
     }
+    if (format->group) {
+        if (format->zeropad) {
+            spec->n_leading_zeros = (format->group*(format->width
+                                                    - spec->n_sign
+                                                    - spec->n_prefix + 1)
+                                     + 1)/(format->group + 1) - spec->n_digits;
+            if (spec->n_leading_zeros < 0) {
+                spec->n_leading_zeros = 0;
+            }
+            spec->n_digits += spec->n_leading_zeros;
+        }
+        spec->n_grouped_digits = spec->n_digits + (spec->n_digits - 1)/format->group;
+    }
 
     /* Given the desired width and the total of digit and non-digit
-       space we consume, see if we need any padding. format->width can
-       be negative (meaning no padding), but this code still works in
-       that case. */
+       space we consume, see if we need any padding.  format->width can
+       be negative (meaning no padding). */
     Py_ssize_t n_padding = format->width - (spec->n_sign + spec->n_prefix
-                                            + spec->n_digits);
+                                            + spec->n_grouped_digits);
 
     if (n_padding > 0) {
-        /* Some padding is needed.  Determine if it's left, space, or right. */
         switch (format->align) {
         case '<':
             spec->n_rpadding = n_padding;
@@ -284,35 +286,7 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
         }
     }
     return (spec->n_lpadding + spec->n_sign + spec->n_prefix
-            + spec->n_spadding + spec->n_digits + spec->n_rpadding);
-}
-
-/* Fill in the digit parts of a number's string representation,
-   as determined in calc_number_widths(). */
-Py_LOCAL(void)
-fill_number(const NumberFieldWidths *spec,
-            char *digits, const char prefix[2], char fill_char)
-{
-    Py_ssize_t cur = 0;
-
-    for (Py_ssize_t i = 0; i < spec->n_lpadding; i++) {
-        digits[cur++] = fill_char;
-    }
-    if (spec->n_sign == 1) {
-        digits[cur++] = spec->sign;
-    }
-    if (spec->n_prefix) {
-        digits[cur++] = prefix[0];
-        digits[cur++] = prefix[1];
-    }
-    for (Py_ssize_t i = 0; i < spec->n_spadding; i++) {
-        digits[cur++] = fill_char;
-    }
-    cur += spec->n_digits;
-    for (Py_ssize_t i = 0; i < spec->n_rpadding; i++) {
-        digits[cur++] = fill_char;
-    }
-    digits[cur] = '\0';
+            + spec->n_spadding + spec->n_grouped_digits + spec->n_rpadding);
 }
 
 Py_LOCAL(void)
@@ -331,150 +305,65 @@ insert_from_end_inplace(char *str, Py_ssize_t n, char c)
     }
 }
 
-Py_LOCAL(size_t)
-calc_len(const zz_t *u, const InternalFormatSpec *format,
-         Py_ssize_t *min_leading)
-{
-    size_t len = 0;
-    bool negative = zz_isneg(u);
-    bool sign = format->sign;
-    Py_ssize_t width = -1;
-
-    if (format->fill_char == '0' && format->align == '=') {
-        width = format->width;
-    }
-    sign |= negative;
-    (void)zz_sizeinbase(u, format->base, &len);
-    if (format->alternate) {
-        len += 2;
-    }
-    *min_leading = width - (Py_ssize_t)len - sign;
-    if (*min_leading > 0) {
-        *min_leading = ((format->group*(width - sign))/(format->group + 1)
-                        + 1 - (Py_ssize_t)len);
-        if (*min_leading > 0) {
-            len += (size_t)*min_leading;
-        }
-    }
-    if (format->group) {
-        len += (len - 1) / (size_t)format->group;
-    }
-    return len + negative;
-}
-
-Py_LOCAL(zz_err)
-zz_format(const zz_t *u, Py_ssize_t min_leading,
-          const InternalFormatSpec *format, char *buf)
-{
-    bool negative = zz_isneg(u);
-    char *p = buf, saved_char = 0;
-
-    if (negative) {
-        saved_char = '-';
-        *(p++) = saved_char;
-    }
-    if (format->prefix[1]) {
-        memcpy(p, format->prefix, 2);
-        p += 2;
-    }
-    if (saved_char) {
-        saved_char = *(--p);
-        assert(saved_char);
-    }
-    for (int i = 0; i < min_leading; i++) {
-        *(p++) = '0';
-    }
-
-    zz_err ret = zz_get_str(u, format->base, p);
-
-    if (ret) {
-        return ret; /* LCOV_EXCL_LINE */
-    }
-    if (min_leading > 0) {
-       if (negative) {
-           *p = '0';
-       }
-       p -= min_leading;
-    }
-    if (format->group && !zz_iszero(u)) {
-        insert_from_end_inplace(p + negative, format->group, '_');
-    }
-    if (saved_char) {
-        *p = saved_char;
-    }
-    return ZZ_OK;
-}
-
 Py_LOCAL(PyObject *)
-format_mpz_internal(MPZ_Object *value, const InternalFormatSpec *format)
+MPZ_format(const MPZ_Object *value, const IntFormatSpec *format)
 {
-    PyObject *tmp = NULL;
-    char *buf = NULL;
-    Py_ssize_t inumeric_chars = 0;
-    char sign_char = '\0';
-    Py_ssize_t n_digits; /* Count of digits need from the computed string */
-    Py_ssize_t n_prefix = 2; /* Count of prefix chars, (e.g., '0x') */
-    Py_ssize_t n_total;
-    Py_ssize_t min_leading = 0;
-    NumberFieldWidths spec;
+    size_t n_total;
+    bool negative = zz_isneg(&value->z);
+    IntFieldWidths spec;
 
-    /* The number of prefix chars is the same as the leading
-       chars to skip */
-    if (!format->alternate) {
-        n_prefix = 0;
-    }
-    n_digits = (Py_ssize_t)calc_len(&value->z, format, &min_leading);
-    buf = malloc((size_t)n_digits + 1);
-    if (buf == NULL || zz_format(&value->z, min_leading, format, buf)) {
+    /* n_total will be exact, unless base = 10.  Then it could
+       be 1 too big. */
+    (void)zz_sizeinbase(&value->z, format->base, &n_total);
+    n_total = (size_t)calc_number_widths(negative, n_total, format, &spec);
+
+    char *buf = malloc(n_total + 1), *p = buf;
+
+    if (buf == NULL || zz_get_str(&value->z, format->base, buf)) {
         /* LCOV_EXCL_START */
         free(buf);
-        PyErr_NoMemory();
-        goto done;
+        return PyErr_NoMemory();
         /* LCOV_EXCL_STOP */
     }
-    n_digits = (Py_ssize_t)strlen(buf);
-    /* Is a sign character present in the output?  If so, remember it
-       and skip it */
-    if (zz_isneg(&value->z)) {
-        sign_char = '-';
-        n_digits--;
-        inumeric_chars++;
+    if (format->base == 10) {
+        n_total = (size_t)calc_number_widths(negative, strlen(buf) - negative,
+                                             format, &spec);
     }
-    /* Skip over the leading chars (0x, 0b, etc.) */
-    n_digits -= n_prefix;
-    inumeric_chars += n_prefix;
-    /* Calculate how much memory we'll need. */
-    n_total = calc_number_widths(&spec, n_prefix, sign_char, inumeric_chars,
-                                 inumeric_chars + n_digits, format);
-    if (n_total == -1) {
-        goto done; /* LCOV_EXCL_LINE */
+    /* Fill in leading zeros and separators, if specified. */
+    memmove(buf + spec.n_leading_zeros, buf + negative, strlen(buf) + 1);
+    for (Py_ssize_t i = 0; i < spec.n_leading_zeros; i++) {
+        buf[i] = '0';
     }
-
-    char *old_buf = buf;
-
-    buf = realloc(old_buf, (size_t)n_total + 1);
-    if (buf == NULL) {
-        /* LCOV_EXCL_START */
-        free(old_buf);
-        PyErr_NoMemory();
-        goto done;
-        /* LCOV_EXCL_STOP */
+    if (spec.n_grouped_digits > spec.n_digits) {
+        insert_from_end_inplace(buf, format->group, '_');
     }
     memmove(buf + spec.n_lpadding + spec.n_sign + spec.n_prefix + spec.n_spadding,
-            buf + inumeric_chars, (size_t)spec.n_digits);
-    /* Populate the memory. */
-    fill_number(&spec, buf, format->prefix, format->fill_char);
-    tmp = PyUnicode_FromString(buf);
-    free(buf);
-    if (tmp == NULL) {
-        goto done; /* LCOV_EXCL_LINE */
+            buf, (size_t)spec.n_grouped_digits);
+    /* Fill in the non-digit parts of a number's string representation,
+       as determined in calc_number_widths(). */
+    for (Py_ssize_t i = 0; i < spec.n_lpadding; i++) {
+        *(p++) = format->fill_char;
     }
-    return tmp;
-    /* LCOV_EXCL_START */
-done:
-    Py_XDECREF(tmp);
-    return NULL;
-    /* LCOV_EXCL_STOP */
+    if (spec.n_sign) {
+        *(p++) = spec.sign;
+    }
+    if (spec.n_prefix) {
+        *(p++) = format->prefix[0];
+        *(p++) = format->prefix[1];
+    }
+    for (Py_ssize_t i = 0; i < spec.n_spadding; i++) {
+        *(p++) = format->fill_char;
+    }
+    p += spec.n_grouped_digits;
+    for (Py_ssize_t i = 0; i < spec.n_rpadding; i++) {
+        *(p++) = format->fill_char;
+    }
+    *p = '\0';
+
+    PyObject *res = PyUnicode_FromString(buf);
+
+    free(buf);
+    return res;
 }
 
 extern PyObject * to_float(PyObject *self);
@@ -490,22 +379,17 @@ __format__(PyObject *self, PyObject *format_spec)
         return NULL;
     }
 
-    Py_ssize_t end = PyUnicode_GetLength(format_spec);
+    Py_ssize_t len = PyUnicode_GetLength(format_spec);
 
-    if (!end) {
+    if (!len) {
        return PyObject_Str(self);
     }
 
-    InternalFormatSpec format;
+    IntFormatSpec format;
     unaryfunc cast = to_int;
 
     if (PyUnicode_IS_ASCII(format_spec)) {
-        const char *format_str = PyUnicode_AsUTF8AndSize(format_spec, NULL);
-
-        if (!parse_internal_render_format_spec(self, format_str,
-                                               format_str + end,
-                                               &format))
-        {
+        if (!parse_int_format_spec(self, format_spec, len, &format)) {
             PyErr_Clear();
             goto fallback;
         }
@@ -519,7 +403,7 @@ __format__(PyObject *self, PyObject *format_spec)
     case 'o':
     case 'x':
     case 'X':
-        return format_mpz_internal((MPZ_Object *)self, &format);
+        return MPZ_format((MPZ_Object *)self, &format);
     case 'c':
     case 'n':
         break;
