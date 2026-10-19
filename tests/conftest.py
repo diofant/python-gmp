@@ -26,9 +26,3 @@ def pytest_report_header(config):
 
   The gmp module v{gmp.__version__}
 """)
-
-
-def pytest_sessionstart(session):
-    import os
-
-    os.environ["MPMATH_NOGMPY"] = "Y"

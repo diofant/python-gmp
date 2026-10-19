@@ -22,7 +22,7 @@ _Thread_local gmp_global global = {
 uint8_t bits_per_digit;
 Py_hash_t pyhash_modulus;
 
-static MPZ_Object *
+Py_LOCAL(MPZ_Object *)
 MPZ_new(void)
 {
     MPZ_Object *res;
@@ -51,7 +51,7 @@ MPZ_new(void)
 
 static const char *MPZ_TAG = "mpz(";
 
-static PyObject *
+Py_LOCAL(PyObject *)
 MPZ_to_str(MPZ_Object *u, int base, bool tag)
 {
     size_t len = 0;
@@ -98,7 +98,7 @@ MPZ_to_str(MPZ_Object *u, int base, bool tag)
     return res;
 }
 
-static MPZ_Object *
+Py_LOCAL(MPZ_Object *)
 MPZ_from_str(PyObject *obj, int base)
 {
     const char *str = PyUnicode_AsUTF8AndSize(obj, NULL);
@@ -145,7 +145,7 @@ MPZ_from_str(PyObject *obj, int base)
     return res;
 }
 
-static MPZ_Object *
+Py_LOCAL(MPZ_Object *)
 MPZ_from_int(PyObject *obj)
 {
 #if defined(ON_CPYTHON) && !defined(Py_LIMITED_API)
@@ -213,7 +213,7 @@ MPZ_from_int(PyObject *obj)
 #endif /* defined(ON_CPYTHON) && !defined(Py_LIMITED_API) */
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 MPZ_to_int(MPZ_Object *u)
 {
     int64_t value;
@@ -257,7 +257,7 @@ MPZ_to_int(MPZ_Object *u)
 #endif /* defined(ON_CPYTHON) && !defined(Py_LIMITED_API) */
 }
 
-static void
+Py_LOCAL(void)
 revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r)
 {
     while (l < r) {
@@ -270,7 +270,7 @@ revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r)
     }
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
 {
     PyObject *bytes = PyBytes_FromStringAndSize(NULL, length);
@@ -311,7 +311,7 @@ MPZ_to_bytes(MPZ_Object *u, Py_ssize_t length, int is_little, int is_signed)
     /* LCOV_EXCL_STOP */
 }
 
-static MPZ_Object *
+Py_LOCAL(MPZ_Object *)
 MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
 {
     PyObject *bytes = PyObject_Bytes(obj);
@@ -373,7 +373,7 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
     return res;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
 {
     int base = 10;
@@ -474,7 +474,7 @@ str:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 new(PyTypeObject *type, PyObject *args, PyObject *keywds)
 {
     static char *kwlist[] = {"", "base", NULL};
@@ -520,7 +520,7 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     return new_impl(type, arg, base);
 }
 
-static void
+Py_LOCAL(void)
 dealloc(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -549,7 +549,7 @@ dealloc(PyObject *self)
 #endif
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 vectorcall(PyObject *type, PyObject *const *args, size_t nargsf,
            PyObject *kwnames)
 {
@@ -579,13 +579,13 @@ vectorcall(PyObject *type, PyObject *const *args, size_t nargsf,
     }
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 repr(PyObject *self)
 {
     return MPZ_to_str((MPZ_Object *)self, 10, true);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 str(PyObject *self)
 {
     return MPZ_to_str((MPZ_Object *)self, 10, false);
@@ -610,7 +610,7 @@ str(PyObject *self)
         goto fallback;                  \
     }
 
-PyObject *
+Py_LOCAL(PyObject *)
 to_float(PyObject *self)
 {
     double d;
@@ -625,7 +625,7 @@ to_float(PyObject *self)
     return PyFloat_FromDouble(d);
 }
 
-static inline int64_t
+Py_LOCAL_INLINE(int64_t)
 PyLong_AsSdigit_t(PyObject *obj, int *error)
 {
 #if SIZEOF_LONG == 8
@@ -640,7 +640,7 @@ PyLong_AsSdigit_t(PyObject *obj, int *error)
     return (int64_t)value;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 richcompare(PyObject *self, PyObject *other, int op)
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -704,7 +704,7 @@ numbers:
     return res;
 }
 
-static Py_hash_t
+Py_LOCAL(Py_hash_t)
 hash(PyObject *self)
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -745,7 +745,7 @@ hash(PyObject *self)
 }
 
 #define UNOP(suff, func)                                       \
-    static PyObject *                                          \
+    Py_LOCAL(PyObject *)                                       \
     func(PyObject *self)                                       \
     {                                                          \
         MPZ_Object *u = (MPZ_Object *)self;                    \
@@ -775,13 +775,13 @@ UNOP(neg, nb_negative)
 UNOP(abs, nb_absolute)
 UNOP(invert, nb_invert) /* may overflow */
 
-PyObject *
+Py_LOCAL(PyObject *)
 to_int(PyObject *self)
 {
     return MPZ_to_int((MPZ_Object *)self);
 }
 
-static int
+Py_LOCAL(int)
 to_bool(PyObject *self)
 {
     return !zz_iszero(&((MPZ_Object *)self)->z);
@@ -810,7 +810,7 @@ to_bool(PyObject *self)
     }
 
 #define BINOP(suff, slot)                                       \
-    static PyObject *                                           \
+    Py_LOCAL(PyObject *)                                        \
     nb_##suff(PyObject *self, PyObject *other)                  \
     {                                                           \
         MPZ_Object *u = NULL, *v = NULL, *res = NULL;           \
@@ -907,7 +907,7 @@ BINOP(rem, PyNumber_Remainder)
         }                               \
     }                                   \
 
-static PyObject *
+Py_LOCAL(PyObject *)
 nb_divmod(PyObject *self, PyObject *other)
 {
     PyObject *res = PyTuple_New(2);
@@ -957,7 +957,7 @@ end:
     /* LCOV_EXCL_STOP */
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 nb_truediv(PyObject *self, PyObject *other)
 {
     PyObject *res = NULL;
@@ -1026,7 +1026,7 @@ numbers:
 }
 
 #define BINOP_INT(suff)                                         \
-    static PyObject *                                           \
+    Py_LOCAL(PyObject *)                                        \
     nb_##suff(PyObject *self, PyObject *other)                  \
     {                                                           \
         MPZ_Object *u = NULL, *v = NULL, *res = NULL;           \
@@ -1065,7 +1065,7 @@ BINOP_INT(xor)
 BINOP_INT(lshift)
 BINOP_INT(rshift)
 
-static PyObject *
+Py_LOCAL(PyObject *)
 power(PyObject *self, PyObject *other, PyObject *module)
 {
     MPZ_Object *res = NULL;
@@ -1212,13 +1212,13 @@ static PyNumberMethods as_number = {
     .nb_bool = to_bool,
 };
 
-static PyObject *
+Py_LOCAL_INLINE(PyObject *)
 get_copy(PyObject *self, void *Py_UNUSED(closure))
 {
     return Py_NewRef(self);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 get_one(PyObject *Py_UNUSED(self), void *Py_UNUSED(closure))
 {
     MPZ_Object *res = MPZ_new();
@@ -1229,7 +1229,7 @@ get_one(PyObject *Py_UNUSED(self), void *Py_UNUSED(closure))
     return (PyObject *)res;
 }
 
-static PyObject *
+Py_LOCAL_INLINE(PyObject *)
 get_zero(PyObject *Py_UNUSED(self), void *Py_UNUSED(closure))
 {
     return (PyObject *)MPZ_new();
@@ -1247,7 +1247,7 @@ static PyGetSetDef getsetters[] = {
     {NULL} /* sentinel */
 };
 
-static PyObject *
+Py_LOCAL(PyObject *)
 bit_length(PyObject *self, PyObject *Py_UNUSED(args))
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -1256,7 +1256,7 @@ bit_length(PyObject *self, PyObject *Py_UNUSED(args))
     return PyLong_FromUnsignedLongLong(digit);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 bit_count(PyObject *self, PyObject *Py_UNUSED(args))
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -1265,7 +1265,7 @@ bit_count(PyObject *self, PyObject *Py_UNUSED(args))
     return PyLong_FromUnsignedLongLong(count);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
          PyObject *kwnames)
 {
@@ -1336,13 +1336,13 @@ to_bytes(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
     return MPZ_to_bytes((MPZ_Object *)self, length, is_little, is_signed);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 _from_bytes(PyObject *Py_UNUSED(type), PyObject *arg)
 {
     return (PyObject *)MPZ_from_bytes(arg, 0, 1);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 from_bytes(PyTypeObject *Py_UNUSED(type), PyObject *const *args,
            Py_ssize_t nargs, PyObject *kwnames)
 {
@@ -1397,7 +1397,7 @@ from_bytes(PyTypeObject *Py_UNUSED(type), PyObject *const *args,
     return (PyObject *)MPZ_from_bytes(args[argidx[0]], is_little, is_signed);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 as_integer_ratio(PyObject *self, PyObject *Py_UNUSED(args))
 {
     PyObject *one = get_one(NULL, NULL);
@@ -1414,7 +1414,7 @@ as_integer_ratio(PyObject *self, PyObject *Py_UNUSED(args))
     return ratio_tuple;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 __round__(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs > 1) {
@@ -1501,7 +1501,7 @@ overflow:
     return (PyObject *)res;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 __reduce_ex__(PyObject *self, PyObject *Py_UNUSED(args))
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -1512,7 +1512,7 @@ __reduce_ex__(PyObject *self, PyObject *Py_UNUSED(args))
                          MPZ_to_bytes(u, (Py_ssize_t)(len + 7)/8 + 1, 0, 1));
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 __sizeof__(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
     MPZ_Object *u = (MPZ_Object *)self;
@@ -1521,13 +1521,13 @@ __sizeof__(PyObject *self, PyObject *Py_UNUSED(ignored))
                              + zz_sizeof(&u->z));
 }
 
-static PyObject *
+Py_LOCAL_INLINE(PyObject *)
 is_integer(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(args))
 {
     Py_RETURN_TRUE;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
        PyObject *kwnames)
 {
@@ -1565,7 +1565,440 @@ digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
     return MPZ_to_str((MPZ_Object *)self, base, false);
 }
 
-extern PyObject * __format__(PyObject *self, PyObject *format_spec);
+/* Accomulates decimal digit characters from an input string,
+   returns nonnegative integer or -1 on error.
+*/
+Py_LOCAL(Py_ssize_t)
+get_integer(char **start, const char *end)
+{
+    char *pos = *start;
+    Py_ssize_t accumulator = 0, digitval;
+
+    for (; pos < end; pos++) {
+        digitval = *pos - '0';
+        if (digitval < 0 || digitval > 9) {
+            break;
+        }
+        if (accumulator > (PY_SSIZE_T_MAX - digitval) / 10) {
+            PyErr_Format(PyExc_ValueError,
+                         "Too many decimal digits in format string");
+            return -1;
+        }
+        accumulator = accumulator * 10 + digitval;
+    }
+    *start = pos;
+    return accumulator;
+}
+
+Py_LOCAL_INLINE(int)
+is_alignment_token(char c)
+{
+    switch (c) {
+    case '<':
+    case '>':
+    case '=':
+    case '^':
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+Py_LOCAL_INLINE(int)
+is_sign_element(char c)
+{
+    switch (c) {
+    case ' ':
+    case '+':
+    case '-':
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+typedef struct {
+    char fill_char;
+    char align;
+    bool zeropad;
+    bool alternate;
+    char sign;
+    Py_ssize_t width;
+    char group;
+    int base;
+    char prefix[2];
+    char type;
+} IntFormatSpec;
+
+/* Fills in format with the parsed information.  Returns 1 on success,
+   0 on failure with an exception set.
+*/
+Py_LOCAL(int)
+parse_int_format_spec(PyObject *obj, PyObject *format_spec,
+                      Py_ssize_t len, IntFormatSpec *format)
+{
+    const char *start = PyUnicode_AsUTF8AndSize(format_spec, NULL);
+    char *pos = (char *)start;
+    const char *end = start + len;
+    bool align_specified = false;
+    bool fill_char_specified = false;
+    bool thousands_separators = false;
+
+    format->fill_char = ' ';
+    format->align = '>';
+    format->zeropad = false;
+    format->alternate = false;
+    format->sign = '\0';
+    format->width = -1;
+    format->group = 0;
+    format->base = 10;
+    format->prefix[0] = '0';
+    format->prefix[1] = '\0';
+    format->type = 'd';
+    assert(pos);
+    /* If the second char is an alignment token, then parse the fill char. */
+    if (end-pos >= 2 && is_alignment_token(*(pos + 1))) {
+        format->fill_char = *pos++;
+        format->align = *pos++;
+        fill_char_specified = true;
+        align_specified = true;
+    }
+    else if (end-pos >= 1 && is_alignment_token(*pos)) {
+        format->align = *pos++;
+        align_specified = true;
+    }
+    /* Parse the various sign options. */
+    if (end-pos >= 1 && is_sign_element(*pos)) {
+        format->sign = *pos++;
+    }
+    /* If the next character is #, we're in alternate mode. */
+    if (end-pos >= 1 && *pos == '#') {
+        format->alternate = true;
+        pos++;
+    }
+    /* The special case for 0-padding (backwards compat). */
+    if (!fill_char_specified && end-pos >= 1 && *pos == '0') {
+        format->fill_char = '0';
+        if (!align_specified) {
+            format->align = '=';
+        }
+        pos++;
+    }
+    format->width = get_integer(&pos, end);
+    if (format->width == -1) {
+        return 0; /* overflow */
+    }
+    /* If we didn't consume any characters, reset the width to -1. */
+    if (format->width == 0) {
+        format->width = -1;
+    }
+    if (format->fill_char == '0' && format->align == '='
+        && format->width > 0)
+    {
+        format->zeropad = true;
+    }
+    /* Underscore signifies thousands separators. */
+    if (end-pos && *pos == '_') {
+        thousands_separators = true;
+        pos++;
+    }
+    /* Finally, parse the type field. */
+    if (end-pos > 1) {
+        /* More than one char remains, so this is an invalid format
+           specifier. */
+        PyErr_Format(PyExc_ValueError,
+                     ("Invalid format specifier '%U' for object "
+                      "of type '%.200U'"), format_spec,
+                     PyType_GetFullyQualifiedName(Py_TYPE(obj)));
+        return 0;
+    }
+    if (end-pos == 1) {
+        format->type = *pos++;
+        switch (format->type) {
+        case 'b':
+            format->base = 2;
+            break;
+        case 'o':
+            format->base = 8;
+            break;
+        case 'x':
+            format->base = 16;
+            break;
+        case 'X':
+            format->base = -16;
+            break;
+        default:
+        case 'd':
+            format->base = 10;
+            format->alternate = 0;
+            break;
+        }
+    }
+    if (format->alternate) {
+        if (format->base == 2) {
+            format->prefix[1] = 'b';
+        }
+        else if (format->base == 8) {
+            format->prefix[1] = 'o';
+        }
+        else if (format->base == 16) {
+            format->prefix[1] = 'x';
+        }
+        else {
+            format->prefix[1] = 'X';
+        }
+    }
+    if (thousands_separators) {
+        if (format->base == 10) {
+            format->group = 3;
+        }
+        else {
+            format->group = 4;
+        }
+    }
+    return 1;
+}
+
+/* Describes the layout for an integer, see the comment in
+   calc_number_widths() for details. */
+typedef struct {
+    Py_ssize_t n_lpadding;
+    Py_ssize_t n_prefix;
+    Py_ssize_t n_spadding;
+    Py_ssize_t n_rpadding;
+    char sign;
+    Py_ssize_t n_leading_zeros;
+    Py_ssize_t n_sign; /* number of digits needed for sign */
+    Py_ssize_t n_digits; /* the number of digits, */
+    Py_ssize_t n_grouped_digits;  /* ... including separators. */
+} IntFieldWidths;
+
+Py_LOCAL(Py_ssize_t)
+calc_number_widths(bool negative, size_t len, const IntFormatSpec *format,
+                   IntFieldWidths *spec)
+{
+    spec->n_lpadding = 0;
+    spec->n_prefix = format->alternate ? 2 : 0;
+    spec->n_spadding = 0;
+    spec->n_rpadding = 0;
+    spec->sign = '\0';
+    spec->n_sign = 0;
+    spec->n_leading_zeros = 0;
+    spec->n_digits = (Py_ssize_t)len;
+    spec->n_grouped_digits = spec->n_digits;
+    /* The output will look like:
+       |                                                                   |
+       | <lpadding> <sign> <prefix> <spadding> <grouped_digits> <rpadding> |
+       |                                                                   |
+
+       Sign is computed from format->sign and the actual sign of the number.
+       Prefix is given (it's for the '0x' prefix).
+       Digits is already known.
+       The total width is either given, or computed from the actual digits.
+    */
+    switch (format->sign) {
+    case '+':
+        spec->n_sign = 1;
+        spec->sign = negative ? '-' : '+';
+        break;
+    case ' ':
+        spec->n_sign = 1;
+        spec->sign = negative ? '-' : ' ';
+        break;
+    case '-':
+    default:
+        if (negative) {
+            spec->n_sign = 1;
+            spec->sign = '-';
+        }
+    }
+    if (format->group) {
+        if (format->zeropad) {
+            spec->n_leading_zeros = (format->group*(format->width
+                                                    - spec->n_sign
+                                                    - spec->n_prefix + 1)
+                                     + 1)/(format->group + 1) - spec->n_digits;
+            if (spec->n_leading_zeros < 0) {
+                spec->n_leading_zeros = 0;
+            }
+            spec->n_digits += spec->n_leading_zeros;
+        }
+        spec->n_grouped_digits = spec->n_digits + (spec->n_digits - 1)/format->group;
+    }
+
+    /* Given the desired width and the total of digit and non-digit
+       space we consume, see if we need any padding.  format->width can
+       be negative (meaning no padding). */
+    Py_ssize_t n_padding = format->width - (spec->n_sign + spec->n_prefix
+                                            + spec->n_grouped_digits);
+
+    if (n_padding > 0) {
+        switch (format->align) {
+        case '<':
+            spec->n_rpadding = n_padding;
+            break;
+        case '^':
+            spec->n_lpadding = n_padding / 2;
+            spec->n_rpadding = n_padding - spec->n_lpadding;
+            break;
+        case '=':
+            spec->n_spadding = n_padding;
+            break;
+        case '>':
+        default:
+            spec->n_lpadding = n_padding;
+            break;
+        }
+    }
+    return (spec->n_lpadding + spec->n_sign + spec->n_prefix
+            + spec->n_spadding + spec->n_grouped_digits + spec->n_rpadding);
+}
+
+Py_LOCAL(void)
+insert_from_end_inplace(char *str, Py_ssize_t n, char c)
+{
+    Py_ssize_t len = (Py_ssize_t)strlen(str);
+    Py_ssize_t src = len, dest = len + (len - 1)/n, count = -1;
+
+    assert(str && 0 < n);
+    while (src >= 0) {
+        if (count > 0 && count % n == 0 && src < len) {
+            str[dest--] = c;
+        }
+        str[dest--] = str[src--];
+        count++;
+    }
+}
+
+Py_LOCAL(PyObject *)
+MPZ_format(const MPZ_Object *value, const IntFormatSpec *format)
+{
+    size_t n_total;
+    bool negative = zz_isneg(&value->z);
+    IntFieldWidths spec;
+
+    /* n_total will be exact, unless base = 10.  Then it could
+       be 1 too big. */
+    (void)zz_sizeinbase(&value->z, format->base, &n_total);
+    n_total = (size_t)calc_number_widths(negative, n_total, format, &spec);
+
+    char *buf = malloc(n_total + 1), *p = buf;
+
+    if (buf == NULL || zz_get_str(&value->z, format->base, buf)) {
+        /* LCOV_EXCL_START */
+        free(buf);
+        return PyErr_NoMemory();
+        /* LCOV_EXCL_STOP */
+    }
+    if (format->base == 10) {
+        n_total = (size_t)calc_number_widths(negative, strlen(buf) - negative,
+                                             format, &spec);
+    }
+    /* Fill in leading zeros and separators, if specified. */
+    memmove(buf + spec.n_leading_zeros, buf + negative, strlen(buf) + 1);
+    for (Py_ssize_t i = 0; i < spec.n_leading_zeros; i++) {
+        buf[i] = '0';
+    }
+    if (spec.n_grouped_digits > spec.n_digits) {
+        insert_from_end_inplace(buf, format->group, '_');
+    }
+    memmove(buf + spec.n_lpadding + spec.n_sign + spec.n_prefix + spec.n_spadding,
+            buf, (size_t)spec.n_grouped_digits);
+    /* Fill in the non-digit parts of a number's string representation,
+       as determined in calc_number_widths(). */
+    for (Py_ssize_t i = 0; i < spec.n_lpadding; i++) {
+        *(p++) = format->fill_char;
+    }
+    if (spec.n_sign) {
+        *(p++) = spec.sign;
+    }
+    if (spec.n_prefix) {
+        *(p++) = format->prefix[0];
+        *(p++) = format->prefix[1];
+    }
+    for (Py_ssize_t i = 0; i < spec.n_spadding; i++) {
+        *(p++) = format->fill_char;
+    }
+    p += spec.n_grouped_digits;
+    for (Py_ssize_t i = 0; i < spec.n_rpadding; i++) {
+        *(p++) = format->fill_char;
+    }
+    *p = '\0';
+
+    PyObject *res = PyUnicode_FromString(buf);
+
+    free(buf);
+    return res;
+}
+
+Py_LOCAL(PyObject *)
+__format__(PyObject *self, PyObject *format_spec)
+{
+    if (!PyUnicode_Check(format_spec)) {
+        PyErr_Format(PyExc_TypeError,
+                     "__format__() argument must be str, not %U",
+                     PyType_GetFullyQualifiedName(Py_TYPE(format_spec)));
+        return NULL;
+    }
+
+    Py_ssize_t len = PyUnicode_GetLength(format_spec);
+
+    if (!len) {
+       return PyObject_Str(self);
+    }
+
+    IntFormatSpec format;
+    unaryfunc cast = to_int;
+
+    if (PyUnicode_IS_ASCII(format_spec)) {
+        if (!parse_int_format_spec(self, format_spec, len, &format)) {
+            PyErr_Clear();
+            goto fallback;
+        }
+    }
+    else {
+        goto fallback;
+    }
+    switch (format.type) {
+    case 'b':
+    case 'd':
+    case 'o':
+    case 'x':
+    case 'X':
+        return MPZ_format((MPZ_Object *)self, &format);
+    case 'c':
+    case 'n':
+        break;
+    case 'e':
+    case 'E':
+    case 'f':
+    case 'F':
+    case 'g':
+    case 'G':
+    case '%':
+        cast = to_float;
+        break;
+    default:
+        PyErr_Format(PyExc_ValueError,
+                     "Unknown format code '%c' for object of type '%U'",
+                     format.type, PyType_GetFullyQualifiedName(Py_TYPE(self)));
+        return NULL;
+    }
+
+fallback:
+    {
+        PyObject *num = cast(self);
+
+        if (!num) {
+            return NULL; /* LCOV_EXCL_LINE */
+        }
+
+        PyObject *res = PyObject_CallMethod(num, "__format__", "O", format_spec);
+
+        Py_DECREF(num);
+        return res;
+    }
+}
 
 /* Explicit signatures for METH_NOARGS methods are redundant
    since CPython 3.13. */
@@ -1662,7 +2095,7 @@ PyTypeObject MPZ_Type = {
     .tp_vectorcall = vectorcall,
 };
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_gcd(PyObject *Py_UNUSED(module), PyObject *const *args, Py_ssize_t nargs)
 {
     MPZ_Object *res = MPZ_new();
@@ -1693,7 +2126,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_gcdext(PyObject *Py_UNUSED(module), PyObject *const *args,
            Py_ssize_t nargs)
 {
@@ -1737,7 +2170,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_lcm(PyObject *Py_UNUSED(module), PyObject *const *args, Py_ssize_t nargs)
 {
     MPZ_Object *res = MPZ_new();
@@ -1776,7 +2209,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_isqrt(PyObject *Py_UNUSED(module), PyObject *arg)
 {
     MPZ_Object *x, *root = MPZ_new();
@@ -1804,7 +2237,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_isqrt_rem(PyObject *Py_UNUSED(module), PyObject *arg)
 {
     MPZ_Object *x, *root = MPZ_new(), *rem = MPZ_new();
@@ -1838,7 +2271,7 @@ end:
     return tup;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_fac(PyObject *Py_UNUSED(module), PyObject *arg)
 {
     MPZ_Object *x, *res = MPZ_new();
@@ -1882,7 +2315,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs != 2) {
@@ -1933,7 +2366,7 @@ end:
     return NULL;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs > 2 || nargs < 1) {
@@ -2003,7 +2436,7 @@ end:
     return NULL;
 }
 
-static zz_rnd
+Py_LOCAL(zz_rnd)
 get_round_mode(PyObject *rndstr)
 {
     if (!PyUnicode_Check(rndstr)) {
@@ -2038,7 +2471,7 @@ invalid:
     return rnd;
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs != 6) {
@@ -2096,7 +2529,7 @@ gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
     return Py_BuildValue("(bNNK)", negative, man, iexp, bc);
 }
 
-static PyObject *
+Py_LOCAL(PyObject *)
 gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs < 2 || nargs > 4) {
@@ -2235,7 +2668,7 @@ static PyStructSequence_Field mpz_info_fields[] = {
 static PyStructSequence_Desc mpz_info_desc = {
     "gmp.mpz_info", mpz_info__doc__, mpz_info_fields, 3};
 
-static int
+Py_LOCAL(int)
 gmp_exec(PyObject *m)
 {
     if (zz_setup()) {

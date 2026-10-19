@@ -9,7 +9,7 @@ if freethreaded and cc.get_id() == 'msvc'
   add_project_arguments('/experimental:c11atomics', language: 'c')
 endif
 libzz = dependency('zz', version: '>= 0.9.0a4')
-py.extension_module('gmp', ['fmt.c', 'extra.c', 'gmp.c', 'utils.c'],
+py.extension_module('gmp', ['extra.c', 'gmp.c', 'utils.c'],
                     install: true, dependencies: libzz)
 install_dir = py.get_install_dir()
 
