@@ -1814,16 +1814,16 @@ calc_number_widths(bool negative, size_t len, const IntFormatSpec *format,
     }
     if (format->group) {
         if (format->zeropad) {
-            spec->n_leading_zeros = (format->group*(format->width
-                                                    - spec->n_sign
-                                                    - spec->n_prefix + 1)
-                                     + 1)/(format->group + 1) - spec->n_digits;
-            if (spec->n_leading_zeros < 0) {
-                spec->n_leading_zeros = 0;
-            }
+            spec->n_leading_zeros = Py_MAX(0,
+                                           (format->group*(format->width
+                                                           - spec->n_sign
+                                                           - spec->n_prefix + 1)
+                                            + 1)/(format->group + 1)
+                                           - spec->n_digits);
             spec->n_digits += spec->n_leading_zeros;
         }
-        spec->n_grouped_digits = spec->n_digits + (spec->n_digits - 1)/format->group;
+        spec->n_grouped_digits = spec->n_digits + (spec->n_digits
+                                                   - 1)/format->group;
     }
 
     /* Given the desired width and the total of digit and non-digit
