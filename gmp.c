@@ -2316,7 +2316,7 @@ end:
 }
 
 Py_LOCAL(PyObject *)
-gmp_comb(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
+gmp_comb(PyObject *Py_UNUSED(module), PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs != 2) {
         PyErr_SetString(PyExc_TypeError, "two arguments required");
@@ -2367,14 +2367,14 @@ end:
 }
 
 Py_LOCAL(PyObject *)
-gmp_perm(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
+gmp_perm(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 {
     if (nargs > 2 || nargs < 1) {
         PyErr_SetString(PyExc_TypeError, "one or two arguments required");
         return NULL;
     }
     if (nargs == 1) {
-        return gmp_fac(self, args[0]);
+        return gmp_fac(module, args[0]);
     }
 
     MPZ_Object *x, *y, *res = MPZ_new();
@@ -2472,7 +2472,8 @@ invalid:
 }
 
 Py_LOCAL(PyObject *)
-gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
+gmp__mpmath_normalize(PyObject *Py_UNUSED(module), PyObject *const *args,
+                      Py_ssize_t nargs)
 {
     if (nargs != 6) {
         PyErr_SetString(PyExc_TypeError, "6 arguments required");
@@ -2530,7 +2531,8 @@ gmp__mpmath_normalize(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
 }
 
 Py_LOCAL(PyObject *)
-gmp__mpmath_create(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
+gmp__mpmath_create(PyObject *Py_UNUSED(module), PyObject *const *args,
+                   Py_ssize_t nargs)
 {
     if (nargs < 2 || nargs > 4) {
         PyErr_Format(PyExc_TypeError,
