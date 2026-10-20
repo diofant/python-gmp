@@ -2671,12 +2671,12 @@ static PyStructSequence_Desc mpz_info_desc = {
     "gmp.mpz_info", mpz_info__doc__, mpz_info_fields, 3};
 
 Py_LOCAL(int)
-gmp_exec(PyObject *m)
+gmp_exec(PyObject *module)
 {
     if (zz_setup()) {
         return -1; /* LCOV_EXCL_LINE */
     }
-    if (PyModule_AddType(m, &MPZ_Type) < 0) {
+    if (PyModule_AddType(module, &MPZ_Type) < 0) {
         return -1; /* LCOV_EXCL_LINE */
     }
 
@@ -2705,10 +2705,12 @@ fail1:
         return -1;
         /* LCOV_EXCL_STOP */
     }
-    if (PyModule_AddObject(m, "mpz_info", mpz_info) < 0) {
+    if (PyModule_AddObject(module, "mpz_info", mpz_info) < 0) {
         goto fail1; /* LCOV_EXCL_LINE */
     }
-    if (PyModule_AddStringConstant(m, "_zz_version", zz_get_version()) < 0) {
+    if (PyModule_AddStringConstant(module, "_zz_version",
+                                   zz_get_version()) < 0)
+    {
         goto fail1; /* LCOV_EXCL_LINE */
     }
 
@@ -2717,7 +2719,7 @@ fail1:
     if (!ns) {
         goto fail1; /* LCOV_EXCL_LINE */
     }
-    if (PyDict_SetItemString(ns, "gmp", m) < 0) {
+    if (PyDict_SetItemString(ns, "gmp", module) < 0) {
         /* LCOV_EXCL_START */
         Py_DECREF(mpz_info);
         Py_DECREF(ns);
