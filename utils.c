@@ -61,3 +61,18 @@ gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
     }
     return 0;
 }
+
+#ifdef Py_LIMITED_API
+unsigned int
+PyUnicode_IS_ASCII(PyObject *unicode)
+{
+    PyObject *bytes = PyUnicode_AsASCIIString(unicode);
+
+    if (bytes) {
+        Py_DECREF(bytes);
+        return 1;
+    }
+    PyErr_Clear();
+    return 0;
+}
+#endif

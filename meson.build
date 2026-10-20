@@ -1,7 +1,8 @@
 project('gmp', 'c',
         version: run_command('python', 'scripts/gitversion.py',
                              check: true).stdout().strip(),
-        default_options: ['c_std=c17'])
+        default_options: ['c_std=c17'],
+        meson_version: '>=1.3.0')
 cc = meson.get_compiler('c')
 py = import('python').find_installation(pure: false)
 freethreaded = py.get_variable('Py_GIL_DISABLED', 0) == 1
@@ -10,7 +11,8 @@ if freethreaded and cc.get_id() == 'msvc'
 endif
 libzz = dependency('zz', version: '>= 0.9.0a4')
 py.extension_module('gmp', ['extra.c', 'gmp.c', 'utils.c'],
-                    install: true, dependencies: libzz)
+                    install: true, dependencies: libzz,
+                    limited_api: '3.14')
 install_dir = py.get_install_dir()
 
 # Generate version.py for sdist

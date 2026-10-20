@@ -20,22 +20,17 @@ classifiers = ["Development Status :: 5 - Production/Stable",
                "Programming Language :: C",
                "Programming Language :: Python :: 3",
                "Programming Language :: Python :: 3 :: Only",
-               "Programming Language :: Python :: 3.11",
-               "Programming Language :: Python :: 3.12",
-               "Programming Language :: Python :: 3.13",
                "Programming Language :: Python :: 3.14",
                "Programming Language :: Python :: 3.15",
                "Programming Language :: Python :: Free Threading :: 3 - Stable",
                "Programming Language :: Python :: Implementation :: CPython",
-               "Programming Language :: Python :: Implementation :: PyPy",
-               "Programming Language :: Python :: Implementation :: GraalPy",
                "Operating System :: Microsoft :: Windows",
                "Operating System :: POSIX",
                "Operating System :: Unix",
                "Operating System :: MacOS",
                "Topic :: Scientific/Engineering :: Mathematics",
                "Topic :: Software Development :: Libraries :: Python Modules"]
-requires-python = ">= 3.11"
+requires-python = ">= 3.14"
 
 [project.urls]
 Homepage = "https://github.com/diofant/python-gmp"
@@ -57,8 +52,8 @@ select = ["E", "F", "I", "PT", "W", "Q", "SIM", "B", "UP", "RUF"]
 
 [tool.cibuildwheel]
 build-frontend = {name="build", args=["--verbose", "-Csetup-args=--vsenv"]}
-enable = "pypy cpython-prerelease graalpy"
-skip = "gp3*win*amd64* gp312_250-macos*"
+enable = "cpython-prerelease"
+build = "cp314-*"
 
 before-all = "sh scripts/cibw_before_all.sh"
 test-extras = "ci"

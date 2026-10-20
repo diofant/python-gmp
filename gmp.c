@@ -4,6 +4,7 @@
 #ifdef Py_GIL_DISABLED
 #  include <stdatomic.h>
 #endif
+#include <stdlib.h>
 
 #ifdef ON_CPYTHON
 #  define MAX_FREELIST_SIZE 100
@@ -435,7 +436,7 @@ str:
         PyObject *integer;
 
         if (Py_IsNone(base_arg)) {
-            integer = PyObject_CallOneArg(int_func, arg);
+            integer = PyObject_CallFunction(int_func, "O", arg);
         }
         else {
             integer = PyObject_CallFunction(int_func, "OO", arg, base_arg);
@@ -1585,6 +1586,10 @@ digits(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
     }
     return MPZ_to_str((MPZ_Object *)self, base, false);
 }
+
+#ifndef SSIZE_MAX
+#  define SSIZE_MAX LLONG_MAX
+#endif
 
 /* Accomulates decimal digit characters from an input string,
    returns nonnegative integer or -1 on error.
