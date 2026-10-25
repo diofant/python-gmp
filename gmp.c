@@ -1891,7 +1891,8 @@ MPZ_format(const MPZ_Object *value, const IntFormatSpec *format)
                                              format, &spec);
     }
     /* Fill in leading zeros and separators, if specified. */
-    memmove(buf + spec.n_leading_zeros, buf + negative, strlen(buf) + 1);
+    memmove(buf + spec.n_leading_zeros, buf + negative,
+            strlen(buf) - negative + 1);
     for (Py_ssize_t i = 0; i < spec.n_leading_zeros; i++) {
         buf[i] = '0';
     }
