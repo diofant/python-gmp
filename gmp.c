@@ -1688,10 +1688,6 @@ parse_int_format_spec(PyObject *obj, PyObject *format_spec,
     if (format->width == -1) {
         return 0; /* overflow */
     }
-    /* If we didn't consume any characters, reset the width to -1. */
-    if (format->width == 0) {
-        format->width = -1;
-    }
     if (format->fill_char == '0' && format->align == '='
         && format->width > 0)
     {
@@ -1828,7 +1824,7 @@ calc_number_widths(bool negative, size_t len, const IntFormatSpec *format,
 
     /* Given the desired width and the total of digit and non-digit
        space we consume, see if we need any padding.  format->width can
-       be negative (meaning no padding). */
+       be zero (meaning no padding). */
     Py_ssize_t n_padding = format->width - (spec->n_sign + spec->n_prefix
                                             + spec->n_grouped_digits);
 
@@ -1895,7 +1891,8 @@ MPZ_format(const MPZ_Object *value, const IntFormatSpec *format)
                                              format, &spec);
     }
     /* Fill in leading zeros and separators, if specified. */
-    memmove(buf + spec.n_leading_zeros, buf + negative, strlen(buf) + 1);
+    memmove(buf + spec.n_leading_zeros, buf + negative,
+            strlen(buf) - negative + 1);
     for (Py_ssize_t i = 0; i < spec.n_leading_zeros; i++) {
         buf[i] = '0';
     }
