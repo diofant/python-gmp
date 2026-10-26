@@ -414,7 +414,7 @@ def test_mul_distributivity(x, y, z):
 @example(-2, 1<<64)
 @example(2, 1<<64)
 @example(18446744073709551615<<64, -1<<64)
-@example(int("0x"+"f"*32, 0), -1<<64)  # XXX: assuming BITS_PER_DIGIT == 64
+@example((1<<128) - 1, -1<<64)  # assuming BITS_PER_DIGIT == 64
 @example(-68501870735943706700000000000000000001, 10**20)  # issue 117
 @example(0, 123)
 @example(0, -1382074480823709287)
