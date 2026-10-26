@@ -211,7 +211,7 @@ def test_mpz_interface():
     assert mpz("१23") == 123
     assert mpz("\t123") == 123
     if platform.python_implementation() != "GraalVM":
-        assert mpz("\xa0123") == 123  # see oracle/graalpython#1209
+        assert mpz("\xa0123") == 123  # oracle/graalpython#1209
     assert mpz("-010") == -10
     assert mpz("-10") == -10
     assert mpz("0b_10", 0) == 2
@@ -627,7 +627,7 @@ def test_power_mod(x, y, z):
         assert pow(mx, y, z) == r
         assert pow(x, my, z) == r
         if platform.python_implementation() == "PyPy":
-            return  # XXX: pypy/pypy#5207
+            return  # pypy/pypy#5207
         assert pow(x, y, mz) == r
 
 
