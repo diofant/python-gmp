@@ -990,7 +990,6 @@ def test_pickle(protocol, x):
     assert mx == pickle.loads(pickle.dumps(mx, protocol))
 
 
-@pytest.mark.skipif(platform.system() == "Darwin", reason="XXX")
 @settings(max_examples=100)
 @given(lists(integers(min_value=2), min_size=3, max_size=20))
 def test_mpz_collatz(xs):
