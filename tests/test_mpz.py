@@ -1005,7 +1005,7 @@ def test_mpz_collatz(xs):
 
 
 @pytest.mark.skipif(platform.python_implementation() == "GraalVM",
-                    reason="oracle/graalpython#593")
+                    reason="oracle/graalpython#998")
 def test_int_api():
     for meth in dir(int):
         m = getattr(int, meth)
