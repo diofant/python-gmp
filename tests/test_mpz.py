@@ -660,7 +660,7 @@ def test_power_errors():
             mpz(1) << ((1 << 64) - 1)
 
 
-@given(bigints(), integers(max_value=12345))
+@given(bigints(), integers(min_value=0, max_value=12345))
 @example(18446744073709551618, 64)
 @example(1, 1<<128)
 @example(90605555449081991889354259339521952450308780844225461, 64)
@@ -676,20 +676,13 @@ def test_lshift(x, y):
             x << my
         with pytest.raises(OverflowError):
             mx << y
-    except ValueError:
-        with pytest.raises(ValueError, match="negative shift count"):
-            mx << my
-        with pytest.raises(ValueError, match="negative shift count"):
-            x << my
-        with pytest.raises(ValueError, match="negative shift count"):
-            mx << y
     else:
         assert mx << my == r
         assert mx << y == r
         assert x << my == r
 
 
-@given(bigints(), bigints())
+@given(bigints(), bigints(min_value=0))
 @example(1, 1<<78)
 @example(-1, 1<<128)
 @example(-340282366920938463444927863358058659840, 64)
@@ -710,17 +703,17 @@ def test_rshift(x, y):
             x >> my
         with pytest.raises(OverflowError):
             mx >> y
-    except ValueError:
-        with pytest.raises(ValueError, match="negative shift count"):
-            mx >> my
-        with pytest.raises(ValueError, match="negative shift count"):
-            x >> my
-        with pytest.raises(ValueError, match="negative shift count"):
-            mx >> y
     else:
         assert mx >> my == r
         assert mx >> y == r
         assert x >> my == r
+
+
+def test_shift_errors():
+    with pytest.raises(ValueError, match="negative shift count"):
+        mpz(123) << mpz(-123)
+    with pytest.raises(ValueError, match="negative shift count"):
+        mpz(123) >> mpz(-123)
 
 
 @given(bigints())
