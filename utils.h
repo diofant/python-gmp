@@ -4,7 +4,7 @@
 /* For GraalVM: unicodeobject.h, implicit conversion changes
    signedness: 'enum PyUnicode_Kind' to 'int' */
 #if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic push /* XXX: oracle/graalpython#580 */
+#  pragma GCC diagnostic push /* oracle/graalpython#580 */
 #  pragma GCC diagnostic ignored "-Wsign-conversion"
 #endif
 

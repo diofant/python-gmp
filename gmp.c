@@ -1808,41 +1808,63 @@ calc_number_widths(bool negative, size_t len, const IntFormatSpec *format,
             spec->sign = '-';
         }
     }
-    if (format->group) {
-        if (format->zeropad) {
-            spec->n_leading_zeros = Py_MAX(0,
-                                           (format->group*(format->width
-                                                           - spec->n_sign
-                                                           - spec->n_prefix + 1)
-                                            + 1)/(format->group + 1)
-                                           - spec->n_digits);
-            spec->n_digits += spec->n_leading_zeros;
-        }
-        spec->n_grouped_digits = spec->n_digits + (spec->n_digits
-                                                   - 1)/format->group;
-    }
 
+    Py_ssize_t n = spec->n_digits;
+    Py_ssize_t m = format->group;
+    Py_ssize_t w = format->width - spec->n_sign - spec->n_prefix;
+
+    if (format->group) {
+        /* Compute number of grouped digits.  If no zero-padding is needed,
+           i.e. n digits being grouped in m digits, then the number of
+           separators is obviously ⌊(n - 1)/m⌋.
+
+           The tricky part is computing number of leading zeros, if required.
+           Let now w - requested width of output, without sign and prefix,
+           and n - number of digits in the number.
+           Then if x = ⌈(w*m + 1)/(m + 1)⌉ > n - it's the required number
+           of digits, including zero-padding.
+
+           Indeed, w - x - ⌊(x - 1)/m⌋ = w - ⌊((m + 1)*x - 1)/m⌋.
+           Now (positive m) use identity ⌈n/m⌉ = ⌊(n - 1)/m⌋ + 1:
+           = w - ⌊((m+1)*⌊(w*m)/(m + 1)⌋ + m)/m⌋ =
+           = ⌊(m + 1)/m*{(w*m)/(m + 1)} - 1⌋.  That's equal either to
+           0 or -1, because -1 ≤ (m + 1)/m*{(w*m)/(m + 1)} - 1 < 1/m < 1.
+
+           In other words, actual width of output will be either w or
+           one digit bigger, as in examples below:
+
+              >>> format(123, '011_d')
+              '000_000_123'
+              >>> format(123, '012_d')
+              '0_000_000_123'
+         */
+        if (format->zeropad) {
+            spec->n_leading_zeros = Py_MAX(0, (m*(w + 1) + 1)/(m + 1) - n);
+            n += spec->n_leading_zeros;
+            spec->n_digits = n;
+        }
+        spec->n_grouped_digits = n + (n - 1)/m;
+    }
+    w -= spec->n_grouped_digits;
+    assert(!spec->n_leading_zeros || w == 0 || w == -1);
     /* Given the desired width and the total of digit and non-digit
        space we consume, see if we need any padding.  format->width can
        be zero (meaning no padding). */
-    Py_ssize_t n_padding = format->width - (spec->n_sign + spec->n_prefix
-                                            + spec->n_grouped_digits);
-
-    if (n_padding > 0) {
+    if (w > 0) {
         switch (format->align) {
         case '<':
-            spec->n_rpadding = n_padding;
+            spec->n_rpadding = w;
             break;
         case '^':
-            spec->n_lpadding = n_padding / 2;
-            spec->n_rpadding = n_padding - spec->n_lpadding;
+            spec->n_lpadding = w / 2;
+            spec->n_rpadding = w - spec->n_lpadding;
             break;
         case '=':
-            spec->n_spadding = n_padding;
+            spec->n_spadding = w;
             break;
         case '>':
         default:
-            spec->n_lpadding = n_padding;
+            spec->n_lpadding = w;
             break;
         }
     }

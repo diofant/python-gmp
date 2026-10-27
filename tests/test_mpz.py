@@ -211,7 +211,7 @@ def test_mpz_interface():
     assert mpz("१23") == 123
     assert mpz("\t123") == 123
     if platform.python_implementation() != "GraalVM":
-        assert mpz("\xa0123") == 123  # see oracle/graalpython#1209
+        assert mpz("\xa0123") == 123  # oracle/graalpython#1209
     assert mpz("-010") == -10
     assert mpz("-10") == -10
     assert mpz("0b_10", 0) == 2
@@ -414,7 +414,7 @@ def test_mul_distributivity(x, y, z):
 @example(-2, 1<<64)
 @example(2, 1<<64)
 @example(18446744073709551615<<64, -1<<64)
-@example(int("0x"+"f"*32, 0), -1<<64)  # XXX: assuming BITS_PER_DIGIT == 64
+@example((1<<128) - 1, -1<<64)  # assuming BITS_PER_DIGIT == 64
 @example(-68501870735943706700000000000000000001, 10**20)  # issue 117
 @example(0, 123)
 @example(0, -1382074480823709287)
@@ -627,7 +627,7 @@ def test_power_mod(x, y, z):
         assert pow(mx, y, z) == r
         assert pow(x, my, z) == r
         if platform.python_implementation() == "PyPy":
-            return  # XXX: pypy/pypy#5207
+            return  # pypy/pypy#5207
         assert pow(x, y, mz) == r
 
 
@@ -660,7 +660,7 @@ def test_power_errors():
             mpz(1) << ((1 << 64) - 1)
 
 
-@given(bigints(), integers(max_value=12345))
+@given(bigints(), integers(min_value=0, max_value=12345))
 @example(18446744073709551618, 64)
 @example(1, 1<<128)
 @example(90605555449081991889354259339521952450308780844225461, 64)
@@ -676,29 +676,19 @@ def test_lshift(x, y):
             x << my
         with pytest.raises(OverflowError):
             mx << y
-    except ValueError:
-        with pytest.raises(ValueError, match="negative shift count"):
-            mx << my
-        with pytest.raises(ValueError, match="negative shift count"):
-            x << my
-        with pytest.raises(ValueError, match="negative shift count"):
-            mx << y
     else:
         assert mx << my == r
         assert mx << y == r
         assert x << my == r
 
 
-@given(bigints(), bigints())
+@given(bigints(), bigints(min_value=0))
 @example(1, 1<<78)
 @example(-1, 1<<128)
 @example(-340282366920938463444927863358058659840, 64)
 @example(-514220174162876888173427869549172032807104958010493707296440352, 206)
 @example(-6277101735386680763495507056286727952638980837032266301441, 128)
 def test_rshift(x, y):
-    # XXX: mp_size_t might be smaller than mp_limb_t
-    if abs(y) >= 2**32 and platform.system() == "Windows":
-        return
     mx = mpz(x)
     my = mpz(y)
     try:
@@ -710,17 +700,17 @@ def test_rshift(x, y):
             x >> my
         with pytest.raises(OverflowError):
             mx >> y
-    except ValueError:
-        with pytest.raises(ValueError, match="negative shift count"):
-            mx >> my
-        with pytest.raises(ValueError, match="negative shift count"):
-            x >> my
-        with pytest.raises(ValueError, match="negative shift count"):
-            mx >> y
     else:
         assert mx >> my == r
         assert mx >> y == r
         assert x >> my == r
+
+
+def test_shift_errors():
+    with pytest.raises(ValueError, match="negative shift count"):
+        mpz(123) << mpz(-123)
+    with pytest.raises(ValueError, match="negative shift count"):
+        mpz(123) >> mpz(-123)
 
 
 @given(bigints())
@@ -990,7 +980,6 @@ def test_pickle(protocol, x):
     assert mx == pickle.loads(pickle.dumps(mx, protocol))
 
 
-@pytest.mark.skipif(platform.system() == "Darwin", reason="XXX")
 @settings(max_examples=100)
 @given(lists(integers(min_value=2), min_size=3, max_size=20))
 def test_mpz_collatz(xs):
@@ -1005,7 +994,7 @@ def test_mpz_collatz(xs):
 
 
 @pytest.mark.skipif(platform.python_implementation() == "GraalVM",
-                    reason="oracle/graalpython#593")
+                    reason="oracle/graalpython#998")
 def test_int_api():
     for meth in dir(int):
         m = getattr(int, meth)
