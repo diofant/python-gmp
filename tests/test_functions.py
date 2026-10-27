@@ -138,7 +138,7 @@ def test_lcm_nary(xs):
 @example(1, 9727076909039105, -48, 53, "u")
 @example(1, 6277101735386680763495507056286727952638980837032266301441,
          0, 64, "f")
-def test_mpmath_normalize(sign, man, exp, prec, rnd):
+def test__mpmath_normalize(sign, man, exp, prec, rnd):
     mman = mpz(man)
     sign = int(sign)
     bc = mman.bit_length()
@@ -152,7 +152,7 @@ def test_mpmath_normalize(sign, man, exp, prec, rnd):
        sampled_from(["n", "f", "c", "u", "d"]))
 @example(-6277101735386680763495507056286727952638980837032266301441,
          0, 64, "f")
-def test_mpmath_create(man, exp, prec, rnd):
+def test__mpmath_create(man, exp, prec, rnd):
     mman = mpz(man)
     res = mpmath_from_man_exp(man, exp, prec, rnd)
     assert all(type(_) is int for _ in res)
