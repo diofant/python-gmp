@@ -41,8 +41,14 @@ jobs:
       # This is probably something to do with \ vs / in paths...
       - run: echo "PKG_CONFIG_PATH=${{ github.workspace }}/.local/lib/pkgconfig" >> $env:GITHUB_ENV
         if: ${{ startsWith(matrix.os, 'windows') }}
+      - uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/cibw-cache
+          key: cibw-${{ runner.os }}-${{ hashFiles('scripts/*') }}
       - name: Build wheels
         uses: pypa/cibuildwheel@v4.3.5
+        env:
+          CIBW_CACHE_PATH: ${{ runner.temp }}/cibw-cache
       - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}

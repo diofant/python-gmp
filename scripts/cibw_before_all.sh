@@ -61,6 +61,12 @@ done
 
 set -o xtrace
 
+if [ -n "$CIBW_CACHE_PATH" ] && [ -d $CIBW_CACHE_PATH/.local ]
+then
+  cp -av $CIBW_CACHE_PATH/.local $PREFIX
+  exit 0
+fi
+
 if [ $SKIP_GMP = "no" ]
 then
   GMP_VERSION=6.3.0
@@ -135,4 +141,10 @@ cd ../
 if [ "$OSTYPE" = "cygwin" ]
 then
   genlib libzz-0.dll
+fi
+
+if [ -n "$CIBW_CACHE_PATH" ] && [ ! -d $CIBW_CACHE_PATH/.local ]
+then
+  rm -rf $CIBW_CACHE_PATH/.local
+  cp -av $PREFIX $CIBW_CACHE_PATH/.local
 fi
