@@ -210,8 +210,7 @@ def test_mpz_interface():
     assert mpz("١٢٣٤", base=20) == 8864
     assert mpz("१23") == 123
     assert mpz("\t123") == 123
-    if platform.python_implementation() != "GraalVM":
-        assert mpz("\xa0123") == 123  # oracle/graalpython#1209
+    assert mpz("\xa0123") == 123
     assert mpz("-010") == -10
     assert mpz("-10") == -10
     assert mpz("0b_10", 0) == 2
