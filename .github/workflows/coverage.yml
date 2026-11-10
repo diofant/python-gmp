@@ -5,7 +5,7 @@ jobs:
     timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     env:
-      CFLAGS: -Wall -Werror -std=c17 -Wconversion
+      CFLAGS: -Wall -Werror -Wconversion
     strategy:
       matrix:
         os: [ubuntu-26.04]
