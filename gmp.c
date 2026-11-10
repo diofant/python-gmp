@@ -1,9 +1,20 @@
-#include "mpz.h"
+#include "utils.h"
 #include "extra.h"
 
 #ifdef Py_GIL_DISABLED
 #  include <stdatomic.h>
 #endif
+
+typedef struct {
+    PyObject_HEAD
+    Py_hash_t hash;
+    zz_t z;
+} MPZ_Object;
+
+extern PyTypeObject MPZ_Type;
+
+#define MPZ_CheckExact(u) Py_IS_TYPE((u), &MPZ_Type)
+#define MPZ_Check(u) PyObject_TypeCheck((u), &MPZ_Type)
 
 #ifdef ON_CPYTHON
 #  define MAX_FREELIST_SIZE 100
