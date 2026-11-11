@@ -10,9 +10,9 @@ integer type (`mpz`_), compatible with Python's `int`_.  It also includes
 functions, compatible with the Python stdlib's submodule `math.integer
 <https://docs.python.org/3.15/library/math.integer.html>`_.
 
-This module requires Python 3.11 or later versions and has been tested with
-CPython 3.11 through 3.15, with PyPy3.12 8.0.0 and with GraalPy 25.3.4.1.
-Free-threading builds of the CPython are supported.
+This module requires Python 3.12 or later versions and has been tested with
+CPython 3.12 through 3.15, with PyPy3.12 and with GraalPy3.13.  Free-threading
+builds of the CPython are supported.
 
 Releases are available in the Python Package Index (PyPI) at
 https://pypi.org/project/python-gmp/.
