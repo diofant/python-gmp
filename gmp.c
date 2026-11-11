@@ -385,7 +385,7 @@ MPZ_from_bytes(PyObject *obj, int is_little, int is_signed)
 }
 
 Py_LOCAL(PyObject *)
-new_impl(PyTypeObject *Py_UNUSED(type), PyObject *arg, PyObject *base_arg)
+new_impl(PyObject *arg, PyObject *base_arg)
 {
     int base = 10;
 
@@ -521,14 +521,14 @@ new(PyTypeObject *type, PyObject *args, PyObject *keywds)
     }
     if (argc == 1 && !keywds) {
         arg = PyTuple_GetItem(args, 0);
-        return new_impl(type, arg, Py_None);
+        return new_impl(arg, Py_None);
     }
     if (!PyArg_ParseTupleAndKeywords(args, keywds, "O|O",
                                      kwlist, &arg, &base))
     {
         return NULL;
     }
-    return new_impl(type, arg, base);
+    return new_impl(arg, base);
 }
 
 Py_LOCAL(void)
@@ -561,7 +561,7 @@ dealloc(PyObject *self)
 }
 
 Py_LOCAL(PyObject *)
-vectorcall(PyObject *type, PyObject *const *args, size_t nargsf,
+vectorcall(PyObject *Py_UNUSED(type), PyObject *const *args, size_t nargsf,
            PyObject *kwnames)
 {
     Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
@@ -579,11 +579,10 @@ vectorcall(PyObject *type, PyObject *const *args, size_t nargsf,
         return NULL;
     }
     if (argidx[1] >= 0) {
-        return new_impl((PyTypeObject *)type, args[argidx[0]],
-                        args[argidx[1]]);
+        return new_impl(args[argidx[0]], args[argidx[1]]);
     }
     else if (argidx[0] >= 0) {
-        return new_impl((PyTypeObject *)type, args[argidx[0]], Py_None);
+        return new_impl(args[argidx[0]], Py_None);
     }
     else {
         return (PyObject *)MPZ_new();
