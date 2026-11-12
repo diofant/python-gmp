@@ -56,7 +56,7 @@ select = ["E", "F", "I", "PT", "W", "Q", "SIM", "B", "UP", "RUF"]
 [tool.cibuildwheel]
 build-frontend = {name="build", args=["--verbose", "-Csetup-args=--vsenv"]}
 enable = "pypy cpython-prerelease graalpy"
-skip = "gp3*win*amd64* gp312_250-macos*"
+skip = "gp3*win*amd64* gp312*"
 
 before-all = "sh scripts/cibw_before_all.sh"
 test-extras = "ci"
