@@ -11,7 +11,7 @@ functions, compatible with the Python stdlib's submodule `math.integer
 <https://docs.python.org/3.15/library/math.integer.html>`_.
 
 This module requires Python 3.12 or later versions and has been tested with
-CPython 3.12 through 3.15, with PyPy3.12 and with GraalPy3.13.  Free-threading
+CPython 3.12 through 3.16, with PyPy3.12 and with GraalPy3.13.  Free-threading
 builds of the CPython are supported.
 
 Releases are available in the Python Package Index (PyPI) at
