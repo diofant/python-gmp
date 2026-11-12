@@ -36,8 +36,6 @@ will work if you set address space limit for the Python interpreter (e.g. by
 .. code:: pycon
 
    >>> import gmpy2
-   >>> gmpy2.__version__
-   '2.2.1'
    >>> z = gmpy2.mpz(29925959575501)
    >>> while True:  # this loop will crash interpter
    ...     z = z*z
