@@ -8,8 +8,7 @@
 static const zz_layout bytes_layout = {8, 1, 1, 0};
 
 zz_err
-zz_get_bytes(const zz_t *u, size_t length, bool is_signed,
-             unsigned char **buffer)
+zz_get_bytes(const zz_t *u, size_t len, bool is_signed, unsigned char **buf)
 {
     zz_t tmp;
     bool is_negative = zz_isneg(u);
@@ -21,7 +20,7 @@ zz_get_bytes(const zz_t *u, size_t length, bool is_signed,
         if (!is_signed) {
             return ZZ_BUF;
         }
-        if (zz_set(1, &tmp) || zz_mul_2exp(&tmp, 8*length, &tmp)
+        if (zz_set(1, &tmp) || zz_mul_2exp(&tmp, 8*len, &tmp)
             || zz_add(&tmp, u, &tmp))
         {
             /* LCOV_EXCL_START */
@@ -34,43 +33,42 @@ zz_get_bytes(const zz_t *u, size_t length, bool is_signed,
 
     size_t nbits = zz_bitlen(u);
 
-    if (zz_isneg(u) || nbits > 8*length
+    if (zz_isneg(u) || nbits > 8*len
         || (is_signed && ((!nbits && is_negative)
-            || (nbits && (nbits == 8 * length ? !is_negative : is_negative)))))
+        || (nbits && (nbits == 8 * len ? !is_negative : is_negative)))))
     {
         zz_clear(&tmp);
         return ZZ_BUF;
     }
 
-    size_t gap = length - (nbits + bits_per_digit/8 - 1)/(bits_per_digit/8);
+    size_t gap = len - (nbits + bits_per_digit/8 - 1)/(bits_per_digit/8);
 
-    (void)zz_export(u, bytes_layout, length - gap, *buffer + gap);
-    memset(*buffer, is_negative ? 0xFF : 0, gap);
+    (void)zz_export(u, bytes_layout, len - gap, *buf + gap);
+    memset(*buf, is_negative ? 0xFF : 0, gap);
     zz_clear(&tmp);
     return ZZ_OK;
 }
 
 zz_err
-zz_set_bytes(const unsigned char *buffer, size_t length, bool is_signed,
-             zz_t *u)
+zz_set_bytes(const unsigned char *buf, size_t len, bool is_signed, zz_t *u)
 {
-    if (!length) {
+    if (!len) {
         return zz_set(0, u);
     }
 
-    zz_err ret = zz_import(length, buffer, bytes_layout, u);
+    zz_err ret = zz_import(len, buf, bytes_layout, u);
 
     if (ret) {
         return ret; /* LCOV_EXCL_LINE */
     }
     (void)zz_abs(u, u);
-    if (is_signed && zz_bitlen(u) == 8*(size_t)length) {
+    if (is_signed && zz_bitlen(u) == 8*(size_t)len) {
         zz_t tmp;
 
         /* we assume, that bytes were created by zz_get_bytes(),
            else there could be overflow in zz_mul_2exp() */
         if (zz_init(&tmp) || zz_set(1, &tmp)
-            || zz_mul_2exp(&tmp, 8*length, &tmp)
+            || zz_mul_2exp(&tmp, 8*len, &tmp)
             || zz_sub(&tmp, u, u) || zz_neg(u, u))
         {
             /* LCOV_EXCL_START */
@@ -150,13 +148,13 @@ err:
 }
 
 zz_err
-zz_truediv(const zz_t *u, const zz_t *v, double *res)
+zz_truediv(const zz_t *u, const zz_t *v, double *w)
 {
     if (zz_iszero(v)) {
         return ZZ_VAL;
     }
     if (zz_iszero(u)) {
-        *res = zz_isneg(v) ? -0.0 : 0.0;
+        *w = zz_isneg(v) ? -0.0 : 0.0;
         return ZZ_OK;
     }
 
@@ -167,7 +165,7 @@ zz_truediv(const zz_t *u, const zz_t *v, double *res)
         return ZZ_BUF;
     }
     if (ubits < vbits && vbits - ubits > -DBL_MIN_EXP + DBL_MANT_DIG + 1) {
-        *res = zz_isneg(u) != zz_isneg(v) ? -0.0 : 0.0;
+        *w = zz_isneg(u) != zz_isneg(v) ? -0.0 : 0.0;
         return ZZ_OK;
     }
 
@@ -241,13 +239,13 @@ tmp_clear:
         /* LCOV_EXCL_STOP */
     }
     zz_clear(&b);
-    (void)zz_get(&a, res);
+    (void)zz_get(&a, w);
     zz_clear(&a);
-    *res = ldexp(*res, -shift);
+    *w = ldexp(*w, -shift);
     if (zz_isneg(u) != zz_isneg(v)) {
-        *res = -*res;
+        *w = -*w;
     }
-    if (isinf(*res)) {
+    if (isinf(*w)) {
         return ZZ_BUF;
     }
     return ZZ_OK;
@@ -285,7 +283,7 @@ zz_rshift(const zz_t *u, const zz_t *v, zz_t *w)
 
 zz_err
 zz_mpmath_normalize(zz_bitcnt_t prec, zz_rnd rnd, bool *negative,
-                     zz_t *man, zz_t *exp, zz_bitcnt_t *bc)
+                    zz_t *man, zz_t *exp, zz_bitcnt_t *bc)
 {
     /* If the mantissa is 0, return the normalized representation. */
     if (zz_iszero(man)) {

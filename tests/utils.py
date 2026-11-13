@@ -15,7 +15,6 @@ from hypothesis.strategies import (
 BITS_PER_DIGIT = mpz_info.bits_per_digit
 SIZEOF_DIGIT = mpz_info.sizeof_digit
 BITCNT_MAX = mpz_info.bitcnt_max
-MAX_FACTORIAL_CACHE = 1000
 
 
 def python_gcdext(a, b):
