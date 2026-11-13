@@ -5,17 +5,17 @@
 
 extern uint8_t bits_per_digit;
 
-zz_err zz_get_bytes(const zz_t *u, size_t length, bool is_signed,
-                    unsigned char **buffer);
-zz_err zz_set_bytes(const unsigned char *buffer, size_t length,
+zz_err zz_get_bytes(const zz_t *u, size_t len, bool is_signed,
+                    unsigned char **buf);
+zz_err zz_set_bytes(const unsigned char *buf, size_t len,
                     bool is_signed, zz_t *u);
 
 #define zz_quo(u, v, w) zz_div((u), (v), (w), NULL)
 #define zz_rem(u, v, w) zz_div((u), (v), NULL, (w))
 
 zz_err zz_divnear(const zz_t *u, const zz_t *v, zz_t *q, zz_t *r);
-zz_err zz_truediv(const zz_t *u, const zz_t *v, double *res);
 
+zz_err zz_truediv(const zz_t *u, const zz_t *v, double *w);
 zz_err zz_lshift(const zz_t *u, const zz_t *v, zz_t *w);
 zz_err zz_rshift(const zz_t *u, const zz_t *v, zz_t *w);
 
