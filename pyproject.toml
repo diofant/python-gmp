@@ -46,7 +46,7 @@ Documentation = "https://python-gmp.readthedocs.io/en/latest/"
 [project.optional-dependencies]
 tests = ["pytest", "hypothesis"]
 ci = ["python-gmp[tests]", "pytest-xdist"]
-develop = ["python-gmp[tests]", "prek", "pyperf"]
+develop = ["python-gmp[tests]", "prek", "pyperf", "sphinx"]
 
 [tool.ruff]
 line-length = 79
