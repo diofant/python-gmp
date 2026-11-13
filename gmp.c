@@ -601,25 +601,6 @@ str(PyObject *self)
     return MPZ_to_str((MPZ_Object *)self, 10, false);
 }
 
-#define Number_Check(op) (PyFloat_Check((op)) || PyComplex_Check((op)))
-
-#define CHECK_OP(u, a)                  \
-    if (MPZ_Check(a)) {                 \
-        u = (MPZ_Object *)Py_NewRef(a); \
-    }                                   \
-    else if (PyLong_Check(a)) {         \
-        u = MPZ_from_int(a);            \
-        if (!u) {                       \
-            goto end;                   \
-        }                               \
-    }                                   \
-    else if (Number_Check(a)) {         \
-        goto numbers;                   \
-    }                                   \
-    else {                              \
-        goto fallback;                  \
-    }
-
 Py_LOCAL(PyObject *)
 to_float(PyObject *self)
 {
@@ -650,37 +631,60 @@ PyLong_AsSdigit_t(PyObject *obj, int *error)
     return (int64_t)value;
 }
 
+#define Number_Check(op) (PyFloat_Check((op)) || PyComplex_Check((op)))
+
+#define CHECK_OP(u, a)                  \
+    if (MPZ_Check(a)) {                 \
+        u = (MPZ_Object *)Py_NewRef(a); \
+    }                                   \
+    else if (PyLong_Check(a)) {         \
+        u = MPZ_from_int(a);            \
+        if (!u) {                       \
+            goto end;                   \
+        }                               \
+    }                                   \
+    else if (Number_Check(a)) {         \
+        goto numbers;                   \
+    }                                   \
+    else {                              \
+        goto fallback;                  \
+    }
+
+#define CHECK_OPv2(u, a)                     \
+    if (MPZ_Check(a)) {                      \
+        u = (MPZ_Object *)Py_NewRef(a);      \
+    }                                        \
+    else if (PyLong_Check(a)) {              \
+        int error;                           \
+                                             \
+        ival = PyLong_AsSdigit_t(a, &error); \
+        if (error) {                         \
+            u = MPZ_from_int(a);             \
+            if (!u) {                        \
+                goto end;                    \
+            }                                \
+        }                                    \
+    }                                        \
+    else if (Number_Check(a)) {              \
+        goto numbers;                        \
+    }                                        \
+    else {                                   \
+        goto fallback;                       \
+    }
+
 Py_LOCAL(PyObject *)
 richcompare(PyObject *self, PyObject *other, int op)
 {
-    MPZ_Object *u = (MPZ_Object *)self;
+    MPZ_Object *u = (MPZ_Object *)self, *v = NULL;
     zz_ord r;
+    int64_t ival = 0;
 
-    if (MPZ_Check(other)) {
-        r = zz_cmp(&u->z, &((MPZ_Object *)other)->z);
-    }
-    else if (PyLong_Check(other)) {
-        int error;
-        int64_t temp = PyLong_AsSdigit_t(other, &error);
-
-        if (!error) {
-            r = zz_cmp(&u->z, temp);
-        }
-        else {
-            MPZ_Object *v = MPZ_from_int(other);
-
-            if (!v) {
-                goto end; /* LCOV_EXCL_LINE */
-            }
-            r = zz_cmp(&u->z, &v->z);
-            Py_DECREF(v);
-        }
-    }
-    else if (Number_Check(other)) {
-        goto numbers;
+    CHECK_OPv2(v, other);
+    if (v) {
+        r = zz_cmp(&u->z, &v->z);
     }
     else {
-        goto fallback;
+        r = zz_cmp(&u->z, ival);
     }
     switch (op) {
         case Py_LT:
@@ -797,28 +801,6 @@ to_bool(PyObject *self)
     return !zz_iszero(&((MPZ_Object *)self)->z);
 }
 
-#define CHECK_OPv2(u, a)                     \
-    if (MPZ_Check(a)) {                      \
-        u = (MPZ_Object *)Py_NewRef(a);      \
-    }                                        \
-    else if (PyLong_Check(a)) {              \
-        int error;                           \
-                                             \
-        ival = PyLong_AsSdigit_t(a, &error); \
-        if (error) {                         \
-            u = MPZ_from_int(a);             \
-            if (!u) {                        \
-                goto end;                    \
-            }                                \
-        }                                    \
-    }                                        \
-    else if (Number_Check(a)) {              \
-        goto numbers;                        \
-    }                                        \
-    else {                                   \
-        goto fallback;                       \
-    }
-
 #define BINOP(suff, slot)                                       \
     Py_LOCAL(PyObject *)                                        \
     nb_##suff(PyObject *self, PyObject *other)                  \
@@ -828,7 +810,6 @@ to_bool(PyObject *self)
                                                                 \
         CHECK_OPv2(u, self);                                    \
         CHECK_OPv2(v, other);                                   \
-                                                                \
         res = MPZ_new();                                        \
         if (!res) {                                             \
             goto end;                                           \
@@ -1043,8 +1024,8 @@ numbers:
                                                                 \
         CHECK_OP_INT(u, self);                                  \
         CHECK_OP_INT(v, other);                                 \
-                                                                \
         res = MPZ_new();                                        \
+                                                                \
         zz_err ret = ZZ_OK;                                     \
                                                                 \
         if (res && (ret = zz_##suff(&u->z, &v->z, &res->z))) {  \
