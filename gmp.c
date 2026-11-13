@@ -617,7 +617,7 @@ to_float(PyObject *self)
 }
 
 Py_LOCAL_INLINE(int64_t)
-PyLong_AsSdigit_t(PyObject *obj, int *error)
+PyLong_AsInt64AndOverflow(PyObject *obj, int *error)
 {
 #if SIZEOF_LONG == 8
     long value = PyLong_AsLongAndOverflow(obj, error);
@@ -650,26 +650,26 @@ PyLong_AsSdigit_t(PyObject *obj, int *error)
         goto fallback;                  \
     }
 
-#define CHECK_OPv2(u, a)                     \
-    if (MPZ_Check(a)) {                      \
-        u = (MPZ_Object *)Py_NewRef(a);      \
-    }                                        \
-    else if (PyLong_Check(a)) {              \
-        int error;                           \
-                                             \
-        ival = PyLong_AsSdigit_t(a, &error); \
-        if (error) {                         \
-            u = MPZ_from_int(a);             \
-            if (!u) {                        \
-                goto end;                    \
-            }                                \
-        }                                    \
-    }                                        \
-    else if (Number_Check(a)) {              \
-        goto numbers;                        \
-    }                                        \
-    else {                                   \
-        goto fallback;                       \
+#define CHECK_OPv2(u, a)                             \
+    if (MPZ_Check(a)) {                              \
+        u = (MPZ_Object *)Py_NewRef(a);              \
+    }                                                \
+    else if (PyLong_Check(a)) {                      \
+        int error;                                   \
+                                                     \
+        ival = PyLong_AsInt64AndOverflow(a, &error); \
+        if (error) {                                 \
+            u = MPZ_from_int(a);                     \
+            if (!u) {                                \
+                goto end;                            \
+            }                                        \
+        }                                            \
+    }                                                \
+    else if (Number_Check(a)) {                      \
+        goto numbers;                                \
+    }                                                \
+    else {                                           \
+        goto fallback;                               \
     }
 
 Py_LOCAL(PyObject *)
