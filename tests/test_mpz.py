@@ -450,6 +450,8 @@ def test_divmod_bulk(x, y):
     assert x % my == r
     r = divmod(x, y)
     assert divmod(mx, my) == r
+    assert divmod(mx, y) == r
+    assert divmod(x, my) == r
 
 
 @given(bigints(), floats())
