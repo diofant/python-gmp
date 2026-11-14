@@ -914,7 +914,10 @@ BINOP(rem, PyNumber_Remainder)
                 goto end;                            \
             }                                        \
         }                                            \
-    }                                                \
+        else if (ival == -1 && PyErr_Occurred()) {   \
+            goto end;                                \
+        }                                            \
+    }
 
 
 Py_LOCAL(PyObject *)
@@ -922,12 +925,13 @@ nb_divmod(PyObject *self, PyObject *other)
 {
     PyObject *res = PyTuple_New(2);
     MPZ_Object *u = NULL, *v = NULL;
+    int64_t ival = 0;
 
     if (!res) {
         return NULL; /* LCOV_EXCL_LINE */
     }
-    CHECK_OP_INT(u, self);
-    CHECK_OP_INT(v, other);
+    CHECK_OP_INTv2(u, self);
+    CHECK_OP_INTv2(v, other);
 
     MPZ_Object *q = MPZ_new();
     MPZ_Object *r = MPZ_new();
@@ -940,8 +944,19 @@ nb_divmod(PyObject *self, PyObject *other)
         /* LCOV_EXCL_STOP */
     }
 
-    zz_err ret = zz_div(&u->z, &v->z, &q->z, &r->z);
+    zz_err ret = ZZ_OK;
 
+    if (u) {
+        if (v) {
+            ret = zz_div(&u->z, &v->z, &q->z, &r->z);
+        }
+        else {
+            ret = zz_div(&u->z, ival, &q->z, &r->z);
+        }
+    }
+    else {
+        ret = zz_div(ival, &v->z, &q->z, &r->z);
+    }
     if (ret) {
         Py_DECREF(q);
         Py_DECREF(r);
@@ -953,8 +968,8 @@ nb_divmod(PyObject *self, PyObject *other)
         }
         goto end;
     }
-    Py_DECREF(u);
-    Py_DECREF(v);
+    Py_XDECREF(u);
+    Py_XDECREF(v);
     (void)PyTuple_SetItem(res, 0, (PyObject *)q);
     (void)PyTuple_SetItem(res, 1, (PyObject *)r);
     return res;
