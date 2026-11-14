@@ -817,14 +817,16 @@ to_bool(PyObject *self)
                                                                 \
         zz_err ret = ZZ_OK;                                     \
                                                                 \
-        if (!u) {                                               \
-            ret = zz_##suff(ival, &v->z, &res->z);              \
-        }                                                       \
-        else if (!v) {                                          \
-            ret = zz_##suff(&u->z, ival, &res->z);              \
+        if (u) {                                                \
+            if (v) {                                            \
+                ret = zz_##suff(&u->z, &v->z, &res->z);         \
+            }                                                   \
+            else {                                              \
+                ret = zz_##suff(&u->z, ival, &res->z);          \
+            }                                                   \
         }                                                       \
         else {                                                  \
-            ret = zz_##suff(&u->z, &v->z, &res->z);             \
+            ret = zz_##suff(ival, &v->z, &res->z);              \
         }                                                       \
         if (ret) {                                              \
             Py_CLEAR(res);                                      \
@@ -897,6 +899,23 @@ BINOP(rem, PyNumber_Remainder)
             goto end;                   \
         }                               \
     }                                   \
+
+#define CHECK_OP_INTv2(u, a)                         \
+    if (MPZ_Check(a)) {                              \
+        u = (MPZ_Object *)Py_NewRef(a);              \
+    }                                                \
+    else {                                           \
+        int error;                                   \
+                                                     \
+        ival = PyLong_AsInt64AndOverflow(a, &error); \
+        if (error) {                                 \
+            u = MPZ_from_int(a);                     \
+            if (!u) {                                \
+                goto end;                            \
+            }                                        \
+        }                                            \
+    }                                                \
+
 
 Py_LOCAL(PyObject *)
 nb_divmod(PyObject *self, PyObject *other)
@@ -1016,6 +1035,55 @@ numbers:
     return res;
 }
 
+#define BINOP_INT_MIXED(suff)                                   \
+    Py_LOCAL(PyObject *)                                        \
+    nb_##suff(PyObject *self, PyObject *other)                  \
+    {                                                           \
+        MPZ_Object *u = NULL, *v = NULL, *res = NULL;           \
+        int64_t ival = 0;                                       \
+                                                                \
+        CHECK_OP_INTv2(u, self);                                \
+        CHECK_OP_INTv2(v, other);                               \
+        res = MPZ_new();                                        \
+        if (!res) {                                             \
+            goto end;                                           \
+        }                                                       \
+                                                                \
+        zz_err ret = ZZ_OK;                                     \
+                                                                \
+        if (u) {                                                \
+            if (v) {                                            \
+                ret = zz_##suff(&u->z, &v->z, &res->z);         \
+            }                                                   \
+            else {                                              \
+                ret = zz_##suff(&u->z, ival, &res->z);          \
+            }                                                   \
+        }                                                       \
+        else {                                                  \
+            ret = zz_##suff(ival, &v->z, &res->z);              \
+        }                                                       \
+        if (ret) {                                              \
+            /* LCOV_EXCL_START */                               \
+            Py_CLEAR(res);                                      \
+            if (ret == ZZ_VAL) {                                \
+                PyErr_SetString(PyExc_ValueError,               \
+                                "negative shift count");        \
+            }                                                   \
+            else if (ret == ZZ_BUF) {                           \
+                PyErr_SetString(PyExc_OverflowError,            \
+                                "too many digits in integer");  \
+            }                                                   \
+            else {                                              \
+                PyErr_NoMemory();                               \
+            }                                                   \
+            /* LCOV_EXCL_STOP */                                \
+        }                                                       \
+    end:                                                        \
+        Py_XDECREF((PyObject *)u);                              \
+        Py_XDECREF((PyObject *)v);                              \
+        return (PyObject *)res;                                 \
+    }
+
 #define BINOP_INT(suff)                                         \
     Py_LOCAL(PyObject *)                                        \
     nb_##suff(PyObject *self, PyObject *other)                  \
@@ -1050,9 +1118,9 @@ numbers:
         return (PyObject *)res;                                 \
     }
 
-BINOP_INT(and)
-BINOP_INT(or)
-BINOP_INT(xor)
+BINOP_INT_MIXED(and)
+BINOP_INT_MIXED(or)
+BINOP_INT_MIXED(xor)
 BINOP_INT(lshift)
 BINOP_INT(rshift)
 

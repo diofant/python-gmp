@@ -371,3 +371,31 @@ do_rnd:
     }
     return ZZ_OK;
 }
+
+#define MAKE_MIX_LOGIC(func, op)                          \
+    zz_err                                                \
+    zz_##func##_##i64(const zz_t *u, int64_t v, zz_t *w)  \
+    {                                                     \
+        int64_t iu;                                       \
+                                                          \
+        if (zz_get_##i64(u, &iu)) {                       \
+            zz_t tmp;                                     \
+                                                          \
+            if (zz_init(&tmp) || zz_set_##i64(v, &tmp)) { \
+                /* LCOV_EXCL_START */                     \
+                zz_clear(&tmp);                           \
+                return ZZ_MEM;                            \
+                /* LCOV_EXCL_STOP */                      \
+            }                                             \
+                                                          \
+            zz_err ret = zz_##func(u, &tmp, w);           \
+                                                          \
+            zz_clear(&tmp);                               \
+            return ret;                                   \
+        }                                                 \
+        return zz_set_##i64(iu op v, w);                  \
+    }
+
+MAKE_MIX_LOGIC(and, &)
+MAKE_MIX_LOGIC(or, |)
+MAKE_MIX_LOGIC(xor, ^)
