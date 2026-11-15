@@ -15,7 +15,6 @@ from hypothesis.strategies import (
 BITS_PER_DIGIT = mpz_info.bits_per_digit
 SIZEOF_DIGIT = mpz_info.sizeof_digit
 BITCNT_MAX = mpz_info.bitcnt_max
-MAX_FACTORIAL_CACHE = 1000
 
 
 def python_gcdext(a, b):
@@ -69,7 +68,7 @@ def python_truediv(a, b):
 
    # find integer d satisfying 2**(d - 1) <= a/b < 2**d
     d = a.bit_length() - b.bit_length()
-    if d >= 0 and a >= 2**d * b or d < 0 and a * 2**-d >= b:
+    if (d >= 0 and a >= 2**d * b) or (d < 0 and a * 2**-d >= b):
         d += 1
 
     # compute 2**-exp * a / b for suitable exp
@@ -79,7 +78,7 @@ def python_truediv(a, b):
 
     # round-half-to-even: fractional part is r/b, which is > 0.5 iff
     # 2*r > b, and == 0.5 iff 2*r == b.
-    if 2*r > b or 2*r == b and q % 2 == 1:
+    if 2*r > b or (2*r == b and q % 2 == 1):
         q += 1
 
     result = math.ldexp(q, exp)
@@ -107,7 +106,7 @@ def to_digits(n, base):
 
 
 @composite
-def fmt_str(draw, types="bdoxXn"):
+def fmt_str(draw, types="bdoxX"):
     res = ""
     type = draw(sampled_from(types))
 
@@ -118,7 +117,7 @@ def fmt_str(draw, types="bdoxXn"):
         align = draw(sampled_from(list("<^>=")))
         res += fill_char + align
     else:
-        align = draw(sampled_from([""] + list("<^>=")))
+        align = draw(sampled_from(["", *list("<^>=")]))
         if align:
             skip_0_padding = True
             res += align
@@ -126,7 +125,7 @@ def fmt_str(draw, types="bdoxXn"):
             skip_0_padding = False
 
     # sign character
-    res += draw(sampled_from([""] + list("-+ ")))
+    res += draw(sampled_from(["", *list("-+ ")]))
 
     # alternate mode
     res += draw(sampled_from(["", "#"]))
@@ -142,7 +141,7 @@ def fmt_str(draw, types="bdoxXn"):
     res += draw(sampled_from([""]*7 + list(map(str, range(1, 40)))))
 
     # grouping character (thousand_separators)
-    gchar = draw(sampled_from([""] + list(",_")))
+    gchar = draw(sampled_from(["", "_"]))
     if (gchar and not skip_thousand_separators
             and not (gchar == "," and type in ["b", "o", "x", "X"])
             and type != "n"):

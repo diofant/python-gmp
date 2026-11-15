@@ -4,14 +4,12 @@
 /* For GraalVM: unicodeobject.h, implicit conversion changes
    signedness: 'enum PyUnicode_Kind' to 'int' */
 #if defined(__GNUC__) || defined(__clang__)
-#  pragma GCC diagnostic push /* XXX: oracle/graalpython#580 */
+#  pragma GCC diagnostic push /* oracle/graalpython#580 */
 #  pragma GCC diagnostic ignored "-Wsign-conversion"
 #endif
 
-#include "pythoncapi_compat.h"
-
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
+#include "pythoncapi_compat.h"
 
 #if defined(__GNUC__) || defined(__clang__)
 #  pragma GCC diagnostic pop
@@ -33,7 +31,5 @@ typedef struct gmp_pyargs {
 int gmp_parse_pyargs(const gmp_pyargs *fnargs, Py_ssize_t argidx[],
                      PyObject *const *args, Py_ssize_t nargs,
                      PyObject *kwnames);
-
-PyObject * gmp_PyUnicode_TransformDecimalAndSpaceToASCII(PyObject *unicode);
 
 #endif /* UTILS_H */

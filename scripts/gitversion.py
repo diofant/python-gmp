@@ -12,7 +12,7 @@ def git_version():
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
                          cwd=os.path.dirname(__file__))
-    out, err = p.communicate()
+    out, _ = p.communicate()
     if p.returncode:
         raise RuntimeError("Non-zero return code from git-describe: "
                            f"{p.returncode}")
