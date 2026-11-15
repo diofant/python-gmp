@@ -156,9 +156,6 @@ MPZ_from_str(PyObject *obj, int base)
     return res;
 }
 
-static zz_err zz_set_bytes(const unsigned char *buffer, size_t length,
-                           bool is_signed, zz_t *u);
-
 Py_LOCAL(MPZ_Object *)
 MPZ_from_int(PyObject *obj)
 {
@@ -232,9 +229,7 @@ free:
           && !defined(Py_LIMITED_API) */
 }
 
-static zz_err zz_get_bytes(const zz_t *u, size_t length,
-                           bool is_signed, unsigned char **buffer);
-static void revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r);
+Py_LOCAL(void) revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r);
 
 Py_LOCAL(PyObject *)
 MPZ_to_int(MPZ_Object *u)
