@@ -156,52 +156,37 @@ MPZ_from_str(PyObject *obj, int base)
     return res;
 }
 
+static zz_layout native_layout;
+
+#if defined(__MINGW32__) && defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wconversion"
+#endif
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+#include <gmp.h>
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif
+#if defined(__MINGW32__) && defined(__GNUC__)
+#  pragma GCC diagnostic pop
+#endif
+
+Py_LOCAL_INLINE(int64_t) PyLong_AsInt64AndOverflow(PyObject *obj, int *error);
+
 Py_LOCAL(MPZ_Object *)
 MPZ_from_int(PyObject *obj)
 {
-#if defined(ON_CPYTHON) && !defined(Py_LIMITED_API)
-    PyLongExport long_export = {0, 0, 0, 0, 0};
-    const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
-    MPZ_Object *res = NULL;
+    int error;
+    int64_t value = PyLong_AsInt64AndOverflow(obj, &error);
 
-    if (PyLong_Export(obj, &long_export) < 0) {
-        return res; /* LCOV_EXCL_LINE */
-    }
-    if (long_export.digits) {
-        res = MPZ_new();
-        if (!res) {
-            return NULL; /* LCOV_EXCL_LINE */
-        }
-
-        zz_err ret = zz_import((size_t)long_export.ndigits,
-                               long_export.digits, *int_layout, &res->z);
-
-        if (ret) {
-            /* LCOV_EXCL_START */
-            if (ret == ZZ_MEM) {
-                return (MPZ_Object *)PyErr_NoMemory();
-            }
-            PyErr_SetString(PyExc_OverflowError,
-                            "too many digits in integer");
+    if (!error) {
+        if (value == -1 && PyErr_Occurred()) {
             return NULL;
-            /* LCOV_EXCL_STOP */
         }
-        if (long_export.negative) {
-            (void)zz_neg(&res->z, &res->z);
-        }
-        PyLong_FreeExport(&long_export);
-    }
-    else {
-        res = MPZ_new();
-        if (res && zz_set(long_export.value, &res->z)) {
-            PyErr_NoMemory(); /* LCOV_EXCL_LINE */
-        }
-    }
-    return res;
-#else
-    int64_t value;
 
-    if (!PyLong_AsInt64(obj, &value)) {
         MPZ_Object *res = MPZ_new();
 
         if (res && zz_set(value, &res->z)) {
@@ -209,8 +194,69 @@ MPZ_from_int(PyObject *obj)
         }
         return res;
     }
-    PyErr_Clear();
 
+#if defined(ON_CPYTHON) && PY_VERSION_HEX > 0x030D00A0 \
+        && !defined(Py_LIMITED_API)
+    Py_ssize_t expected = PyLong_AsNativeBytes(obj, NULL, 0,
+                                               Py_ASNATIVEBYTES_LITTLE_ENDIAN);
+
+    if (expected < 0) {
+        return NULL; /* LCOV_EXCL_LINE */
+    }
+
+    Py_ssize_t len = (8*expected + bits_per_digit - 1)/bits_per_digit;
+    unsigned char *buf = malloc((size_t)len*8);
+
+    if (!buf) {
+        return (MPZ_Object *)PyErr_NoMemory(); /* LCOV_EXCL_LINE */
+    }
+
+    expected = PyLong_AsNativeBytes(obj, buf, len*8,
+                                    Py_ASNATIVEBYTES_LITTLE_ENDIAN);
+    if (expected < 0) {
+free:
+        /* LCOV_EXCL_START */
+        free(buf);
+        return NULL;
+        /* LCOV_EXCL_STOP */
+    }
+
+    MPZ_Object *res = MPZ_new();
+
+    if (!res) {
+        goto free; /* LCOV_EXCL_LINE */
+    }
+
+    zz_err ret = zz_import((size_t)len, buf, native_layout, &res->z);
+
+    free(buf);
+    if (ret) {
+        /* LCOV_EXCL_START */
+        if (ret == ZZ_MEM) {
+            return (MPZ_Object *)PyErr_NoMemory();
+        }
+        PyErr_SetString(PyExc_OverflowError,
+                        "too many digits in integer");
+        return NULL;
+        /* LCOV_EXCL_STOP */
+    }
+    if (PyLong_IsNegative(obj)) {
+#define SIGN_EXT(x) (-(uint64_t)((int64_t)(x) < 0))
+        zz_size_t n = res->z.size;
+        uint64_t csign = SIGN_EXT(res->z.digits[n - 1]);
+
+        while (n > 0 && res->z.digits[n - 1] == csign) {
+            n--;
+        }
+        res->z.size = n;
+        if (!mpn_neg(res->z.digits, res->z.digits, res->z.size)) {
+            res->z.digits[n] = 1;
+            res->z.size++;
+        }
+        res->z.negative = true;
+    }
+    return res;
+#else
     PyObject *str = PyNumber_ToBase(obj, 16);
 
     if (!str) {
@@ -221,8 +267,11 @@ MPZ_from_int(PyObject *obj)
 
     Py_DECREF(str);
     return res;
-#endif /* defined(ON_CPYTHON) && !defined(Py_LIMITED_API) */
+#endif /* defined(ON_CPYTHON) && PY_VERSION_HEX > 0x030D00A0
+          && !defined(Py_LIMITED_API) */
 }
+
+Py_LOCAL(void) revstr(unsigned char *s, Py_ssize_t l, Py_ssize_t r);
 
 Py_LOCAL(PyObject *)
 MPZ_to_int(MPZ_Object *u)
@@ -233,19 +282,24 @@ MPZ_to_int(MPZ_Object *u)
         return PyLong_FromInt64(value);
     }
 
-#if defined(ON_CPYTHON) && !defined(Py_LIMITED_API)
-    const zz_layout *int_layout = (zz_layout *)PyLong_GetNativeLayout();
-    size_t size = (zz_bitlen(&u->z) + int_layout->bits_per_digit
-                   - 1)/int_layout->bits_per_digit;
-    void *digits;
-    PyLongWriter *writer = PyLongWriter_Create(zz_isneg(&u->z),
-                                               (Py_ssize_t)size, &digits);
+#if defined(ON_CPYTHON) && PY_VERSION_HEX > 0x030D00A0 \
+        && !defined(Py_LIMITED_API)
+    size_t size = (size_t)u->z.size;
+    unsigned char *buf = malloc(8*size);
 
-    if (!writer) {
-        return NULL; /* LCOV_EXCL_LINE */
+    if (!buf) {
+        return PyErr_NoMemory(); /* LCOV_EXCL_LINE */
     }
-    (void)zz_export(&u->z, *int_layout, size, digits);
-    return PyLongWriter_Finish(writer);
+    (void)zz_export(&u->z, native_layout, size, buf);
+
+    PyObject *res = PyLong_FromUnsignedNativeBytes(buf, 8*size,
+                                                   Py_ASNATIVEBYTES_LITTLE_ENDIAN);
+
+    free(buf);
+    if (res && zz_isneg(&u->z)) {
+        Py_SETREF(res, PyNumber_Negative(res));
+    }
+    return res;
 #else
     size_t len;
 
@@ -265,7 +319,8 @@ MPZ_to_int(MPZ_Object *u)
 
     free(buf);
     return res;
-#endif /* defined(ON_CPYTHON) && !defined(Py_LIMITED_API) */
+#endif /* defined(ON_CPYTHON) && PY_VERSION_HEX > 0x030D00A0
+          && !defined(Py_LIMITED_API) */
 }
 
 Py_LOCAL(void)
@@ -2782,6 +2837,8 @@ gmp_exec(PyObject *module)
     const zz_layout *layout = zz_get_layout();
 
     bits_per_digit = layout->bits_per_digit;
+    memcpy(&native_layout, layout, sizeof(zz_layout));
+    native_layout.digit_endianness = -1;
     Py_DECREF(MPZ_InfoType);
     if (mpz_info == NULL) {
         return -1; /* LCOV_EXCL_LINE */
